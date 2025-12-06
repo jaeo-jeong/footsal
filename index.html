@@ -297,32 +297,50 @@
         }
 
         .tier-list {
-            display: flex;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            flex-wrap: wrap;
         }
 
         .tier-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 15px 20px;
             background: white;
             border-radius: 8px;
             border: 2px solid #e9ecef;
-            min-width: 80px;
+            padding: 15px;
+        }
+
+        .tier-item-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
         }
 
         .tier-item-label {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: 700;
         }
 
-        .tier-item-weight {
+        .tier-item-count {
             font-size: 0.9em;
             color: #666;
+            margin-left: auto;
+        }
+
+        .tier-item-players {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tier-player-name {
+            padding: 5px 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 0.9em;
+            color: #333;
         }
 
         @media (max-width: 768px) {
@@ -342,32 +360,7 @@
 
         <div class="tier-table">
             <div class="tier-table-title">티어 표</div>
-            <div class="tier-list">
-                <div class="tier-item">
-                    <span class="tier-badge tier-S tier-item-label">S</span>
-                    <span class="tier-item-weight">가중치: 6</span>
-                </div>
-                <div class="tier-item">
-                    <span class="tier-badge tier-Aplus tier-item-label">A+</span>
-                    <span class="tier-item-weight">가중치: 5</span>
-                </div>
-                <div class="tier-item">
-                    <span class="tier-badge tier-A tier-item-label">A</span>
-                    <span class="tier-item-weight">가중치: 4</span>
-                </div>
-                <div class="tier-item">
-                    <span class="tier-badge tier-B tier-item-label">B</span>
-                    <span class="tier-item-weight">가중치: 3</span>
-                </div>
-                <div class="tier-item">
-                    <span class="tier-badge tier-C tier-item-label">C</span>
-                    <span class="tier-item-weight">가중치: 2</span>
-                </div>
-                <div class="tier-item">
-                    <span class="tier-badge tier-D tier-item-label">D</span>
-                    <span class="tier-item-weight">가중치: 1</span>
-                </div>
-            </div>
+            <div class="tier-list" id="tierList"></div>
         </div>
 
         <div class="section">
@@ -521,6 +514,39 @@
                 `;
                 grid.appendChild(card);
             });
+            
+            // 티어표도 업데이트
+            renderTierTable();
+        }
+
+        // 티어표 렌더링
+        function renderTierTable() {
+            const tierList = document.getElementById('tierList');
+            tierList.innerHTML = '';
+
+            // 티어 순서
+            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            
+            tierOrder.forEach(tier => {
+                const tierPlayers = players.filter(p => p.tier === tier);
+                
+                const tierItem = document.createElement('div');
+                tierItem.className = 'tier-item';
+                
+                tierItem.innerHTML = `
+                    <div class="tier-item-header">
+                        <span class="tier-badge tier-${tier.replace('+', 'plus')} tier-item-label">${tier}</span>
+                        <span class="tier-item-count">${tierPlayers.length}명</span>
+                    </div>
+                    <div class="tier-item-players">
+                        ${tierPlayers.length > 0 
+                            ? tierPlayers.map(p => `<span class="tier-player-name">${p.name}</span>`).join('')
+                            : '<span class="tier-player-name" style="color: #999;">선수 없음</span>'
+                        }
+                    </div>
+                `;
+                tierList.appendChild(tierItem);
+            });
         }
 
         // 선수 추가
@@ -549,6 +575,7 @@
         function updatePlayer(index, field, value) {
             players[index][field] = value;
             savePlayers(); // 저장
+            renderTierTable(); // 티어표 업데이트
         }
 
         // 선수 삭제
@@ -873,6 +900,7 @@
 
         // 초기 렌더링
         renderPlayers();
+        renderTierTable();
     </script>
 </body>
 </html>
