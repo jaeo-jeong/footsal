@@ -311,7 +311,6 @@
 <body>
     <div class="container">
         <h1>⚽ 젓자FC 팀 짜기</h1>
-        <p class="subtitle">밸런스 있는 팀 구성 도구</p>
 
         <div class="section">
             <h2 class="section-title">선수 관리</h2>
@@ -375,8 +374,11 @@
             'D': 1
         };
 
-        // 초기 선수 데이터
-        let players = [
+        // localStorage 키
+        const STORAGE_KEY = 'jeotjaFcPlayers';
+
+        // 기본 선수 데이터
+        const defaultPlayers = [
             { name: '정재오', tier: 'B', position: '멀티' },
             { name: '강신재', tier: 'B', position: '멀티' },
             { name: '장건호', tier: 'B', position: '멀티' },
@@ -405,6 +407,33 @@
             { name: '정우진', tier: 'B', position: '멀티' },
             { name: '전근우', tier: 'B', position: '멀티' }
         ];
+
+        // 선수 데이터 로드 (localStorage에서 불러오기)
+        function loadPlayers() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    // 저장된 데이터가 있으면 사용, 없으면 기본 데이터 사용
+                    return parsed.length > 0 ? parsed : defaultPlayers;
+                }
+            } catch (e) {
+                console.error('데이터 로드 실패:', e);
+            }
+            return defaultPlayers;
+        }
+
+        // 선수 데이터 저장 (localStorage에 저장)
+        function savePlayers() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+            } catch (e) {
+                console.error('데이터 저장 실패:', e);
+            }
+        }
+
+        // 선수 데이터 초기화
+        let players = loadPlayers();
 
         // 선수 목록 렌더링
         function renderPlayers() {
@@ -461,18 +490,21 @@
 
             players.push({ name, tier, position });
             document.getElementById('newPlayerName').value = '';
+            savePlayers(); // 저장
             renderPlayers();
         }
 
         // 선수 정보 업데이트
         function updatePlayer(index, field, value) {
             players[index][field] = value;
+            savePlayers(); // 저장
         }
 
         // 선수 삭제
         function deletePlayer(index) {
             if (confirm(`${players[index].name} 선수를 삭제하시겠습니까?`)) {
                 players.splice(index, 1);
+                savePlayers(); // 저장
                 renderPlayers();
             }
         }
