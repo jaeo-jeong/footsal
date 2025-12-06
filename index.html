@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>젓자FC 팀 짜기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .team-size-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .team-size-selector label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .team-size-selector select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .player-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+
+        .player-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .player-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .player-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .field-group label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .field-group select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95em;
+        }
+
+        .delete-btn {
+            margin-top: 10px;
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .add-player-form {
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .teams-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .team {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+        }
+
+        .team-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .team-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .team-players {
+            list-style: none;
+        }
+
+        .team-player {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-tier {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .player-position {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-top: 3px;
+        }
+
+        .tier-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .tier-S { background: #ff6b6b; }
+        .tier-Aplus { background: #ffa500; }
+        .tier-A { background: #ffd93d; }
+        .tier-B { background: #6bcf7f; }
+        .tier-C { background: #4ecdc4; }
+        .tier-D { background: #95a5a6; }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .players-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚽ 젓자FC 팀 짜기</h1>
+        <p class="subtitle">밸런스 있는 팀 구성 도구</p>
+
+        <div class="section">
+            <h2 class="section-title">선수 관리</h2>
+            
+            <div class="add-player-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>이름</label>
+                        <input type="text" id="newPlayerName" placeholder="선수 이름">
+                    </div>
+                    <div class="form-group">
+                        <label>티어</label>
+                        <select id="newPlayerTier">
+                            <option value="S">S</option>
+                            <option value="A+">A+</option>
+                            <option value="A">A</option>
+                            <option value="B" selected>B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>포지션</label>
+                        <select id="newPlayerPosition">
+                            <option value="공격">공격</option>
+                            <option value="수비">수비</option>
+                            <option value="멀티" selected>멀티</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="addPlayer()">추가</button>
+                </div>
+            </div>
+
+            <div class="players-grid" id="playersGrid"></div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">팀 구성</h2>
+            <div class="controls">
+                <div class="team-size-selector">
+                    <label>팀 인원:</label>
+                    <select id="teamSize">
+                        <option value="5">5명</option>
+                        <option value="6" selected>6명</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="generateTeams()">팀 구성하기</button>
+            </div>
+            <div class="teams-container" id="teamsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // 티어 가중치 (높을수록 강함)
+        const tierWeights = {
+            'S': 6,
+            'A+': 5,
+            'A': 4,
+            'B': 3,
+            'C': 2,
+            'D': 1
+        };
+
+        // 초기 선수 데이터
+        let players = [
+            { name: '정재오', tier: 'B', position: '멀티' },
+            { name: '강신재', tier: 'B', position: '멀티' },
+            { name: '장건호', tier: 'B', position: '멀티' },
+            { name: '김관영', tier: 'B', position: '멀티' },
+            { name: '김상욱', tier: 'B', position: '멀티' },
+            { name: '김승현', tier: 'B', position: '멀티' },
+            { name: '김태연', tier: 'B', position: '멀티' },
+            { name: '김동현', tier: 'B', position: '멀티' },
+            { name: '문용혁', tier: 'B', position: '멀티' },
+            { name: '문찬우', tier: 'B', position: '멀티' },
+            { name: '문태영', tier: 'B', position: '멀티' },
+            { name: '박찬영', tier: 'B', position: '멀티' },
+            { name: '박찬혁', tier: 'B', position: '멀티' },
+            { name: '배기정', tier: 'B', position: '멀티' },
+            { name: '하상우', tier: 'B', position: '멀티' },
+            { name: '김성호', tier: 'B', position: '멀티' },
+            { name: '신현우', tier: 'B', position: '멀티' },
+            { name: '옥준혁', tier: 'B', position: '멀티' },
+            { name: '우승훈', tier: 'B', position: '멀티' },
+            { name: '이도경', tier: 'B', position: '멀티' },
+            { name: '이신원', tier: 'B', position: '멀티' },
+            { name: '이준순', tier: 'B', position: '멀티' },
+            { name: '이창준', tier: 'B', position: '멀티' },
+            { name: '장재혁', tier: 'B', position: '멀티' },
+            { name: '정기헌', tier: 'B', position: '멀티' },
+            { name: '정우진', tier: 'B', position: '멀티' },
+            { name: '전근우', tier: 'B', position: '멀티' }
+        ];
+
+        // 선수 목록 렌더링
+        function renderPlayers() {
+            const grid = document.getElementById('playersGrid');
+            grid.innerHTML = '';
+
+            players.forEach((player, index) => {
+                const card = document.createElement('div');
+                card.className = 'player-card';
+                card.innerHTML = `
+                    <div class="player-name">${player.name}</div>
+                    <div class="player-fields">
+                        <div class="field-group">
+                            <label>티어</label>
+                            <select onchange="updatePlayer(${index}, 'tier', this.value)">
+                                <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
+                                <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
+                                <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
+                                <option value="B" ${player.tier === 'B' ? 'selected' : ''}>B</option>
+                                <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
+                                <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label>포지션</label>
+                            <select onchange="updatePlayer(${index}, 'position', this.value)">
+                                <option value="공격" ${player.position === '공격' ? 'selected' : ''}>공격</option>
+                                <option value="수비" ${player.position === '수비' ? 'selected' : ''}>수비</option>
+                                <option value="멀티" ${player.position === '멀티' ? 'selected' : ''}>멀티</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-danger delete-btn" onclick="deletePlayer(${index})">삭제</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // 선수 추가
+        function addPlayer() {
+            const name = document.getElementById('newPlayerName').value.trim();
+            const tier = document.getElementById('newPlayerTier').value;
+            const position = document.getElementById('newPlayerPosition').value;
+
+            if (!name) {
+                alert('이름을 입력해주세요.');
+                return;
+            }
+
+            if (players.some(p => p.name === name)) {
+                alert('이미 존재하는 선수입니다.');
+                return;
+            }
+
+            players.push({ name, tier, position });
+            document.getElementById('newPlayerName').value = '';
+            renderPlayers();
+        }
+
+        // 선수 정보 업데이트
+        function updatePlayer(index, field, value) {
+            players[index][field] = value;
+        }
+
+        // 선수 삭제
+        function deletePlayer(index) {
+            if (confirm(`${players[index].name} 선수를 삭제하시겠습니까?`)) {
+                players.splice(index, 1);
+                renderPlayers();
+            }
+        }
+
+        // 팀 구성 생성
+        function generateTeams() {
+            const teamSize = parseInt(document.getElementById('teamSize').value);
+            
+            if (players.length < teamSize * 2) {
+                alert(`최소 ${teamSize * 2}명의 선수가 필요합니다.`);
+                return;
+            }
+
+            // 포지션별로 분류
+            const attackers = players.filter(p => p.position === '공격');
+            const defenders = players.filter(p => p.position === '수비');
+            const multis = players.filter(p => p.position === '멀티');
+
+            // 각 팀에 필요한 포지션 수
+            const neededAttackers = 2;
+            const neededDefenders = teamSize - neededAttackers;
+
+            // 최적 팀 찾기 (최대 200번 시도)
+            let bestTeams = null;
+            let bestDiff = Infinity;
+
+            for (let attempt = 0; attempt < 200; attempt++) {
+                const teams = createBalancedTeams(teamSize, neededAttackers, neededDefenders, attackers, defenders, multis);
+                if (teams) {
+                    const diff = calculateTeamDifference(teams);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        bestTeams = teams;
+                        // 완벽한 밸런스면 중단
+                        if (diff === 0) break;
+                    }
+                }
+            }
+
+            if (!bestTeams) {
+                alert('팀 구성을 실패했습니다. 선수 수나 포지션 구성을 확인해주세요.');
+                return;
+            }
+
+            renderTeams(bestTeams);
+        }
+
+        // 밸런스 있는 팀 생성
+        function createBalancedTeams(teamSize, neededAttackers, neededDefenders, attackers, defenders, multis) {
+            const teams = [[], []];
+            const used = new Set();
+            
+            // 선수들을 랜덤하게 섞기
+            const shuffledAttackers = [...attackers].sort(() => Math.random() - 0.5);
+            const shuffledDefenders = [...defenders].sort(() => Math.random() - 0.5);
+            const shuffledMultis = [...multis].sort(() => Math.random() - 0.5);
+
+            // 각 팀에 공격수 배정 (공격 포지션 우선, 부족하면 멀티 사용)
+            for (let teamIdx = 0; teamIdx < 2; teamIdx++) {
+                let assignedAttackers = 0;
+                
+                // 공격 포지션 선수 먼저 배정
+                for (const player of shuffledAttackers) {
+                    if (assignedAttackers >= neededAttackers) break;
+                    if (!used.has(player.name)) {
+                        teams[teamIdx].push(player);
+                        used.add(player.name);
+                        assignedAttackers++;
+                    }
+                }
+                
+                // 부족하면 멀티 선수 사용
+                for (const player of shuffledMultis) {
+                    if (assignedAttackers >= neededAttackers) break;
+                    if (!used.has(player.name)) {
+                        teams[teamIdx].push(player);
+                        used.add(player.name);
+                        assignedAttackers++;
+                    }
+                }
+            }
+
+            // 각 팀에 수비수 배정 (수비 포지션 우선, 부족하면 멀티 사용)
+            for (let teamIdx = 0; teamIdx < 2; teamIdx++) {
+                let currentDefenders = teams[teamIdx].filter(p => p.position === '수비').length;
+                let needed = neededDefenders - currentDefenders;
+                
+                // 수비 포지션 선수 먼저 배정
+                for (const player of shuffledDefenders) {
+                    if (needed <= 0) break;
+                    if (!used.has(player.name)) {
+                        teams[teamIdx].push(player);
+                        used.add(player.name);
+                        needed--;
+                    }
+                }
+                
+                // 부족하면 멀티 선수 사용
+                for (const player of shuffledMultis) {
+                    if (needed <= 0) break;
+                    if (!used.has(player.name)) {
+                        teams[teamIdx].push(player);
+                        used.add(player.name);
+                        needed--;
+                    }
+                }
+            }
+
+            // 팀 크기 확인
+            if (teams[0].length !== teamSize || teams[1].length !== teamSize) {
+                return null;
+            }
+
+            // 포지션 확인
+            for (let i = 0; i < 2; i++) {
+                const teamAttackers = teams[i].filter(p => 
+                    p.position === '공격' || 
+                    (p.position === '멀티' && teams[i].indexOf(p) < neededAttackers)
+                ).length;
+                
+                if (teamAttackers < neededAttackers) {
+                    return null;
+                }
+            }
+
+            // 티어 밸런스 최적화 (선수 교체 시도)
+            optimizeTierBalance(teams, neededAttackers, neededDefenders);
+
+            return teams;
+        }
+
+        // 티어 밸런스 최적화
+        function optimizeTierBalance(teams, neededAttackers, neededDefenders) {
+            function getTeamTierSum(team) {
+                return team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+            }
+
+            // 여러 번 시도하여 밸런스 개선
+            for (let iteration = 0; iteration < 50; iteration++) {
+                const sum0 = getTeamTierSum(teams[0]);
+                const sum1 = getTeamTierSum(teams[1]);
+                const diff = Math.abs(sum0 - sum1);
+                
+                if (diff <= 1) break; // 충분히 밸런스가 맞으면 중단
+                
+                // 더 무거운 팀에서 가벼운 팀으로 선수 교체 시도
+                const heavyTeam = sum0 > sum1 ? 0 : 1;
+                const lightTeam = sum0 > sum1 ? 1 : 0;
+                
+                // 같은 포지션 그룹 내에서 교체 가능한 선수 찾기
+                const heavyAttackers = teams[heavyTeam].slice(0, neededAttackers);
+                const lightAttackers = teams[lightTeam].slice(0, neededAttackers);
+                const heavyDefenders = teams[heavyTeam].slice(neededAttackers);
+                const lightDefenders = teams[lightTeam].slice(neededAttackers);
+                
+                // 공격수 교체 시도
+                for (const hPlayer of heavyAttackers) {
+                    for (const lPlayer of lightAttackers) {
+                        if (tierWeights[hPlayer.tier] > tierWeights[lPlayer.tier]) {
+                            const newSum0 = getTeamTierSum(teams[0]) - tierWeights[hPlayer.tier] + tierWeights[lPlayer.tier];
+                            const newSum1 = getTeamTierSum(teams[1]) - tierWeights[lPlayer.tier] + tierWeights[hPlayer.tier];
+                            const newDiff = Math.abs(newSum0 - newSum1);
+                            
+                            if (newDiff < diff) {
+                                // 교체
+                                const hIdx = teams[heavyTeam].indexOf(hPlayer);
+                                const lIdx = teams[lightTeam].indexOf(lPlayer);
+                                teams[heavyTeam][hIdx] = lPlayer;
+                                teams[lightTeam][lIdx] = hPlayer;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // 수비수 교체 시도
+                for (const hPlayer of heavyDefenders) {
+                    for (const lPlayer of lightDefenders) {
+                        if (tierWeights[hPlayer.tier] > tierWeights[lPlayer.tier]) {
+                            const newSum0 = getTeamTierSum(teams[0]) - tierWeights[hPlayer.tier] + tierWeights[lPlayer.tier];
+                            const newSum1 = getTeamTierSum(teams[1]) - tierWeights[lPlayer.tier] + tierWeights[hPlayer.tier];
+                            const newDiff = Math.abs(newSum0 - newSum1);
+                            
+                            if (newDiff < diff) {
+                                // 교체
+                                const hIdx = teams[heavyTeam].indexOf(hPlayer);
+                                const lIdx = teams[lightTeam].indexOf(lPlayer);
+                                teams[heavyTeam][hIdx] = lPlayer;
+                                teams[lightTeam][lIdx] = hPlayer;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 팀 간 티어 차이 계산
+        function calculateTeamDifference(teams) {
+            const sum0 = teams[0].reduce((sum, p) => sum + tierWeights[p.tier], 0);
+            const sum1 = teams[1].reduce((sum, p) => sum + tierWeights[p.tier], 0);
+            return Math.abs(sum0 - sum1);
+        }
+
+        // 팀 렌더링
+        function renderTeams(teams) {
+            const container = document.getElementById('teamsContainer');
+            container.innerHTML = '';
+
+            const teamSize = parseInt(document.getElementById('teamSize').value);
+            const neededAttackers = 2;
+
+            teams.forEach((team, index) => {
+                const teamDiv = document.createElement('div');
+                teamDiv.className = 'team';
+                
+                const tierSum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                
+                // 실제 배정된 포지션 계산
+                const actualAttackers = team.slice(0, neededAttackers);
+                const actualDefenders = team.slice(neededAttackers);
+                
+                // 포지션 표시용 함수
+                function getDisplayPosition(player, isInAttackGroup) {
+                    if (player.position === '멀티') {
+                        return isInAttackGroup ? '공격(멀티)' : '수비(멀티)';
+                    }
+                    return player.position;
+                }
+
+                teamDiv.innerHTML = `
+                    <div class="team-title">팀 ${index + 1}</div>
+                    <div class="team-stats">
+                        <div>티어 합: ${tierSum}</div>
+                        <div>공격: ${actualAttackers.length}명</div>
+                        <div>수비: ${actualDefenders.length}명</div>
+                    </div>
+                    <ul class="team-players">
+                        ${actualAttackers.map(player => `
+                            <li class="team-player">
+                                <div class="player-info">
+                                    <div>${player.name} <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span></div>
+                                    <div class="player-position">${getDisplayPosition(player, true)}</div>
+                                </div>
+                            </li>
+                        `).join('')}
+                        ${actualDefenders.map(player => `
+                            <li class="team-player">
+                                <div class="player-info">
+                                    <div>${player.name} <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span></div>
+                                    <div class="player-position">${getDisplayPosition(player, false)}</div>
+                                </div>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+                container.appendChild(teamDiv);
+            });
+        }
+
+        // 초기 렌더링
+        renderPlayers();
+    </script>
+</body>
+</html>
