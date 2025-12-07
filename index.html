@@ -732,17 +732,25 @@
             const teamSizes = getTeamSizes(totalPlayers);
             const numTeams = teamSizes.length;
             
-            // 선택된 선수들만 포지션별로 분류
-            const attackers = selectedPlayersList.filter(p => p.position === '공격');
-            const defenders = selectedPlayersList.filter(p => p.position === '수비');
-            const multis = selectedPlayersList.filter(p => p.position === '멀티');
+            // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
+            const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
+            
+            // 섞인 선수들을 포지션별로 분류
+            const attackers = shuffledList.filter(p => p.position === '공격');
+            const defenders = shuffledList.filter(p => p.position === '수비');
+            const multis = shuffledList.filter(p => p.position === '멀티');
 
-            // 최적 팀 찾기 (최대 200번 시도)
+            // 최적 팀 찾기 (최대 200번 시도, 매번 새로운 랜덤 시드)
             let bestTeams = null;
             let bestDiff = Infinity;
 
             for (let attempt = 0; attempt < 200; attempt++) {
-                const teams = createBalancedTeams(teamSizes, attackers, defenders, multis);
+                // 매 시도마다 선수 목록을 다시 섞기
+                const reShuffledAttackers = [...attackers].sort(() => Math.random() - 0.5);
+                const reShuffledDefenders = [...defenders].sort(() => Math.random() - 0.5);
+                const reShuffledMultis = [...multis].sort(() => Math.random() - 0.5);
+                
+                const teams = createBalancedTeams(teamSizes, reShuffledAttackers, reShuffledDefenders, reShuffledMultis);
                 if (teams) {
                     const diff = calculateTeamDifference(teams);
                     if (diff < bestDiff) {
