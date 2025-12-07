@@ -529,6 +529,7 @@
                                 <option value="멀티" ${player.position === '멀티' ? 'selected' : ''}>멀티</option>
                             </select>
                         </div>
+                        <button class="btn btn-danger delete-btn" onclick="deletePlayer(${index})">삭제</button>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -621,7 +622,17 @@
             renderTierTable(); // 티어표 업데이트
         }
 
-        // 선수 삭제 기능 제거 (추가된 선수는 삭제 불가)
+        // 선수 삭제
+        function deletePlayer(index) {
+            const playerName = players[index].name;
+            if (confirm(`${playerName} 선수를 삭제하시겠습니까?`)) {
+                // 선택 목록에서도 제거
+                selectedPlayers.delete(playerName);
+                players.splice(index, 1);
+                savePlayers(); // 저장
+                renderPlayers();
+            }
+        }
 
         // 총 인원에 따른 팀 구성 규칙
         function getTeamSizes(totalPlayers) {
