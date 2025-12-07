@@ -135,6 +135,15 @@
             font-weight: 600;
             margin-bottom: 10px;
             color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
         }
 
         .player-fields {
@@ -401,6 +410,8 @@
         <div class="section">
             <h2 class="section-title">팀 구성</h2>
             <div class="controls">
+                <button class="btn btn-secondary" onclick="selectAllPlayers()">전체 선택</button>
+                <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
                 <button class="btn btn-primary" onclick="generateTeams()">팀 구성하기</button>
             </div>
             <div class="teams-container" id="teamsContainer"></div>
@@ -478,6 +489,9 @@
 
         // 선수 데이터 초기화
         let players = loadPlayers();
+        
+        // 선택된 선수 추적 (선수 이름을 키로 사용)
+        let selectedPlayers = new Set();
 
         // 선수 목록 렌더링
         function renderPlayers() {
@@ -487,8 +501,14 @@
             players.forEach((player, index) => {
                 const card = document.createElement('div');
                 card.className = 'player-card';
+                const isSelected = selectedPlayers.has(player.name);
                 card.innerHTML = `
-                    <div class="player-name">${player.name}</div>
+                    <div class="player-name">
+                        <input type="checkbox" class="player-checkbox" 
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="togglePlayerSelection('${player.name}', this.checked)">
+                        ${player.name}
+                    </div>
                     <div class="player-fields">
                         <div class="field-group">
                             <label>티어</label>
@@ -509,7 +529,6 @@
                                 <option value="멀티" ${player.position === '멀티' ? 'selected' : ''}>멀티</option>
                             </select>
                         </div>
-                        <button class="btn btn-danger delete-btn" onclick="deletePlayer(${index})">삭제</button>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -517,6 +536,29 @@
             
             // 티어표도 업데이트
             renderTierTable();
+        }
+
+        // 선수 선택 토글
+        function togglePlayerSelection(playerName, isChecked) {
+            if (isChecked) {
+                selectedPlayers.add(playerName);
+            } else {
+                selectedPlayers.delete(playerName);
+            }
+        }
+
+        // 전체 선택
+        function selectAllPlayers() {
+            players.forEach(player => {
+                selectedPlayers.add(player.name);
+            });
+            renderPlayers();
+        }
+
+        // 전체 해제
+        function deselectAllPlayers() {
+            selectedPlayers.clear();
+            renderPlayers();
         }
 
         // 티어표 렌더링
@@ -566,6 +608,7 @@
             }
 
             players.push({ name, tier, position });
+            // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
             document.getElementById('newPlayerName').value = '';
             savePlayers(); // 저장
             renderPlayers();
@@ -578,14 +621,7 @@
             renderTierTable(); // 티어표 업데이트
         }
 
-        // 선수 삭제
-        function deletePlayer(index) {
-            if (confirm(`${players[index].name} 선수를 삭제하시겠습니까?`)) {
-                players.splice(index, 1);
-                savePlayers(); // 저장
-                renderPlayers();
-            }
-        }
+        // 선수 삭제 기능 제거 (추가된 선수는 삭제 불가)
 
         // 총 인원에 따른 팀 구성 규칙
         function getTeamSizes(totalPlayers) {
@@ -641,10 +677,12 @@
 
         // 팀 구성 생성
         function generateTeams() {
-            const totalPlayers = players.length;
+            // 선택된 선수들만 필터링
+            const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
+            const totalPlayers = selectedPlayersList.length;
             
             if (totalPlayers < 10) {
-                alert('최소 10명의 선수가 필요합니다.');
+                alert('최소 10명의 선수를 선택해주세요.');
                 return;
             }
 
@@ -657,10 +695,10 @@
             const teamSizes = getTeamSizes(totalPlayers);
             const numTeams = teamSizes.length;
             
-            // 포지션별로 분류
-            const attackers = players.filter(p => p.position === '공격');
-            const defenders = players.filter(p => p.position === '수비');
-            const multis = players.filter(p => p.position === '멀티');
+            // 선택된 선수들만 포지션별로 분류
+            const attackers = selectedPlayersList.filter(p => p.position === '공격');
+            const defenders = selectedPlayersList.filter(p => p.position === '수비');
+            const multis = selectedPlayersList.filter(p => p.position === '멀티');
 
             // 최적 팀 찾기 (최대 200번 시도)
             let bestTeams = null;
