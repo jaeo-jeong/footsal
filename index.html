@@ -599,14 +599,37 @@
                 18: [6, 6, 6],
                 19: [7, 6, 6],
                 20: [7, 7, 6],
-                21: [7, 7, 7]
+                21: [7, 7, 7],
+                // 축구 팀 구성 (22명 이상)
+                22: [11, 11],
+                23: [12, 11],
+                24: [12, 12],
+                25: [13, 12],
+                26: [13, 13],
+                27: [14, 13],
+                28: [14, 14],
+                29: [15, 14],
+                30: [15, 15],
+                31: [16, 15],
+                32: [16, 16]
             };
             
             if (rules[totalPlayers]) {
                 return rules[totalPlayers];
             }
             
-            // 규칙에 없는 경우 기본 처리 (2팀으로 균등 분배)
+            // 32명 초과인 경우 기본 처리 (2팀으로 균등 분배)
+            if (totalPlayers > 32) {
+                const teamSize = Math.floor(totalPlayers / 2);
+                const remainder = totalPlayers % 2;
+                if (remainder === 0) {
+                    return [teamSize, teamSize];
+                } else {
+                    return [teamSize + 1, teamSize];
+                }
+            }
+            
+            // 10-11명인 경우 기본 처리
             const teamSize = Math.floor(totalPlayers / 2);
             const remainder = totalPlayers % 2;
             if (remainder === 0) {
@@ -623,6 +646,11 @@
             if (totalPlayers < 10) {
                 alert('최소 10명의 선수가 필요합니다.');
                 return;
+            }
+
+            // 22명 이상일 때 메시지 표시
+            if (totalPlayers >= 22) {
+                alert('22명 이상부터는 축구 팀으로 구성합니다.');
             }
 
             // 총 인원에 따른 팀 크기 결정
@@ -666,57 +694,95 @@
             const used = new Set();
             const neededAttackers = 2; // 각 팀마다 공격수 2명 필요
             
-            // 선수들을 랜덤하게 섞기
-            const shuffledAttackers = [...attackers].sort(() => Math.random() - 0.5);
-            const shuffledDefenders = [...defenders].sort(() => Math.random() - 0.5);
-            const shuffledMultis = [...multis].sort(() => Math.random() - 0.5);
+            // 티어별로 선수 분류
+            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const criticalTiers = ['S', 'A+', 'D'];
+            
+            // 포지션별로 티어별 분류
+            function groupByTier(playerList) {
+                const grouped = {};
+                tierOrder.forEach(tier => {
+                    grouped[tier] = playerList.filter(p => p.tier === tier);
+                });
+                return grouped;
+            }
+            
+            const attackersByTier = groupByTier(attackers);
+            const defendersByTier = groupByTier(defenders);
+            const multisByTier = groupByTier(multis);
+            
+            // 각 티어별로 라운드 로빈 방식으로 배정
+            let tierRoundRobin = {};
+            tierOrder.forEach(tier => {
+                tierRoundRobin[tier] = 0;
+            });
 
-            // 각 팀에 공격수 배정 (공격 포지션 우선, 부족하면 멀티 사용)
-            for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
-                let assignedAttackers = 0;
-                
-                // 공격 포지션 선수 먼저 배정
-                for (const player of shuffledAttackers) {
-                    if (assignedAttackers >= neededAttackers) break;
-                    if (!used.has(player.name)) {
-                        teams[teamIdx].push(player);
-                        used.add(player.name);
-                        assignedAttackers++;
+            // 각 팀에 공격수 배정 (티어 균등 분배 고려)
+            for (let round = 0; round < neededAttackers; round++) {
+                for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
+                    if (teams[teamIdx].length >= neededAttackers) continue;
+                    
+                    // 티어 순서대로 시도 (S, A+, D는 더 신중하게)
+                    let assigned = false;
+                    for (const tier of tierOrder) {
+                        // 공격 포지션 선수 먼저
+                        const tierAttackers = attackersByTier[tier].filter(p => !used.has(p.name));
+                        if (tierAttackers.length > 0) {
+                            const player = tierAttackers[0];
+                            teams[teamIdx].push(player);
+                            used.add(player.name);
+                            assigned = true;
+                            break;
+                        }
                     }
-                }
-                
-                // 부족하면 멀티 선수 사용
-                for (const player of shuffledMultis) {
-                    if (assignedAttackers >= neededAttackers) break;
-                    if (!used.has(player.name)) {
-                        teams[teamIdx].push(player);
-                        used.add(player.name);
-                        assignedAttackers++;
+                    
+                    // 부족하면 멀티 선수 사용
+                    if (!assigned) {
+                        for (const tier of tierOrder) {
+                            const tierMultis = multisByTier[tier].filter(p => !used.has(p.name));
+                            if (tierMultis.length > 0) {
+                                const player = tierMultis[0];
+                                teams[teamIdx].push(player);
+                                used.add(player.name);
+                                break;
+                            }
+                        }
                     }
                 }
             }
 
-            // 각 팀에 수비수 배정 (수비 포지션 우선, 부족하면 멀티 사용)
+            // 각 팀에 수비수 배정 (티어 균등 분배 고려)
             for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
                 const teamSize = teamSizes[teamIdx];
-                const currentSize = teams[teamIdx].length;
-                const neededDefenders = teamSize - currentSize;
+                const needed = teamSize - teams[teamIdx].length;
                 
-                // 수비 포지션 선수 먼저 배정
-                for (const player of shuffledDefenders) {
-                    if (teams[teamIdx].length >= teamSize) break;
-                    if (!used.has(player.name)) {
-                        teams[teamIdx].push(player);
-                        used.add(player.name);
+                for (let i = 0; i < needed; i++) {
+                    let assigned = false;
+                    
+                    // 티어 순서대로 시도
+                    for (const tier of tierOrder) {
+                        // 수비 포지션 선수 먼저
+                        const tierDefenders = defendersByTier[tier].filter(p => !used.has(p.name));
+                        if (tierDefenders.length > 0) {
+                            const player = tierDefenders[0];
+                            teams[teamIdx].push(player);
+                            used.add(player.name);
+                            assigned = true;
+                            break;
+                        }
                     }
-                }
-                
-                // 부족하면 멀티 선수 사용
-                for (const player of shuffledMultis) {
-                    if (teams[teamIdx].length >= teamSize) break;
-                    if (!used.has(player.name)) {
-                        teams[teamIdx].push(player);
-                        used.add(player.name);
+                    
+                    // 부족하면 멀티 선수 사용
+                    if (!assigned) {
+                        for (const tier of tierOrder) {
+                            const tierMultis = multisByTier[tier].filter(p => !used.has(p.name));
+                            if (tierMultis.length > 0) {
+                                const player = tierMultis[0];
+                                teams[teamIdx].push(player);
+                                used.add(player.name);
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -745,6 +811,69 @@
             return teams;
         }
 
+        // 티어별 분배 개선 (특정 티어가 한 팀에 몰리지 않도록)
+        function improveTierDistribution(teams) {
+            const criticalTiers = ['S', 'A+', 'D'];
+            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            
+            for (let iteration = 0; iteration < 200; iteration++) {
+                let improved = false;
+                
+                // 각 티어별로 확인
+                tierOrder.forEach(tier => {
+                    const tierCounts = teams.map(team => 
+                        team.filter(p => p.tier === tier).length
+                    );
+                    const maxCount = Math.max(...tierCounts);
+                    const minCount = Math.min(...tierCounts);
+                    
+                    // 분배가 불균형하면 개선 시도
+                    if (maxCount - minCount > 1 || (criticalTiers.includes(tier) && maxCount >= 2)) {
+                        // 가장 많은 팀과 가장 적은 팀 찾기
+                        const maxTeamIdx = tierCounts.indexOf(maxCount);
+                        const minTeamIdx = tierCounts.indexOf(minCount);
+                        
+                        // 해당 티어 선수를 찾아서 교체 시도
+                        const maxTeam = teams[maxTeamIdx];
+                        const minTeam = teams[minTeamIdx];
+                        
+                        // 같은 티어가 아닌 선수와 교체
+                        for (let i = 0; i < maxTeam.length; i++) {
+                            if (maxTeam[i].tier === tier) {
+                                for (let j = 0; j < minTeam.length; j++) {
+                                    if (minTeam[j].tier !== tier) {
+                                        // 교체 시도
+                                        const temp = maxTeam[i];
+                                        maxTeam[i] = minTeam[j];
+                                        minTeam[j] = temp;
+                                        
+                                        // 개선되었는지 확인
+                                        const newTierCounts = teams.map(team => 
+                                            team.filter(p => p.tier === tier).length
+                                        );
+                                        const newMaxCount = Math.max(...newTierCounts);
+                                        const newMinCount = Math.min(...newTierCounts);
+                                        
+                                        if (newMaxCount - newMinCount < maxCount - minCount) {
+                                            improved = true;
+                                            break;
+                                        } else {
+                                            // 되돌리기
+                                            minTeam[j] = maxTeam[i];
+                                            maxTeam[i] = temp;
+                                        }
+                                    }
+                                }
+                                if (improved) break;
+                            }
+                        }
+                    }
+                });
+                
+                if (!improved) break;
+            }
+        }
+
         // 티어 밸런스 최적화
         function optimizeTierBalance(teams, neededAttackers) {
             function getTeamTierSum(team) {
@@ -758,9 +887,12 @@
                 return variance;
             }
 
-            // 여러 번 시도하여 밸런스 개선
-            for (let iteration = 0; iteration < 100; iteration++) {
-                const currentVariance = getTeamVariance(teams);
+            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록)
+            improveTierDistribution(teams);
+
+            // 여러 번 시도하여 전체 티어 합 밸런스 개선
+            for (let iteration = 0; iteration < 150; iteration++) {
+                const currentScore = calculateTeamDifference(teams);
                 
                 // 모든 팀 쌍에 대해 교체 시도
                 let improved = false;
@@ -776,15 +908,15 @@
                         
                         for (const p1 of team1Attackers) {
                             for (const p2 of team2Attackers) {
-                                if (tierWeights[p1.tier] !== tierWeights[p2.tier]) {
+                                if (p1.tier !== p2.tier) {
                                     // 교체 시도
                                     const idx1 = team1.indexOf(p1);
                                     const idx2 = team2.indexOf(p2);
                                     team1[idx1] = p2;
                                     team2[idx2] = p1;
                                     
-                                    const newVariance = getTeamVariance(teams);
-                                    if (newVariance < currentVariance) {
+                                    const newScore = calculateTeamDifference(teams);
+                                    if (newScore < currentScore) {
                                         improved = true;
                                         break;
                                     } else {
@@ -805,15 +937,15 @@
                         
                         for (const p1 of team1Defenders) {
                             for (const p2 of team2Defenders) {
-                                if (tierWeights[p1.tier] !== tierWeights[p2.tier]) {
+                                if (p1.tier !== p2.tier) {
                                     // 교체 시도
                                     const idx1 = team1.indexOf(p1);
                                     const idx2 = team2.indexOf(p2);
                                     team1[idx1] = p2;
                                     team2[idx2] = p1;
                                     
-                                    const newVariance = getTeamVariance(teams);
-                                    if (newVariance < currentVariance) {
+                                    const newScore = calculateTeamDifference(teams);
+                                    if (newScore < currentScore) {
                                         improved = true;
                                         break;
                                     } else {
@@ -835,12 +967,50 @@
             }
         }
 
-        // 팀 간 티어 차이 계산 (분산 기반)
+        // 티어별 분배 점수 계산 (낮을수록 좋음)
+        function calculateTierDistributionScore(teams) {
+            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const criticalTiers = ['S', 'A+', 'D']; // 한 팀에 몰리면 안 되는 티어
+            let score = 0;
+            
+            // 각 티어별로 팀 간 분배 확인
+            tierOrder.forEach(tier => {
+                const tierCounts = teams.map(team => 
+                    team.filter(p => p.tier === tier).length
+                );
+                
+                // 팀 간 분배의 분산 계산
+                const avg = tierCounts.reduce((a, b) => a + b, 0) / tierCounts.length;
+                const variance = tierCounts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / tierCounts.length;
+                score += variance * 10; // 티어 분배 불균형 페널티
+                
+                // S, A+, D 티어는 한 팀에 몰리면 큰 페널티
+                if (criticalTiers.includes(tier)) {
+                    const maxCount = Math.max(...tierCounts);
+                    const minCount = Math.min(...tierCounts);
+                    if (maxCount - minCount > 1) {
+                        score += (maxCount - minCount - 1) * 100; // 큰 페널티
+                    }
+                    // 한 팀에 2명 이상 몰리면 추가 페널티
+                    if (maxCount >= 2) {
+                        score += (maxCount - 1) * 50;
+                    }
+                }
+            });
+            
+            return score;
+        }
+
+        // 팀 간 티어 차이 계산 (분산 기반 + 티어 분배)
         function calculateTeamDifference(teams) {
             const sums = teams.map(team => team.reduce((sum, p) => sum + tierWeights[p.tier], 0));
             const avg = sums.reduce((a, b) => a + b, 0) / sums.length;
             const variance = sums.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / sums.length;
-            return variance;
+            
+            // 티어 분배 점수 추가
+            const tierDistributionScore = calculateTierDistributionScore(teams);
+            
+            return variance + tierDistributionScore;
         }
 
         // 팀 렌더링
