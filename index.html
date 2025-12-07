@@ -366,6 +366,12 @@
 <body>
     <div class="container">
         <h1>⚽ 젓자FC</h1>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn btn-secondary" onclick="resetToDefault()" style="background: #dc3545; color: white;">
+                초기값으로 되돌리기
+            </button>
+        </div>
 
         <div class="tier-table">
             <div class="tier-table-title">티어 표</div>
@@ -560,6 +566,26 @@
         function deselectAllPlayers() {
             selectedPlayers.clear();
             renderPlayers();
+        }
+
+        // 초기값으로 되돌리기
+        function resetToDefault() {
+            if (confirm('모든 선수 데이터를 초기 상태로 되돌리시겠습니까?\n(추가/수정/삭제한 모든 내용이 초기값으로 복원됩니다)')) {
+                // localStorage 초기화
+                localStorage.removeItem(STORAGE_KEY);
+                
+                // 선수 데이터를 기본값으로 복원
+                players = defaultPlayers.map(p => ({ ...p })); // 깊은 복사
+                
+                // 선택된 선수 목록 초기화
+                selectedPlayers.clear();
+                
+                // 저장 및 렌더링
+                savePlayers();
+                renderPlayers();
+                
+                alert('초기값으로 복원되었습니다.');
+            }
         }
 
         // 티어표 렌더링
