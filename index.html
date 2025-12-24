@@ -474,7 +474,7 @@
             <button id="resetBtn" class="btn btn-secondary" onclick="resetToDefault()" style="background: #dc3545; color: white;" disabled>
                 초기값으로 되돌리기
             </button>
-            <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()" style="margin-left: 10px;">
+            <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()" style="margin-left: 20px;">
                 티어 투표하기
             </button>
         </div>
@@ -891,13 +891,11 @@
                     togglePlayerSelection(player.name, checkbox.checked);
                 };
                 
-                // 정렬 후 실제 인덱스 찾기
-                const actualIndex = players.findIndex(p => p.name === player.name);
-                
                 // 관리자만 수정/삭제 가능
                 const tierSelectDisabled = isAdmin ? '' : 'disabled';
-                const deleteButtonHtml = isAdmin 
-                    ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayer(${actualIndex})">삭제</button>`
+                const playerId = player.id || '';
+                const deleteButtonHtml = isAdmin && playerId
+                    ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayerById('${playerId}')">삭제</button>`
                     : '';
                 
                 card.innerHTML = `
@@ -911,7 +909,7 @@
                     <div class="player-fields">
                         <div class="field-group">
                             <label>티어</label>
-                            <select onchange="updatePlayer(${actualIndex}, 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
+                            <select onchange="updatePlayerById('${playerId}', 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
                                 <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
                                 <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
@@ -960,6 +958,11 @@
                 return;
             }
             
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
             if (confirm('모든 선수 데이터를 초기 상태로 되돌리시겠습니까?\n(추가/수정/삭제한 모든 내용이 초기값으로 복원됩니다)')) {
                 try {
                     // 기존 선수 모두 삭제
@@ -968,7 +971,9 @@
                     playersSnapshot.docs.forEach(doc => {
                         batch1.delete(doc.ref);
                     });
-                    await batch1.commit();
+                    if (playersSnapshot.docs.length > 0) {
+                        await batch1.commit();
+                    }
                     
                     // 투표 데이터 삭제
                     const votesSnapshot = await db.collection('votes').get();
@@ -976,7 +981,9 @@
                     votesSnapshot.docs.forEach(doc => {
                         batch2.delete(doc.ref);
                     });
-                    await batch2.commit();
+                    if (votesSnapshot.docs.length > 0) {
+                        await batch2.commit();
+                    }
                     
                     // 기본 선수 데이터 추가
                     await initializeDefaultPlayers();
@@ -990,7 +997,7 @@
                     alert('초기값으로 복원되었습니다.');
                 } catch (error) {
                     console.error('초기화 실패:', error);
-                    alert('초기화에 실패했습니다.');
+                    alert('초기화에 실패했습니다: ' + error.message);
                 }
             }
         }
@@ -1141,6 +1148,11 @@
                 return;
             }
             
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
             const name = document.getElementById('newPlayerName').value.trim();
             const tier = document.getElementById('newPlayerTier').value;
 
@@ -1166,69 +1178,97 @@
                 renderPlayers();
             } catch (error) {
                 console.error('선수 추가 실패:', error);
-                alert('선수 추가에 실패했습니다.');
+                alert('선수 추가에 실패했습니다: ' + error.message);
             }
         }
 
-        // 선수 정보 업데이트
-        async function updatePlayer(index, field, value) {
+        // 선수 정보 업데이트 (ID로)
+        async function updatePlayerById(playerId, field, value) {
             if (!isAdmin) {
                 alert('관리자만 선수 정보를 수정할 수 있습니다.');
                 return;
             }
             
-            const player = players[index];
-            if (!player || !player.id) {
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
+            if (!playerId) {
+                alert('선수 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            const player = players.find(p => p.id === playerId);
+            if (!player) {
                 alert('선수 정보를 찾을 수 없습니다.');
                 return;
             }
             
             try {
                 // Firebase 업데이트
-                await db.collection('players').doc(player.id).update({ [field]: value });
+                await db.collection('players').doc(playerId).update({ [field]: value });
                 player[field] = value;
                 renderTierTable(); // 티어표 업데이트
             } catch (error) {
                 console.error('선수 정보 업데이트 실패:', error);
-                alert('업데이트에 실패했습니다.');
+                alert('업데이트에 실패했습니다: ' + error.message);
             }
         }
 
-        // 선수 삭제
-        async function deletePlayer(index) {
+        // 선수 삭제 (ID로)
+        async function deletePlayerById(playerId) {
             if (!isAdmin) {
                 alert('관리자만 선수를 삭제할 수 있습니다.');
                 return;
             }
             
-            const player = players[index];
-            if (!player) return;
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
+            if (!playerId) {
+                alert('선수 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            const player = players.find(p => p.id === playerId);
+            if (!player) {
+                alert('선수 정보를 찾을 수 없습니다.');
+                return;
+            }
             
             const playerName = player.name;
             if (confirm(`${playerName} 선수를 삭제하시겠습니까?`)) {
                 try {
                     // Firebase에서 삭제
-                    if (player.id) {
-                        await db.collection('players').doc(player.id).delete();
-                    }
+                    await db.collection('players').doc(playerId).delete();
                     
                     // 투표 데이터도 삭제
                     const votesSnapshot = await db.collection('votes')
                         .where('playerName', '==', playerName)
                         .get();
-                    const batch = db.batch();
-                    votesSnapshot.docs.forEach(doc => {
-                        batch.delete(doc.ref);
-                    });
-                    await batch.commit();
+                    
+                    if (!votesSnapshot.empty) {
+                        const batch = db.batch();
+                        votesSnapshot.docs.forEach(doc => {
+                            batch.delete(doc.ref);
+                        });
+                        await batch.commit();
+                    }
                     
                     // 선택 목록에서도 제거
                     selectedPlayers.delete(playerName);
-                    players.splice(index, 1);
+                    // 배열에서 제거
+                    const index = players.findIndex(p => p.id === playerId);
+                    if (index >= 0) {
+                        players.splice(index, 1);
+                    }
                     renderPlayers();
                 } catch (error) {
                     console.error('선수 삭제 실패:', error);
-                    alert('삭제에 실패했습니다.');
+                    alert('삭제에 실패했습니다: ' + error.message);
                 }
             }
         }
