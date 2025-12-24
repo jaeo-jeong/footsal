@@ -717,7 +717,8 @@
             { name: '정기헌', tier: 'B' },
             { name: '정우진', tier: 'B' },
             { name: '전근우', tier: 'B' },
-            { name: '전은호', tier: 'B' }
+            { name: '전은호', tier: 'B' },
+            { name: '박상윤', tier: 'B' }
         ];
 
         // 투표 평균으로 티어 계산
@@ -735,6 +736,33 @@
             return weightToTier[roundedWeight] || 'B';
         }
 
+        // 디바이스 ID 생성 (클라이언트 측)
+        function getDeviceId() {
+            // localStorage에 저장된 디바이스 ID 확인
+            let deviceId = localStorage.getItem('deviceId');
+            
+            if (!deviceId) {
+                // 새로운 디바이스 ID 생성 (User-Agent + 랜덤 값)
+                const userAgent = navigator.userAgent || 'unknown';
+                const screenInfo = `${screen.width}x${screen.height}`;
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const combined = `${userAgent}-${screenInfo}-${timezone}-${Date.now()}-${Math.random()}`;
+                
+                // 간단한 해시 함수 (SHA-256 대신)
+                let hash = 0;
+                for (let i = 0; i < combined.length; i++) {
+                    const char = combined.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // 32bit 정수로 변환
+                }
+                
+                deviceId = Math.abs(hash).toString(36) + Date.now().toString(36);
+                localStorage.setItem('deviceId', deviceId);
+            }
+            
+            return deviceId;
+        }
+        
         // 선수 데이터 초기화
         let players = [];
         
@@ -1280,23 +1308,41 @@
                 console.error('투표 상태 확인 실패:', error);
             }
             
+            // 기존 투표 데이터 가져오기 (있으면 미리 채우기)
+            const existingVotes = {};
+            try {
+                const existingVotesSnapshot = await db.collection('votes')
+                    .where('deviceId', '==', deviceId)
+                    .get();
+                
+                existingVotesSnapshot.docs.forEach(doc => {
+                    const voteData = doc.data();
+                    existingVotes[voteData.playerName] = voteData.tier;
+                });
+            } catch (error) {
+                console.error('기존 투표 데이터 로드 실패:', error);
+            }
+            
             // 투표 UI 생성
             const voteContent = document.getElementById('voteContent');
             voteContent.innerHTML = '<div class="vote-grid" id="voteGrid"></div>';
             
             const voteGrid = document.getElementById('voteGrid');
             players.forEach(player => {
+                // 기존 투표가 있으면 그 값을 사용, 없으면 현재 티어 사용
+                const selectedTier = existingVotes[player.name] || player.tier;
+                
                 const voteItem = document.createElement('div');
                 voteItem.className = 'vote-item';
                 voteItem.innerHTML = `
                     <span style="flex: 1; font-weight: 600;">${player.name}</span>
                     <select id="vote_${player.name}" class="vote-select">
-                        <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
-                        <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
-                        <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
-                        <option value="B" ${player.tier === 'B' ? 'selected' : ''}>B</option>
-                        <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
-                        <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
+                        <option value="S" ${selectedTier === 'S' ? 'selected' : ''}>S</option>
+                        <option value="A+" ${selectedTier === 'A+' ? 'selected' : ''}>A+</option>
+                        <option value="A" ${selectedTier === 'A' ? 'selected' : ''}>A</option>
+                        <option value="B" ${selectedTier === 'B' ? 'selected' : ''}>B</option>
+                        <option value="C" ${selectedTier === 'C' ? 'selected' : ''}>C</option>
+                        <option value="D" ${selectedTier === 'D' ? 'selected' : ''}>D</option>
                     </select>
                 `;
                 voteGrid.appendChild(voteItem);
