@@ -187,7 +187,7 @@
 
         .form-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr auto;
+            grid-template-columns: 2fr 1fr auto;
             gap: 10px;
             align-items: end;
         }
@@ -267,11 +267,6 @@
             opacity: 0.9;
         }
 
-        .player-position {
-            font-size: 0.8em;
-            opacity: 0.8;
-            margin-top: 3px;
-        }
 
         .tier-badge {
             display: inline-block;
@@ -398,14 +393,6 @@
                             <option value="D">D</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>포지션</label>
-                        <select id="newPlayerPosition">
-                            <option value="공격">공격</option>
-                            <option value="수비">수비</option>
-                            <option value="멀티" selected>멀티</option>
-                        </select>
-                    </div>
                     <button class="btn btn-success" onclick="addPlayer()">추가</button>
                 </div>
             </div>
@@ -440,33 +427,33 @@
 
         // 기본 선수 데이터
         const defaultPlayers = [
-            { name: '정재오', tier: 'B', position: '멀티' },
-            { name: '강신재', tier: 'B', position: '멀티' },
-            { name: '장건호', tier: 'B', position: '멀티' },
-            { name: '김관영', tier: 'B', position: '멀티' },
-            { name: '김상욱', tier: 'B', position: '멀티' },
-            { name: '김승현', tier: 'B', position: '멀티' },
-            { name: '김태연', tier: 'B', position: '멀티' },
-            { name: '김동현', tier: 'B', position: '멀티' },
-            { name: '문용혁', tier: 'B', position: '멀티' },
-            { name: '문찬우', tier: 'B', position: '멀티' },
-            { name: '문태영', tier: 'B', position: '멀티' },
-            { name: '박찬영', tier: 'B', position: '멀티' },
-            { name: '박찬혁', tier: 'B', position: '멀티' },
-            { name: '배기정', tier: 'B', position: '멀티' },
-            { name: '하상우', tier: 'B', position: '멀티' },
-            { name: '김성호', tier: 'B', position: '멀티' },
-            { name: '신현우', tier: 'B', position: '멀티' },
-            { name: '옥준혁', tier: 'B', position: '멀티' },
-            { name: '우승훈', tier: 'B', position: '멀티' },
-            { name: '이도경', tier: 'B', position: '멀티' },
-            { name: '이신원', tier: 'B', position: '멀티' },
-            { name: '이준순', tier: 'B', position: '멀티' },
-            { name: '이창준', tier: 'B', position: '멀티' },
-            { name: '장재혁', tier: 'B', position: '멀티' },
-            { name: '정기헌', tier: 'B', position: '멀티' },
-            { name: '정우진', tier: 'B', position: '멀티' },
-            { name: '전근우', tier: 'B', position: '멀티' }
+            { name: '정재오', tier: 'B' },
+            { name: '강신재', tier: 'B' },
+            { name: '장건호', tier: 'B' },
+            { name: '김관영', tier: 'B' },
+            { name: '김상욱', tier: 'B' },
+            { name: '김승현', tier: 'B' },
+            { name: '김태연', tier: 'B' },
+            { name: '김동현', tier: 'B' },
+            { name: '문용혁', tier: 'B' },
+            { name: '문찬우', tier: 'B' },
+            { name: '문태영', tier: 'B' },
+            { name: '박찬영', tier: 'B' },
+            { name: '박찬혁', tier: 'B' },
+            { name: '배기정', tier: 'B' },
+            { name: '하상우', tier: 'B' },
+            { name: '김성호', tier: 'B' },
+            { name: '신현우', tier: 'B' },
+            { name: '옥준혁', tier: 'B' },
+            { name: '우승훈', tier: 'B' },
+            { name: '이도경', tier: 'B' },
+            { name: '이신원', tier: 'B' },
+            { name: '이준순', tier: 'B' },
+            { name: '이창준', tier: 'B' },
+            { name: '장재혁', tier: 'B' },
+            { name: '정기헌', tier: 'B' },
+            { name: '정우진', tier: 'B' },
+            { name: '전근우', tier: 'B' }
         ];
 
         // 선수 데이터 로드 (localStorage에서 불러오기)
@@ -476,12 +463,22 @@
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     // 저장된 데이터가 있으면 사용, 없으면 기본 데이터 사용
-                    return parsed.length > 0 ? parsed : defaultPlayers;
+                    const loadedPlayers = parsed.length > 0 ? parsed : defaultPlayers;
+                    // 기존 데이터에서 position 필드 제거 (하위 호환성)
+                    const cleanedPlayers = loadedPlayers.map(p => {
+                        const { position, ...rest } = p;
+                        return rest;
+                    });
+                    // 이름 기준으로 정렬
+                    cleanedPlayers.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                    return cleanedPlayers;
                 }
             } catch (e) {
                 console.error('데이터 로드 실패:', e);
             }
-            return defaultPlayers;
+            // 기본 데이터도 정렬하여 반환
+            const sortedDefault = [...defaultPlayers].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+            return sortedDefault;
         }
 
         // 선수 데이터 저장 (localStorage에 저장)
@@ -499,26 +496,55 @@
         // 선택된 선수 추적 (선수 이름을 키로 사용)
         let selectedPlayers = new Set();
 
+        // 한국어 이름 정렬 함수 (성 기준 가나다 순)
+        function sortPlayersByName() {
+            players.sort((a, b) => {
+                // 첫 글자(성)를 기준으로 정렬
+                return a.name.localeCompare(b.name, 'ko');
+            });
+        }
+
         // 선수 목록 렌더링
         function renderPlayers() {
+            // 이름 기준으로 정렬
+            sortPlayersByName();
+            
             const grid = document.getElementById('playersGrid');
             grid.innerHTML = '';
 
             players.forEach((player, index) => {
                 const card = document.createElement('div');
                 card.className = 'player-card';
+                card.style.cursor = 'pointer';
                 const isSelected = selectedPlayers.has(player.name);
+                
+                // 카드 클릭 이벤트 추가
+                card.onclick = function(e) {
+                    // 체크박스나 삭제 버튼 클릭 시에는 기본 동작 유지
+                    if (e.target.type === 'checkbox' || e.target.classList.contains('btn') || e.target.tagName === 'SELECT') {
+                        return;
+                    }
+                    // 카드 클릭 시 체크박스 토글
+                    const checkbox = card.querySelector('.player-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                    togglePlayerSelection(player.name, checkbox.checked);
+                };
+                
+                // 정렬 후 실제 인덱스 찾기
+                const actualIndex = players.findIndex(p => p.name === player.name);
+                
                 card.innerHTML = `
                     <div class="player-name">
                         <input type="checkbox" class="player-checkbox" 
                                ${isSelected ? 'checked' : ''} 
-                               onchange="togglePlayerSelection('${player.name}', this.checked)">
+                               onchange="togglePlayerSelection('${player.name}', this.checked)"
+                               onclick="event.stopPropagation()">
                         ${player.name}
                     </div>
                     <div class="player-fields">
                         <div class="field-group">
                             <label>티어</label>
-                            <select onchange="updatePlayer(${index}, 'tier', this.value)">
+                            <select onchange="updatePlayer(${actualIndex}, 'tier', this.value)" onclick="event.stopPropagation()">
                                 <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
                                 <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
@@ -527,15 +553,7 @@
                                 <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
                             </select>
                         </div>
-                        <div class="field-group">
-                            <label>포지션</label>
-                            <select onchange="updatePlayer(${index}, 'position', this.value)">
-                                <option value="공격" ${player.position === '공격' ? 'selected' : ''}>공격</option>
-                                <option value="수비" ${player.position === '수비' ? 'selected' : ''}>수비</option>
-                                <option value="멀티" ${player.position === '멀티' ? 'selected' : ''}>멀티</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-danger delete-btn" onclick="deletePlayer(${index})">삭제</button>
+                        <button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayer(${actualIndex})">삭제</button>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -622,7 +640,6 @@
         function addPlayer() {
             const name = document.getElementById('newPlayerName').value.trim();
             const tier = document.getElementById('newPlayerTier').value;
-            const position = document.getElementById('newPlayerPosition').value;
 
             if (!name) {
                 alert('이름을 입력해주세요.');
@@ -634,7 +651,7 @@
                 return;
             }
 
-            players.push({ name, tier, position });
+            players.push({ name, tier });
             // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
             document.getElementById('newPlayerName').value = '';
             savePlayers(); // 저장
@@ -734,11 +751,6 @@
             
             // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
             const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
-            
-            // 섞인 선수들을 포지션별로 분류
-            const attackers = shuffledList.filter(p => p.position === '공격');
-            const defenders = shuffledList.filter(p => p.position === '수비');
-            const multis = shuffledList.filter(p => p.position === '멀티');
 
             // 최적 팀 찾기 (최대 200번 시도, 매번 새로운 랜덤 시드)
             let bestTeams = null;
@@ -746,11 +758,9 @@
 
             for (let attempt = 0; attempt < 200; attempt++) {
                 // 매 시도마다 선수 목록을 다시 섞기
-                const reShuffledAttackers = [...attackers].sort(() => Math.random() - 0.5);
-                const reShuffledDefenders = [...defenders].sort(() => Math.random() - 0.5);
-                const reShuffledMultis = [...multis].sort(() => Math.random() - 0.5);
+                const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
                 
-                const teams = createBalancedTeams(teamSizes, reShuffledAttackers, reShuffledDefenders, reShuffledMultis);
+                const teams = createBalancedTeams(teamSizes, reShuffledList);
                 if (teams) {
                     const diff = calculateTeamDifference(teams);
                     if (diff < bestDiff) {
@@ -771,83 +781,36 @@
         }
 
         // 밸런스 있는 팀 생성
-        function createBalancedTeams(teamSizes, attackers, defenders, multis) {
+        function createBalancedTeams(teamSizes, playerList) {
             const numTeams = teamSizes.length;
             const teams = Array(numTeams).fill(null).map(() => []);
             const used = new Set();
-            const neededAttackers = 2; // 각 팀마다 공격수 2명 필요
             
             // 티어별로 선수 분류
             const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
-            const criticalTiers = ['S', 'A+', 'D'];
             
-            // 포지션별로 티어별 분류
+            // 티어별로 선수 분류
             function groupByTier(playerList) {
                 const grouped = {};
                 tierOrder.forEach(tier => {
-                    grouped[tier] = playerList.filter(p => p.tier === tier);
+                    grouped[tier] = playerList.filter(p => p.tier === tier && !used.has(p.name));
                 });
                 return grouped;
             }
-            
-            const attackersByTier = groupByTier(attackers);
-            const defendersByTier = groupByTier(defenders);
-            const multisByTier = groupByTier(multis);
-            
-            // 각 티어별로 라운드 로빈 방식으로 배정
-            let tierRoundRobin = {};
-            tierOrder.forEach(tier => {
-                tierRoundRobin[tier] = 0;
-            });
 
-            // 각 팀에 공격수 배정 (티어 균등 분배 고려)
-            for (let round = 0; round < neededAttackers; round++) {
-                for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
-                    if (teams[teamIdx].length >= neededAttackers) continue;
-                    
-                    // 티어 순서대로 시도 (S, A+, D는 더 신중하게)
-                    let assigned = false;
-                    for (const tier of tierOrder) {
-                        // 공격 포지션 선수 먼저
-                        const tierAttackers = attackersByTier[tier].filter(p => !used.has(p.name));
-                        if (tierAttackers.length > 0) {
-                            const player = tierAttackers[0];
-                            teams[teamIdx].push(player);
-                            used.add(player.name);
-                            assigned = true;
-                            break;
-                        }
-                    }
-                    
-                    // 부족하면 멀티 선수 사용
-                    if (!assigned) {
-                        for (const tier of tierOrder) {
-                            const tierMultis = multisByTier[tier].filter(p => !used.has(p.name));
-                            if (tierMultis.length > 0) {
-                                const player = tierMultis[0];
-                                teams[teamIdx].push(player);
-                                used.add(player.name);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 각 팀에 수비수 배정 (티어 균등 분배 고려)
+            // 각 팀에 선수 배정 (티어 균등 분배 고려)
             for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
                 const teamSize = teamSizes[teamIdx];
-                const needed = teamSize - teams[teamIdx].length;
                 
-                for (let i = 0; i < needed; i++) {
+                while (teams[teamIdx].length < teamSize) {
+                    const playersByTier = groupByTier(playerList);
                     let assigned = false;
                     
-                    // 티어 순서대로 시도
+                    // 티어 순서대로 라운드 로빈 방식으로 배정
                     for (const tier of tierOrder) {
-                        // 수비 포지션 선수 먼저
-                        const tierDefenders = defendersByTier[tier].filter(p => !used.has(p.name));
-                        if (tierDefenders.length > 0) {
-                            const player = tierDefenders[0];
+                        const availablePlayers = playersByTier[tier];
+                        if (availablePlayers.length > 0) {
+                            const player = availablePlayers[0];
                             teams[teamIdx].push(player);
                             used.add(player.name);
                             assigned = true;
@@ -855,16 +818,15 @@
                         }
                     }
                     
-                    // 부족하면 멀티 선수 사용
+                    // 모든 티어에서 선수를 찾지 못한 경우 (이론적으로는 발생하지 않아야 함)
                     if (!assigned) {
-                        for (const tier of tierOrder) {
-                            const tierMultis = multisByTier[tier].filter(p => !used.has(p.name));
-                            if (tierMultis.length > 0) {
-                                const player = tierMultis[0];
-                                teams[teamIdx].push(player);
-                                used.add(player.name);
-                                break;
-                            }
+                        // 남은 선수 중 아무나 배정
+                        const remainingPlayer = playerList.find(p => !used.has(p.name));
+                        if (remainingPlayer) {
+                            teams[teamIdx].push(remainingPlayer);
+                            used.add(remainingPlayer.name);
+                        } else {
+                            return null; // 선수가 부족함
                         }
                     }
                 }
@@ -877,19 +839,8 @@
                 }
             }
 
-            // 포지션 확인 (각 팀마다 공격수 2명 이상)
-            for (let i = 0; i < numTeams; i++) {
-                const teamAttackers = teams[i].slice(0, neededAttackers).filter(p => 
-                    p.position === '공격' || p.position === '멀티'
-                ).length;
-                
-                if (teamAttackers < neededAttackers) {
-                    return null;
-                }
-            }
-
             // 티어 밸런스 최적화
-            optimizeTierBalance(teams, neededAttackers);
+            optimizeTierBalance(teams);
 
             return teams;
         }
@@ -958,7 +909,7 @@
         }
 
         // 티어 밸런스 최적화
-        function optimizeTierBalance(teams, neededAttackers) {
+        function optimizeTierBalance(teams) {
             function getTeamTierSum(team) {
                 return team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
             }
@@ -985,41 +936,9 @@
                         const team1 = teams[i];
                         const team2 = teams[j];
                         
-                        // 공격수 교체 시도
-                        const team1Attackers = team1.slice(0, neededAttackers);
-                        const team2Attackers = team2.slice(0, neededAttackers);
-                        
-                        for (const p1 of team1Attackers) {
-                            for (const p2 of team2Attackers) {
-                                if (p1.tier !== p2.tier) {
-                                    // 교체 시도
-                                    const idx1 = team1.indexOf(p1);
-                                    const idx2 = team2.indexOf(p2);
-                                    team1[idx1] = p2;
-                                    team2[idx2] = p1;
-                                    
-                                    const newScore = calculateTeamDifference(teams);
-                                    if (newScore < currentScore) {
-                                        improved = true;
-                                        break;
-                                    } else {
-                                        // 되돌리기
-                                        team1[idx1] = p1;
-                                        team2[idx2] = p2;
-                                    }
-                                }
-                            }
-                            if (improved) break;
-                        }
-                        
-                        if (improved) break;
-                        
-                        // 수비수 교체 시도
-                        const team1Defenders = team1.slice(neededAttackers);
-                        const team2Defenders = team2.slice(neededAttackers);
-                        
-                        for (const p1 of team1Defenders) {
-                            for (const p2 of team2Defenders) {
+                        // 모든 선수 교체 시도
+                        for (const p1 of team1) {
+                            for (const p2 of team2) {
                                 if (p1.tier !== p2.tier) {
                                     // 교체 시도
                                     const idx1 = team1.indexOf(p1);
@@ -1101,47 +1020,22 @@
             const container = document.getElementById('teamsContainer');
             container.innerHTML = '';
 
-            const neededAttackers = 2;
-
             teams.forEach((team, index) => {
                 const teamDiv = document.createElement('div');
                 teamDiv.className = 'team';
                 
                 const tierSum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
-                
-                // 실제 배정된 포지션 계산
-                const actualAttackers = team.slice(0, neededAttackers);
-                const actualDefenders = team.slice(neededAttackers);
-                
-                // 포지션 표시용 함수
-                function getDisplayPosition(player, isInAttackGroup) {
-                    if (player.position === '멀티') {
-                        return isInAttackGroup ? '공격(멀티)' : '수비(멀티)';
-                    }
-                    return player.position;
-                }
 
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
                     <div class="team-stats">
                         <div>티어 합: ${tierSum}</div>
-                        <div>공격: ${actualAttackers.length}명</div>
-                        <div>수비: ${actualDefenders.length}명</div>
                     </div>
                     <ul class="team-players">
-                        ${actualAttackers.map(player => `
+                        ${team.map(player => `
                             <li class="team-player">
                                 <div class="player-info">
                                     <div>${player.name} <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span></div>
-                                    <div class="player-position">${getDisplayPosition(player, true)}</div>
-                                </div>
-                            </li>
-                        `).join('')}
-                        ${actualDefenders.map(player => `
-                            <li class="team-player">
-                                <div class="player-info">
-                                    <div>${player.name} <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span></div>
-                                    <div class="player-position">${getDisplayPosition(player, false)}</div>
                                 </div>
                             </li>
                         `).join('')}
