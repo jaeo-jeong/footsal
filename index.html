@@ -358,6 +358,20 @@
             .players-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .modal-content {
+                padding: 20px;
+                max-height: 85vh;
+            }
+            
+            #voteModal .modal-content {
+                max-height: 85vh;
+            }
+            
+            .modal-title {
+                font-size: 1.2em;
+                margin-bottom: 15px;
+            }
         }
 
         /* 모달 스타일 */
@@ -385,6 +399,43 @@
             max-width: 400px;
             width: 90%;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+        
+        /* 투표 모달 전용 스타일 */
+        #voteModal .modal-content {
+            max-width: 600px;
+            max-height: 90vh;
+        }
+        
+        #voteContent {
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex: 1;
+            min-height: 0;
+            margin-bottom: 20px;
+            padding-right: 10px;
+        }
+        
+        /* 스크롤바 스타일링 (선택사항) */
+        #voteContent::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #voteContent::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        #voteContent::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        #voteContent::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .modal-title {
@@ -408,6 +459,8 @@
             display: flex;
             gap: 10px;
             justify-content: center;
+            flex-shrink: 0;
+            margin-top: auto;
         }
 
         .vote-section {
