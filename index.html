@@ -456,7 +456,7 @@
 </head>
 <body>
     <!-- 관리자 코드 입력 모달 -->
-    <div id="adminModal" class="modal active">
+    <div id="adminModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">관리자 코드 입력</div>
             <input type="password" id="adminCodeInput" class="modal-input" placeholder="관리자 코드를 입력하세요">
@@ -746,17 +746,13 @@
         
         // 페이지 로드 시 초기화
         async function init() {
-            // 저장된 관리자 코드 확인
+            // 모달은 항상 표시 (사용자가 선택하도록)
+            document.getElementById('adminModal').classList.add('active');
+            
+            // 저장된 관리자 코드가 있으면 입력 필드에 미리 채우기 (선택사항)
             const savedAdminCode = localStorage.getItem(ADMIN_CODE_KEY);
             if (savedAdminCode && savedAdminCode === ADMIN_CODE) {
-                isAdmin = true;
-                adminCode = savedAdminCode;
-                document.getElementById('adminModal').classList.remove('active');
-                updateUIForPermission();
-            } else {
-                // 일반 사용자로 입장
-                document.getElementById('adminModal').classList.remove('active');
-                updateUIForPermission();
+                document.getElementById('adminCodeInput').value = savedAdminCode;
             }
             
             // Firebase 연결 확인
@@ -976,12 +972,38 @@
         }
         
         // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
+        // 실시간 리스너 (중복 방지)
+        let playersListener = null;
+        let isInitialLoad = true; // 초기 로드 여부
+        
         function setupRealtimeListener() {
             if (!db) return;
             
-            db.collection('players').onSnapshot((snapshot) => {
+            // 기존 리스너가 있으면 제거 (중복 방지)
+            if (playersListener) {
+                playersListener();
+                playersListener = null;
+            }
+            
+            // 초기 로드 플래그 리셋
+            isInitialLoad = true;
+            
+            // 새 리스너 설정
+            playersListener = db.collection('players').onSnapshot((snapshot) => {
+                // 초기 로드 시에는 변경사항 처리하지 않음 (이미 loadPlayersFromFirebase에서 로드됨)
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    // 초기 로드 후에는 변경사항만 처리
+                    return;
+                }
+                
+                // 변경사항이 있을 때만 업데이트
+                let hasChanges = false;
+                
                 snapshot.docChanges().forEach((change) => {
+                    // 초기 로드가 아닌 경우에만 처리
                     if (change.type === 'added' || change.type === 'modified') {
+                        hasChanges = true;
                         const playerData = { id: change.doc.id, ...change.doc.data() };
                         const index = players.findIndex(p => p.id === change.doc.id);
                         if (index >= 0) {
@@ -990,16 +1012,20 @@
                             players.push(playerData);
                         }
                     } else if (change.type === 'removed') {
+                        hasChanges = true;
                         players = players.filter(p => p.id !== change.doc.id);
                     }
                 });
                 
-                // 투표 데이터로 티어 업데이트
-                updateTiersFromVotes().then(() => {
-                    sortPlayersByName();
-                    renderPlayers();
-                    renderTierTable();
-                });
+                // 변경사항이 있을 때만 렌더링
+                if (hasChanges) {
+                    // 투표 데이터로 티어 업데이트
+                    updateTiersFromVotes().then(() => {
+                        sortPlayersByName();
+                        renderPlayers();
+                        renderTierTable();
+                    });
+                }
             }, (error) => {
                 console.error('실시간 리스너 오류:', error);
             });
@@ -1383,15 +1409,13 @@
             }
 
             try {
-                // Firebase에 추가
-                const docRef = await db.collection('players').add({ name, tier });
-                const newPlayer = { id: docRef.id, name, tier };
-                players.push(newPlayer);
+                // Firebase에 추가만 하고, 로컬 배열에는 추가하지 않음
+                // 실시간 리스너가 자동으로 추가해줄 것임
+                await db.collection('players').add({ name, tier });
                 
                 // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
                 document.getElementById('newPlayerName').value = '';
-                sortPlayersByName();
-                renderPlayers();
+                // renderPlayers()는 실시간 리스너가 자동으로 호출함
             } catch (error) {
                 console.error('선수 추가 실패:', error);
                 alert('선수 추가에 실패했습니다: ' + error.message);
@@ -1459,7 +1483,11 @@
             const playerName = player.name;
             if (confirm(`${playerName} 선수를 삭제하시겠습니까?`)) {
                 try {
-                    // Firebase에서 삭제
+                    // 선택 목록에서도 제거
+                    selectedPlayers.delete(playerName);
+                    
+                    // Firebase에서 삭제만 하고, 로컬 배열 수정은 하지 않음
+                    // 실시간 리스너가 자동으로 제거해줄 것임
                     await db.collection('players').doc(playerId).delete();
                     
                     // 투표 데이터도 삭제
@@ -1475,14 +1503,7 @@
                         await batch.commit();
                     }
                     
-                    // 선택 목록에서도 제거
-                    selectedPlayers.delete(playerName);
-                    // 배열에서 제거
-                    const index = players.findIndex(p => p.id === playerId);
-                    if (index >= 0) {
-                        players.splice(index, 1);
-                    }
-                    renderPlayers();
+                    // renderPlayers()는 실시간 리스너가 자동으로 호출함
                 } catch (error) {
                     console.error('선수 삭제 실패:', error);
                     alert('삭제에 실패했습니다: ' + error.message);
