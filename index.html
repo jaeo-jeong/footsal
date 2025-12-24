@@ -885,8 +885,17 @@
         // 권한에 따른 UI 업데이트
         function updateUIForPermission() {
             // 관리자 전용 버튼 활성화/비활성화
-            document.getElementById('resetBtn').disabled = !isAdmin;
+            const resetBtn = document.getElementById('resetBtn');
+            resetBtn.disabled = !isAdmin;
+            resetBtn.style.display = isAdmin ? 'inline-block' : 'none'; // 일반 사용자일 때 안보이게
+            
             document.getElementById('addPlayerForm').style.display = isAdmin ? 'block' : 'none';
+            
+            // 티어 투표하기 버튼: 관리자일 때 안보이게
+            const voteBtn = document.getElementById('voteBtn');
+            if (voteBtn) {
+                voteBtn.style.display = isAdmin ? 'none' : 'inline-block';
+            }
             
             // 선수 카드의 수정/삭제 버튼은 renderPlayers에서 처리
             // 권한 변경 시 선수 목록 다시 렌더링
