@@ -535,19 +535,60 @@
         </div>
     </div>
 
+    <!-- Firebase 설정 파일 -->
+    <script src="firebase-config.js"></script>
+
     <script>
         // Firebase 초기화
         let db;
-        try {
-            if (typeof firebaseConfig !== 'undefined' && typeof firebase !== 'undefined') {
+        let firebaseInitialized = false;
+        
+        function initializeFirebase() {
+            try {
+                // Firebase SDK와 설정이 모두 로드되었는지 확인
+                if (typeof firebase === 'undefined') {
+                    console.error('Firebase SDK가 로드되지 않았습니다.');
+                    return false;
+                }
+                
+                if (typeof firebaseConfig === 'undefined') {
+                    console.error('Firebase 설정이 없습니다. firebase-config.js 파일을 확인해주세요.');
+                    return false;
+                }
+                
+                // 이미 초기화되었는지 확인
+                if (firebase.apps.length > 0) {
+                    db = firebase.firestore();
+                    firebaseInitialized = true;
+                    console.log('Firebase 이미 초기화됨');
+                    return true;
+                }
+                
+                // Firebase 초기화
                 firebase.initializeApp(firebaseConfig);
                 db = firebase.firestore();
+                firebaseInitialized = true;
                 console.log('Firebase 초기화 완료');
-            } else {
-                console.error('Firebase 설정이 없습니다. firebase-config.js 파일을 확인해주세요.');
+                return true;
+            } catch (error) {
+                console.error('Firebase 초기화 실패:', error);
+                return false;
             }
-        } catch (error) {
-            console.error('Firebase 초기화 실패:', error);
+        }
+        
+        // 페이지 로드 완료 후 Firebase 초기화
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                // 약간의 지연을 두고 초기화 (스크립트 로드 완료 보장)
+                setTimeout(function() {
+                    initializeFirebase();
+                }, 100);
+            });
+        } else {
+            // 이미 로드된 경우
+            setTimeout(function() {
+                initializeFirebase();
+            }, 100);
         }
         
         // 관리자 코드
@@ -675,6 +716,14 @@
             }
             
             if (code === ADMIN_CODE) {
+                // Firebase 초기화 재시도
+                if (!firebaseInitialized) {
+                    if (!initializeFirebase()) {
+                        alert('Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.');
+                        return;
+                    }
+                }
+                
                 isAdmin = true;
                 adminCode = code;
                 localStorage.setItem(ADMIN_CODE_KEY, code);
@@ -688,6 +737,7 @@
                         setupRealtimeListener();
                     } catch (error) {
                         console.error('데이터 로드 실패:', error);
+                        alert('데이터 로드에 실패했습니다: ' + error.message);
                     }
                 } else {
                     console.error('Firebase가 초기화되지 않았습니다.');
@@ -704,6 +754,11 @@
             adminCode = '';
             document.getElementById('adminModal').classList.remove('active');
             updateUIForPermission();
+            
+            // Firebase 초기화 재시도
+            if (!firebaseInitialized) {
+                initializeFirebase();
+            }
             
             // 데이터 로드
             if (db) {
