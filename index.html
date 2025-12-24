@@ -536,8 +536,17 @@
     </div>
 
     <script>
-        // API 서버 URL
-        const API_URL = 'http://localhost:3001/api';
+        // Firebase 초기화
+        let db;
+        if (typeof firebaseConfig !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+        } else {
+            console.error('Firebase 설정이 없습니다. firebase-config.js 파일을 확인해주세요.');
+        }
+        
+        // 관리자 코드
+        const ADMIN_CODE = 'admin123';
         
         // 권한 관리
         let isAdmin = false;
@@ -616,7 +625,12 @@
         async function init() {
             // Firebase 연결 확인
             if (typeof firebase === 'undefined' || !db) {
-                alert('Firebase가 초기화되지 않았습니다. firebase-config.js 파일을 확인해주세요.');
+                console.error('Firebase가 초기화되지 않았습니다.');
+                // Firebase가 없어도 기본 데이터는 표시
+                players = defaultPlayers;
+                sortPlayersByName();
+                renderPlayers();
+                renderTierTable();
                 return;
             }
             
@@ -634,8 +648,17 @@
             }
             
             // 선수 목록 로드 및 실시간 리스너 설정
-            await loadPlayersFromFirebase();
-            setupRealtimeListener();
+            try {
+                await loadPlayersFromFirebase();
+                setupRealtimeListener();
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+                // 오류가 있어도 기본 데이터 표시
+                players = defaultPlayers;
+                sortPlayersByName();
+                renderPlayers();
+                renderTierTable();
+            }
         }
         
         // 관리자로 입장
@@ -652,6 +675,16 @@
                 localStorage.setItem(ADMIN_CODE_KEY, code);
                 document.getElementById('adminModal').classList.remove('active');
                 updateUIForPermission();
+                
+                // 데이터 로드
+                if (db) {
+                    try {
+                        await loadPlayersFromFirebase();
+                        setupRealtimeListener();
+                    } catch (error) {
+                        console.error('데이터 로드 실패:', error);
+                    }
+                }
             } else {
                 alert('잘못된 관리자 코드입니다.');
             }
@@ -661,6 +694,16 @@
         async function enterAsGuest() {
             document.getElementById('adminModal').classList.remove('active');
             updateUIForPermission();
+            
+            // 데이터 로드
+            if (db) {
+                try {
+                    await loadPlayersFromFirebase();
+                    setupRealtimeListener();
+                } catch (error) {
+                    console.error('데이터 로드 실패:', error);
+                }
+            }
         }
         
         // 권한에 따른 UI 업데이트
@@ -700,16 +743,28 @@
         
         // 기본 선수 데이터 초기화
         async function initializeDefaultPlayers() {
-            const batch = db.batch();
-            defaultPlayers.forEach(player => {
-                const docRef = db.collection('players').doc();
-                batch.set(docRef, player);
-            });
-            await batch.commit();
+            if (!db) {
+                console.error('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
+            try {
+                const batch = db.batch();
+                defaultPlayers.forEach(player => {
+                    const docRef = db.collection('players').doc();
+                    batch.set(docRef, player);
+                });
+                await batch.commit();
+            } catch (error) {
+                console.error('기본 선수 데이터 초기화 실패:', error);
+                throw error;
+            }
         }
         
         // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
         function setupRealtimeListener() {
+            if (!db) return;
+            
             db.collection('players').onSnapshot((snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added' || change.type === 'modified') {
@@ -731,6 +786,8 @@
                     renderPlayers();
                     renderTierTable();
                 });
+            }, (error) => {
+                console.error('실시간 리스너 오류:', error);
             });
         }
         
@@ -759,6 +816,8 @@
         
         // 투표 데이터로 티어 업데이트
         async function updateTiersFromVotes() {
+            if (!db) return;
+            
             try {
                 const votesSnapshot = await db.collection('votes').get();
                 const votes = votesSnapshot.docs.map(doc => doc.data());
@@ -774,6 +833,7 @@
                 
                 // 각 선수의 티어를 투표 평균으로 업데이트
                 const batch = db.batch();
+                let hasUpdates = false;
                 for (const player of players) {
                     const playerVotes = votesByPlayer[player.name] || [];
                     if (playerVotes.length > 0) {
@@ -783,12 +843,13 @@
                             if (player.id) {
                                 const docRef = db.collection('players').doc(player.id);
                                 batch.update(docRef, { tier: calculatedTier });
+                                hasUpdates = true;
                             }
                         }
                     }
                 }
                 
-                if (batch._delegate._mutations.length > 0) {
+                if (hasUpdates) {
                     await batch.commit();
                 }
             } catch (error) {
@@ -936,6 +997,16 @@
         
         // 투표 모달 열기
         async function openVoteModal() {
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다. 투표 기능을 사용할 수 없습니다.');
+                return;
+            }
+            
+            if (players.length === 0) {
+                alert('선수가 없습니다.');
+                return;
+            }
+            
             // 투표 상태 확인
             const deviceId = getDeviceId();
             try {
