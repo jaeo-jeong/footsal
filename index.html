@@ -538,11 +538,16 @@
     <script>
         // Firebase 초기화
         let db;
-        if (typeof firebaseConfig !== 'undefined') {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-        } else {
-            console.error('Firebase 설정이 없습니다. firebase-config.js 파일을 확인해주세요.');
+        try {
+            if (typeof firebaseConfig !== 'undefined' && typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                console.log('Firebase 초기화 완료');
+            } else {
+                console.error('Firebase 설정이 없습니다. firebase-config.js 파일을 확인해주세요.');
+            }
+        } catch (error) {
+            console.error('Firebase 초기화 실패:', error);
         }
         
         // 관리자 코드
@@ -684,6 +689,9 @@
                     } catch (error) {
                         console.error('데이터 로드 실패:', error);
                     }
+                } else {
+                    console.error('Firebase가 초기화되지 않았습니다.');
+                    alert('Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.');
                 }
             } else {
                 alert('잘못된 관리자 코드입니다.');
@@ -692,6 +700,8 @@
         
         // 일반 사용자로 입장
         async function enterAsGuest() {
+            isAdmin = false;
+            adminCode = '';
             document.getElementById('adminModal').classList.remove('active');
             updateUIForPermission();
             
@@ -703,6 +713,8 @@
                 } catch (error) {
                     console.error('데이터 로드 실패:', error);
                 }
+            } else {
+                console.error('Firebase가 초기화되지 않았습니다.');
             }
         }
         
@@ -713,10 +725,24 @@
             document.getElementById('addPlayerForm').style.display = isAdmin ? 'block' : 'none';
             
             // 선수 카드의 수정/삭제 버튼은 renderPlayers에서 처리
+            // 권한 변경 시 선수 목록 다시 렌더링
+            if (players.length > 0) {
+                renderPlayers();
+            }
         }
         
         // Firebase에서 선수 목록 로드
         async function loadPlayersFromFirebase() {
+            if (!db || typeof db === 'undefined') {
+                console.error('Firebase가 초기화되지 않았습니다.');
+                // 임시 ID를 가진 기본 데이터 사용
+                players = defaultPlayers.map((p, idx) => ({ ...p, id: 'temp_' + idx }));
+                sortPlayersByName();
+                renderPlayers();
+                renderTierTable();
+                return;
+            }
+            
             try {
                 const playersRef = db.collection('players');
                 const snapshot = await playersRef.get();
@@ -724,7 +750,9 @@
                 if (snapshot.empty) {
                     // 데이터가 없으면 기본 선수 데이터 추가
                     await initializeDefaultPlayers();
-                    players = defaultPlayers;
+                    // 다시 로드
+                    const newSnapshot = await playersRef.get();
+                    players = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 } else {
                     players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 }
@@ -737,7 +765,11 @@
                 renderTierTable();
             } catch (error) {
                 console.error('선수 목록 로드 실패:', error);
-                alert('데이터를 불러오는데 실패했습니다.');
+                // 오류가 있어도 기본 데이터 표시
+                players = defaultPlayers.map((p, idx) => ({ ...p, id: 'temp_' + idx }));
+                sortPlayersByName();
+                renderPlayers();
+                renderTierTable();
             }
         }
         
@@ -894,7 +926,8 @@
                 // 관리자만 수정/삭제 가능
                 const tierSelectDisabled = isAdmin ? '' : 'disabled';
                 const playerId = player.id || '';
-                const deleteButtonHtml = isAdmin && playerId
+                // 관리자이고 playerId가 있으면 삭제 버튼 표시
+                const deleteButtonHtml = (isAdmin && playerId) 
                     ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayerById('${playerId}')">삭제</button>`
                     : '';
                 
@@ -1148,8 +1181,9 @@
                 return;
             }
             
-            if (!db) {
-                alert('Firebase가 초기화되지 않았습니다.');
+            if (!db || typeof db === 'undefined') {
+                alert('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.');
+                console.error('db 상태:', db);
                 return;
             }
             
@@ -1189,8 +1223,9 @@
                 return;
             }
             
-            if (!db) {
-                alert('Firebase가 초기화되지 않았습니다.');
+            if (!db || typeof db === 'undefined') {
+                alert('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.');
+                console.error('db 상태:', db);
                 return;
             }
             
