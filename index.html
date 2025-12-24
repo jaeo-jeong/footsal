@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>젓자FC 팀 짜기</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -356,15 +359,123 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* 모달 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .vote-section {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .vote-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .vote-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .vote-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .vote-item select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
+    <!-- 관리자 코드 입력 모달 -->
+    <div id="adminModal" class="modal active">
+        <div class="modal-content">
+            <div class="modal-title">관리자 코드 입력</div>
+            <input type="password" id="adminCodeInput" class="modal-input" placeholder="관리자 코드를 입력하세요">
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="enterAsAdmin()">관리자로 입장</button>
+                <button class="btn btn-secondary" onclick="enterAsGuest()">일반 사용자로 입장</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <h1>⚽ 젓자FC</h1>
         
         <div style="text-align: center; margin-bottom: 20px;">
-            <button class="btn btn-secondary" onclick="resetToDefault()" style="background: #dc3545; color: white;">
+            <button id="resetBtn" class="btn btn-secondary" onclick="resetToDefault()" style="background: #dc3545; color: white;" disabled>
                 초기값으로 되돌리기
+            </button>
+            <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()" style="margin-left: 10px;">
+                티어 투표하기
             </button>
         </div>
 
@@ -373,10 +484,22 @@
             <div class="tier-list" id="tierList"></div>
         </div>
 
+        <!-- 투표 모달 -->
+        <div id="voteModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-title">티어 투표</div>
+                <div id="voteContent"></div>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" onclick="submitVote()">투표 제출</button>
+                    <button class="btn btn-secondary" onclick="closeVoteModal()">취소</button>
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <h2 class="section-title">선수 관리</h2>
             
-            <div class="add-player-form">
+            <div class="add-player-form" id="addPlayerForm" style="display: none;">
                 <div class="form-row">
                     <div class="form-group">
                         <label>이름</label>
@@ -413,6 +536,13 @@
     </div>
 
     <script>
+        // API 서버 URL
+        const API_URL = 'http://localhost:3001/api';
+        
+        // 권한 관리
+        let isAdmin = false;
+        let adminCode = '';
+
         // 티어 가중치 (높을수록 강함)
         const tierWeights = {
             'S': 6,
@@ -424,7 +554,7 @@
         };
 
         // localStorage 키
-        const STORAGE_KEY = 'jeotjaFcPlayers';
+        const ADMIN_CODE_KEY = 'jeotjaFcAdminCode';
 
         // 기본 선수 데이터
         const defaultPlayers = [
@@ -458,45 +588,213 @@
             { name: '전은호', tier: 'B' }
         ];
 
-        // 선수 데이터 로드 (localStorage에서 불러오기)
-        function loadPlayers() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    // 저장된 데이터가 있으면 사용, 없으면 기본 데이터 사용
-                    const loadedPlayers = parsed.length > 0 ? parsed : defaultPlayers;
-                    // 기존 데이터에서 position 필드 제거 (하위 호환성)
-                    const cleanedPlayers = loadedPlayers.map(p => {
-                        const { position, ...rest } = p;
-                        return rest;
-                    });
-                    // 이름 기준으로 정렬
-                    cleanedPlayers.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-                    return cleanedPlayers;
-                }
-            } catch (e) {
-                console.error('데이터 로드 실패:', e);
-            }
-            // 기본 데이터도 정렬하여 반환
-            const sortedDefault = [...defaultPlayers].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-            return sortedDefault;
-        }
-
-        // 선수 데이터 저장 (localStorage에 저장)
-        function savePlayers() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
-            } catch (e) {
-                console.error('데이터 저장 실패:', e);
-            }
+        // 투표 평균으로 티어 계산
+        function calculateTierFromVotes(votes) {
+            if (!votes || votes.length === 0) return 'B';
+            
+            const tierWeights = { 'S': 6, 'A+': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+            const weightToTier = { 6: 'S', 5: 'A+', 4: 'A', 3: 'B', 2: 'C', 1: 'D' };
+            
+            const totalWeight = votes.reduce((sum, vote) => sum + (tierWeights[vote.tier] || 3), 0);
+            const avgWeight = totalWeight / votes.length;
+            
+            // 가장 가까운 티어로 반올림
+            const roundedWeight = Math.round(avgWeight);
+            return weightToTier[roundedWeight] || 'B';
         }
 
         // 선수 데이터 초기화
-        let players = loadPlayers();
+        let players = [];
         
         // 선택된 선수 추적 (선수 이름을 키로 사용)
         let selectedPlayers = new Set();
+        
+        // 투표 데이터
+        let voteData = {};
+        
+        // 페이지 로드 시 초기화
+        async function init() {
+            // Firebase 연결 확인
+            if (typeof firebase === 'undefined' || !db) {
+                alert('Firebase가 초기화되지 않았습니다. firebase-config.js 파일을 확인해주세요.');
+                return;
+            }
+            
+            // 저장된 관리자 코드 확인
+            const savedAdminCode = localStorage.getItem(ADMIN_CODE_KEY);
+            if (savedAdminCode && savedAdminCode === ADMIN_CODE) {
+                isAdmin = true;
+                adminCode = savedAdminCode;
+                document.getElementById('adminModal').classList.remove('active');
+                updateUIForPermission();
+            } else {
+                // 일반 사용자로 입장
+                document.getElementById('adminModal').classList.remove('active');
+                updateUIForPermission();
+            }
+            
+            // 선수 목록 로드 및 실시간 리스너 설정
+            await loadPlayersFromFirebase();
+            setupRealtimeListener();
+        }
+        
+        // 관리자로 입장
+        async function enterAsAdmin() {
+            const code = document.getElementById('adminCodeInput').value;
+            if (!code) {
+                alert('관리자 코드를 입력해주세요.');
+                return;
+            }
+            
+            if (code === ADMIN_CODE) {
+                isAdmin = true;
+                adminCode = code;
+                localStorage.setItem(ADMIN_CODE_KEY, code);
+                document.getElementById('adminModal').classList.remove('active');
+                updateUIForPermission();
+            } else {
+                alert('잘못된 관리자 코드입니다.');
+            }
+        }
+        
+        // 일반 사용자로 입장
+        async function enterAsGuest() {
+            document.getElementById('adminModal').classList.remove('active');
+            updateUIForPermission();
+        }
+        
+        // 권한에 따른 UI 업데이트
+        function updateUIForPermission() {
+            // 관리자 전용 버튼 활성화/비활성화
+            document.getElementById('resetBtn').disabled = !isAdmin;
+            document.getElementById('addPlayerForm').style.display = isAdmin ? 'block' : 'none';
+            
+            // 선수 카드의 수정/삭제 버튼은 renderPlayers에서 처리
+        }
+        
+        // Firebase에서 선수 목록 로드
+        async function loadPlayersFromFirebase() {
+            try {
+                const playersRef = db.collection('players');
+                const snapshot = await playersRef.get();
+                
+                if (snapshot.empty) {
+                    // 데이터가 없으면 기본 선수 데이터 추가
+                    await initializeDefaultPlayers();
+                    players = defaultPlayers;
+                } else {
+                    players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                }
+                
+                // 투표 데이터로 티어 업데이트
+                await updateTiersFromVotes();
+                
+                sortPlayersByName();
+                renderPlayers();
+                renderTierTable();
+            } catch (error) {
+                console.error('선수 목록 로드 실패:', error);
+                alert('데이터를 불러오는데 실패했습니다.');
+            }
+        }
+        
+        // 기본 선수 데이터 초기화
+        async function initializeDefaultPlayers() {
+            const batch = db.batch();
+            defaultPlayers.forEach(player => {
+                const docRef = db.collection('players').doc();
+                batch.set(docRef, player);
+            });
+            await batch.commit();
+        }
+        
+        // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
+        function setupRealtimeListener() {
+            db.collection('players').onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const playerData = { id: change.doc.id, ...change.doc.data() };
+                        const index = players.findIndex(p => p.id === change.doc.id);
+                        if (index >= 0) {
+                            players[index] = playerData;
+                        } else {
+                            players.push(playerData);
+                        }
+                    } else if (change.type === 'removed') {
+                        players = players.filter(p => p.id !== change.doc.id);
+                    }
+                });
+                
+                // 투표 데이터로 티어 업데이트
+                updateTiersFromVotes().then(() => {
+                    sortPlayersByName();
+                    renderPlayers();
+                    renderTierTable();
+                });
+            });
+        }
+        
+        // Firebase에 선수 목록 저장
+        async function savePlayersToFirebase() {
+            if (!isAdmin) return;
+            
+            try {
+                const batch = db.batch();
+                
+                // 기존 선수들 업데이트
+                for (const player of players) {
+                    if (player.id) {
+                        const docRef = db.collection('players').doc(player.id);
+                        const { id, ...playerData } = player;
+                        batch.update(docRef, playerData);
+                    }
+                }
+                
+                await batch.commit();
+            } catch (error) {
+                console.error('선수 목록 저장 실패:', error);
+                alert('저장에 실패했습니다.');
+            }
+        }
+        
+        // 투표 데이터로 티어 업데이트
+        async function updateTiersFromVotes() {
+            try {
+                const votesSnapshot = await db.collection('votes').get();
+                const votes = votesSnapshot.docs.map(doc => doc.data());
+                
+                // 선수별로 투표 그룹화
+                const votesByPlayer = {};
+                votes.forEach(vote => {
+                    if (!votesByPlayer[vote.playerName]) {
+                        votesByPlayer[vote.playerName] = [];
+                    }
+                    votesByPlayer[vote.playerName].push(vote);
+                });
+                
+                // 각 선수의 티어를 투표 평균으로 업데이트
+                const batch = db.batch();
+                for (const player of players) {
+                    const playerVotes = votesByPlayer[player.name] || [];
+                    if (playerVotes.length > 0) {
+                        const calculatedTier = calculateTierFromVotes(playerVotes);
+                        if (player.tier !== calculatedTier) {
+                            player.tier = calculatedTier;
+                            if (player.id) {
+                                const docRef = db.collection('players').doc(player.id);
+                                batch.update(docRef, { tier: calculatedTier });
+                            }
+                        }
+                    }
+                }
+                
+                if (batch._delegate._mutations.length > 0) {
+                    await batch.commit();
+                }
+            } catch (error) {
+                console.error('티어 업데이트 실패:', error);
+            }
+        }
 
         // 한국어 이름 정렬 함수 (성 기준 가나다 순)
         function sortPlayersByName() {
@@ -535,6 +833,12 @@
                 // 정렬 후 실제 인덱스 찾기
                 const actualIndex = players.findIndex(p => p.name === player.name);
                 
+                // 관리자만 수정/삭제 가능
+                const tierSelectDisabled = isAdmin ? '' : 'disabled';
+                const deleteButtonHtml = isAdmin 
+                    ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayer(${actualIndex})">삭제</button>`
+                    : '';
+                
                 card.innerHTML = `
                     <div class="player-name">
                         <input type="checkbox" class="player-checkbox" 
@@ -546,7 +850,7 @@
                     <div class="player-fields">
                         <div class="field-group">
                             <label>티어</label>
-                            <select onchange="updatePlayer(${actualIndex}, 'tier', this.value)" onclick="event.stopPropagation()">
+                            <select onchange="updatePlayer(${actualIndex}, 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
                                 <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
                                 <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
@@ -555,7 +859,7 @@
                                 <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
                             </select>
                         </div>
-                        <button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayer(${actualIndex})">삭제</button>
+                        ${deleteButtonHtml}
                     </div>
                 `;
                 grid.appendChild(card);
@@ -589,22 +893,143 @@
         }
 
         // 초기값으로 되돌리기
-        function resetToDefault() {
+        async function resetToDefault() {
+            if (!isAdmin) {
+                alert('관리자만 초기값으로 되돌릴 수 있습니다.');
+                return;
+            }
+            
             if (confirm('모든 선수 데이터를 초기 상태로 되돌리시겠습니까?\n(추가/수정/삭제한 모든 내용이 초기값으로 복원됩니다)')) {
-                // localStorage 초기화
-                localStorage.removeItem(STORAGE_KEY);
+                try {
+                    // 기존 선수 모두 삭제
+                    const playersSnapshot = await db.collection('players').get();
+                    const batch1 = db.batch();
+                    playersSnapshot.docs.forEach(doc => {
+                        batch1.delete(doc.ref);
+                    });
+                    await batch1.commit();
+                    
+                    // 투표 데이터 삭제
+                    const votesSnapshot = await db.collection('votes').get();
+                    const batch2 = db.batch();
+                    votesSnapshot.docs.forEach(doc => {
+                        batch2.delete(doc.ref);
+                    });
+                    await batch2.commit();
+                    
+                    // 기본 선수 데이터 추가
+                    await initializeDefaultPlayers();
+                    
+                    // 선택된 선수 목록 초기화
+                    selectedPlayers.clear();
+                    
+                    // 선수 목록 다시 로드
+                    await loadPlayersFromFirebase();
+                    
+                    alert('초기값으로 복원되었습니다.');
+                } catch (error) {
+                    console.error('초기화 실패:', error);
+                    alert('초기화에 실패했습니다.');
+                }
+            }
+        }
+        
+        // 투표 모달 열기
+        async function openVoteModal() {
+            // 투표 상태 확인
+            const deviceId = getDeviceId();
+            try {
+                const votesSnapshot = await db.collection('votes')
+                    .where('deviceId', '==', deviceId)
+                    .get();
                 
-                // 선수 데이터를 기본값으로 복원
-                players = defaultPlayers.map(p => ({ ...p })); // 깊은 복사
+                if (!votesSnapshot.empty) {
+                    if (!confirm('이미 투표하셨습니다. 다시 투표하시겠습니까?\n(기존 투표는 덮어씌워집니다)')) {
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('투표 상태 확인 실패:', error);
+            }
+            
+            // 투표 UI 생성
+            const voteContent = document.getElementById('voteContent');
+            voteContent.innerHTML = '<div class="vote-grid" id="voteGrid"></div>';
+            
+            const voteGrid = document.getElementById('voteGrid');
+            players.forEach(player => {
+                const voteItem = document.createElement('div');
+                voteItem.className = 'vote-item';
+                voteItem.innerHTML = `
+                    <span style="flex: 1; font-weight: 600;">${player.name}</span>
+                    <select id="vote_${player.name}" class="vote-select">
+                        <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
+                        <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
+                        <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
+                        <option value="B" ${player.tier === 'B' ? 'selected' : ''}>B</option>
+                        <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
+                        <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
+                    </select>
+                `;
+                voteGrid.appendChild(voteItem);
+            });
+            
+            document.getElementById('voteModal').classList.add('active');
+        }
+        
+        // 투표 모달 닫기
+        function closeVoteModal() {
+            document.getElementById('voteModal').classList.remove('active');
+        }
+        
+        // 투표 제출
+        async function submitVote() {
+            const deviceId = getDeviceId();
+            const votes = [];
+            
+            players.forEach(player => {
+                const select = document.getElementById(`vote_${player.name}`);
+                if (select) {
+                    votes.push({
+                        playerName: player.name,
+                        tier: select.value
+                    });
+                }
+            });
+            
+            try {
+                // 기존 투표 삭제 (이 디바이스의 모든 투표)
+                const existingVotesSnapshot = await db.collection('votes')
+                    .where('deviceId', '==', deviceId)
+                    .get();
                 
-                // 선택된 선수 목록 초기화
-                selectedPlayers.clear();
+                const batch = db.batch();
+                existingVotesSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
                 
-                // 저장 및 렌더링
-                savePlayers();
-                renderPlayers();
+                // 새 투표 추가
+                const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+                votes.forEach(({ playerName, tier }) => {
+                    const voteRef = db.collection('votes').doc();
+                    batch.set(voteRef, {
+                        playerName,
+                        tier,
+                        deviceId,
+                        timestamp
+                    });
+                });
                 
-                alert('초기값으로 복원되었습니다.');
+                await batch.commit();
+                
+                // 티어 업데이트 (투표 평균 계산)
+                await updateTiersFromVotes();
+                
+                closeVoteModal();
+                alert('투표가 완료되었습니다.');
+            } catch (error) {
+                console.error('투표 제출 실패:', error);
+                alert('투표 제출에 실패했습니다.');
             }
         }
 
@@ -639,7 +1064,12 @@
         }
 
         // 선수 추가
-        function addPlayer() {
+        async function addPlayer() {
+            if (!isAdmin) {
+                alert('관리자만 선수를 추가할 수 있습니다.');
+                return;
+            }
+            
             const name = document.getElementById('newPlayerName').value.trim();
             const tier = document.getElementById('newPlayerTier').value;
 
@@ -653,29 +1083,82 @@
                 return;
             }
 
-            players.push({ name, tier });
-            // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
-            document.getElementById('newPlayerName').value = '';
-            savePlayers(); // 저장
-            renderPlayers();
+            try {
+                // Firebase에 추가
+                const docRef = await db.collection('players').add({ name, tier });
+                const newPlayer = { id: docRef.id, name, tier };
+                players.push(newPlayer);
+                
+                // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
+                document.getElementById('newPlayerName').value = '';
+                sortPlayersByName();
+                renderPlayers();
+            } catch (error) {
+                console.error('선수 추가 실패:', error);
+                alert('선수 추가에 실패했습니다.');
+            }
         }
 
         // 선수 정보 업데이트
-        function updatePlayer(index, field, value) {
-            players[index][field] = value;
-            savePlayers(); // 저장
-            renderTierTable(); // 티어표 업데이트
+        async function updatePlayer(index, field, value) {
+            if (!isAdmin) {
+                alert('관리자만 선수 정보를 수정할 수 있습니다.');
+                return;
+            }
+            
+            const player = players[index];
+            if (!player || !player.id) {
+                alert('선수 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            try {
+                // Firebase 업데이트
+                await db.collection('players').doc(player.id).update({ [field]: value });
+                player[field] = value;
+                renderTierTable(); // 티어표 업데이트
+            } catch (error) {
+                console.error('선수 정보 업데이트 실패:', error);
+                alert('업데이트에 실패했습니다.');
+            }
         }
 
         // 선수 삭제
-        function deletePlayer(index) {
-            const playerName = players[index].name;
+        async function deletePlayer(index) {
+            if (!isAdmin) {
+                alert('관리자만 선수를 삭제할 수 있습니다.');
+                return;
+            }
+            
+            const player = players[index];
+            if (!player) return;
+            
+            const playerName = player.name;
             if (confirm(`${playerName} 선수를 삭제하시겠습니까?`)) {
-                // 선택 목록에서도 제거
-                selectedPlayers.delete(playerName);
-                players.splice(index, 1);
-                savePlayers(); // 저장
-                renderPlayers();
+                try {
+                    // Firebase에서 삭제
+                    if (player.id) {
+                        await db.collection('players').doc(player.id).delete();
+                    }
+                    
+                    // 투표 데이터도 삭제
+                    const votesSnapshot = await db.collection('votes')
+                        .where('playerName', '==', playerName)
+                        .get();
+                    const batch = db.batch();
+                    votesSnapshot.docs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+                    
+                    // 선택 목록에서도 제거
+                    selectedPlayers.delete(playerName);
+                    players.splice(index, 1);
+                    renderPlayers();
+                } catch (error) {
+                    console.error('선수 삭제 실패:', error);
+                    alert('삭제에 실패했습니다.');
+                }
             }
         }
 
@@ -1097,8 +1580,7 @@
         }
 
         // 초기 렌더링
-        renderPlayers();
-        renderTierTable();
+        init();
     </script>
 </body>
 </html>
