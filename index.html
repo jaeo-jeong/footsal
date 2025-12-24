@@ -386,6 +386,8 @@
             background-color: rgba(0, 0, 0, 0.5);
             justify-content: center;
             align-items: center;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .modal.active {
@@ -417,6 +419,12 @@
             min-height: 0;
             margin-bottom: 20px;
             padding-right: 10px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 모달 내부 스크롤 시 배경 스크롤 방지 */
+        #voteModal .modal-content {
+            touch-action: pan-y;
         }
         
         /* 스크롤바 스타일링 (선택사항) */
@@ -1402,11 +1410,49 @@
             });
             
             document.getElementById('voteModal').classList.add('active');
+            // 모달이 열릴 때 body 스크롤 막기
+            document.body.style.overflow = 'hidden';
+            
+            // 모달 내부 스크롤 영역에 터치 이벤트 핸들러 추가 (모바일)
+            const voteContentEl = document.getElementById('voteContent');
+            let startY = 0;
+            let isScrolling = false;
+            
+            voteContentEl.addEventListener('touchstart', function(e) {
+                startY = e.touches[0].clientY;
+                isScrolling = false;
+            }, { passive: true });
+            
+            voteContentEl.addEventListener('touchmove', function(e) {
+                const currentY = e.touches[0].clientY;
+                const scrollTop = voteContentEl.scrollTop;
+                const scrollHeight = voteContentEl.scrollHeight;
+                const clientHeight = voteContentEl.clientHeight;
+                
+                // 스크롤 가능 여부 확인
+                const isAtTop = scrollTop === 0;
+                const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+                const isScrollingUp = currentY > startY;
+                const isScrollingDown = currentY < startY;
+                
+                // 스크롤이 끝에 도달했고, 그 방향으로 더 스크롤하려고 하면 배경 스크롤 방지
+                if ((isAtTop && isScrollingUp) || (isAtBottom && isScrollingDown)) {
+                    e.preventDefault();
+                }
+                
+                isScrolling = true;
+            }, { passive: false });
+            
+            voteContentEl.addEventListener('touchend', function(e) {
+                isScrolling = false;
+            }, { passive: true });
         }
         
         // 투표 모달 닫기
         function closeVoteModal() {
             document.getElementById('voteModal').classList.remove('active');
+            // 모달이 닫힐 때 body 스크롤 복원
+            document.body.style.overflow = '';
         }
         
         // 투표 제출
