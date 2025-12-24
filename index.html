@@ -405,7 +405,8 @@
             <div class="controls">
                 <button class="btn btn-secondary" onclick="selectAllPlayers()">전체 선택</button>
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
-                <button class="btn btn-primary" onclick="generateTeams()">팀 구성하기</button>
+                <button class="btn btn-primary" onclick="generateFutsalTeams()">풋살팀 구성</button>
+                <button class="btn btn-primary" onclick="generateSoccerTeams()">축구팀 구성</button>
             </div>
             <div class="teams-container" id="teamsContainer"></div>
         </div>
@@ -678,8 +679,8 @@
             }
         }
 
-        // 총 인원에 따른 팀 구성 규칙
-        function getTeamSizes(totalPlayers) {
+        // 풋살팀 구성 규칙
+        function getFutsalTeamSizes(totalPlayers) {
             const rules = {
                 12: [6, 6],
                 13: [7, 6],
@@ -691,26 +692,21 @@
                 19: [7, 6, 6],
                 20: [7, 7, 6],
                 21: [7, 7, 7],
-                // 축구 팀 구성 (22명 이상)
-                22: [11, 11],
-                23: [12, 11],
-                24: [12, 12],
-                25: [13, 12],
-                26: [13, 13],
-                27: [14, 13],
-                28: [14, 14],
-                29: [15, 14],
-                30: [15, 15],
-                31: [16, 15],
-                32: [16, 16]
+                22: [6, 6, 5, 5],
+                23: [6, 6, 6, 5],
+                24: [6, 6, 6, 6],
+                25: [7, 6, 6, 6],
+                26: [7, 7, 6, 6],
+                27: [7, 7, 7, 6],
+                28: [7, 7, 7, 7]
             };
             
             if (rules[totalPlayers]) {
                 return rules[totalPlayers];
             }
             
-            // 32명 초과인 경우 기본 처리 (2팀으로 균등 분배)
-            if (totalPlayers > 32) {
+            // 10-11명인 경우 기본 처리 (2팀)
+            if (totalPlayers < 12) {
                 const teamSize = Math.floor(totalPlayers / 2);
                 const remainder = totalPlayers % 2;
                 if (remainder === 0) {
@@ -720,7 +716,11 @@
                 }
             }
             
-            // 10-11명인 경우 기본 처리
+            return null;
+        }
+
+        // 축구팀 구성 규칙 (2팀으로 나누기)
+        function getSoccerTeamSizes(totalPlayers) {
             const teamSize = Math.floor(totalPlayers / 2);
             const remainder = totalPlayers % 2;
             if (remainder === 0) {
@@ -730,8 +730,8 @@
             }
         }
 
-        // 팀 구성 생성
-        function generateTeams() {
+        // 풋살팀 구성 생성
+        function generateFutsalTeams() {
             // 선택된 선수들만 필터링
             const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
             const totalPlayers = selectedPlayersList.length;
@@ -741,14 +741,19 @@
                 return;
             }
 
-            // 22명 이상일 때 메시지 표시
-            if (totalPlayers >= 22) {
-                alert('22명 이상부터는 축구 팀으로 구성합니다.');
+            // 29명 이상일 때 경고
+            if (totalPlayers >= 29) {
+                alert('그냥 축구를 하세요');
+                return;
             }
 
             // 총 인원에 따른 팀 크기 결정
-            const teamSizes = getTeamSizes(totalPlayers);
-            const numTeams = teamSizes.length;
+            const teamSizes = getFutsalTeamSizes(totalPlayers);
+            
+            if (!teamSizes) {
+                alert('풋살팀 구성이 불가능한 인원 수입니다.');
+                return;
+            }
             
             // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
             const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
@@ -774,7 +779,52 @@
             }
 
             if (!bestTeams) {
-                alert('팀 구성을 실패했습니다. 선수 수나 포지션 구성을 확인해주세요.');
+                alert('팀 구성을 실패했습니다. 선수 수를 확인해주세요.');
+                return;
+            }
+
+            renderTeams(bestTeams, teamSizes);
+        }
+
+        // 축구팀 구성 생성
+        function generateSoccerTeams() {
+            // 선택된 선수들만 필터링
+            const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
+            const totalPlayers = selectedPlayersList.length;
+            
+            if (totalPlayers < 2) {
+                alert('최소 2명의 선수를 선택해주세요.');
+                return;
+            }
+
+            // 총 인원에 따른 팀 크기 결정 (2팀으로 나누기)
+            const teamSizes = getSoccerTeamSizes(totalPlayers);
+            
+            // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
+            const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
+
+            // 최적 팀 찾기 (최대 200번 시도, 매번 새로운 랜덤 시드)
+            let bestTeams = null;
+            let bestDiff = Infinity;
+
+            for (let attempt = 0; attempt < 200; attempt++) {
+                // 매 시도마다 선수 목록을 다시 섞기
+                const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
+                
+                const teams = createBalancedTeams(teamSizes, reShuffledList);
+                if (teams) {
+                    const diff = calculateTeamDifference(teams);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        bestTeams = teams;
+                        // 완벽한 밸런스면 중단
+                        if (diff === 0) break;
+                    }
+                }
+            }
+
+            if (!bestTeams) {
+                alert('팀 구성을 실패했습니다. 선수 수를 확인해주세요.');
                 return;
             }
 
