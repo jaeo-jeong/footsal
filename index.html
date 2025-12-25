@@ -1420,8 +1420,8 @@
             
             const voteGrid = document.getElementById('voteGrid');
             players.forEach(player => {
-                // 기존 투표가 있으면 그 값을 사용, 없으면 현재 티어 사용
-                const selectedTier = existingVotes[player.name] || player.tier;
+                // 기존 투표가 있으면 그 값을 사용, 없으면 기본값 B 사용 (다른 사람의 투표 결과가 아닌)
+                const selectedTier = existingVotes[player.name] || 'B';
                 
                 const voteItem = document.createElement('div');
                 voteItem.className = 'vote-item';
