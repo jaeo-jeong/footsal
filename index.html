@@ -283,6 +283,7 @@
         .tier-S { background: #ff6b6b; }
         .tier-Aplus { background: #ffa500; }
         .tier-A { background: #ffd93d; }
+        .tier-Bplus { background: #5dd68a; }
         .tier-B { background: #6bcf7f; }
         .tier-C { background: #4ecdc4; }
         .tier-D { background: #95a5a6; }
@@ -538,6 +539,9 @@
             <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()" style="margin-left: 20px;">
                 티어 투표하기
             </button>
+            <button id="voteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal()" style="margin-left: 20px; background: #17a2b8; color: white; display: none;">
+                티어 투표 이력 보기
+            </button>
         </div>
 
         <div class="tier-table">
@@ -557,6 +561,23 @@
             </div>
         </div>
 
+        <!-- 투표 이력 모달 (관리자 전용) -->
+        <div id="voteHistoryModal" class="modal">
+            <div class="modal-content" style="max-width: 90%; max-height: 90vh;">
+                <div class="modal-title">티어 투표 이력 (관리자 전용)</div>
+                <div id="voteHistoryContent" style="overflow-y: auto; max-height: calc(90vh - 150px); padding: 20px;">
+                    <div id="voteHistoryStats" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 1.2em;">투표 통계</h3>
+                        <p style="margin: 5px 0; font-size: 1em;"><strong>총 투표 수:</strong> <span id="totalVoteCount">0</span>명</p>
+                    </div>
+                    <div id="voteHistoryTable"></div>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeVoteHistoryModal()">닫기</button>
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <h2 class="section-title">선수 관리</h2>
             
@@ -572,6 +593,7 @@
                             <option value="S">S</option>
                             <option value="A+">A+</option>
                             <option value="A">A</option>
+                            <option value="B+">B+</option>
                             <option value="B" selected>B</option>
                             <option value="C">C</option>
                             <option value="D">D</option>
@@ -738,9 +760,10 @@
 
         // 티어 가중치 (높을수록 강함)
         const tierWeights = {
-            'S': 6,
-            'A+': 5,
-            'A': 4,
+            'S': 7,
+            'A+': 6,
+            'A': 5,
+            'B+': 4,
             'B': 3,
             'C': 2,
             'D': 1
@@ -786,8 +809,8 @@
         function calculateTierFromVotes(votes) {
             if (!votes || votes.length === 0) return 'B';
             
-            const tierWeights = { 'S': 6, 'A+': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
-            const weightToTier = { 6: 'S', 5: 'A+', 4: 'A', 3: 'B', 2: 'C', 1: 'D' };
+            const tierWeights = { 'S': 7, 'A+': 6, 'A': 5, 'B+': 4, 'B': 3, 'C': 2, 'D': 1 };
+            const weightToTier = { 7: 'S', 6: 'A+', 5: 'A', 4: 'B+', 3: 'B', 2: 'C', 1: 'D' };
             
             const totalWeight = votes.reduce((sum, vote) => sum + (tierWeights[vote.tier] || 3), 0);
             const avgWeight = totalWeight / votes.length;
@@ -984,6 +1007,12 @@
             const voteBtn = document.getElementById('voteBtn');
             if (voteBtn) {
                 voteBtn.style.display = isAdmin ? 'none' : 'inline-block';
+            }
+            
+            // 티어 투표 이력 보기 버튼: 관리자일 때만 보이게
+            const voteHistoryBtn = document.getElementById('voteHistoryBtn');
+            if (voteHistoryBtn) {
+                voteHistoryBtn.style.display = isAdmin ? 'inline-block' : 'none';
             }
             
             // 선수 카드의 수정/삭제 버튼은 renderPlayers에서 처리
@@ -1252,6 +1281,7 @@
                                 <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
                                 <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
+                                <option value="B+" ${player.tier === 'B+' ? 'selected' : ''}>B+</option>
                                 <option value="B" ${player.tier === 'B' ? 'selected' : ''}>B</option>
                                 <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
                                 <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
@@ -1401,6 +1431,7 @@
                         <option value="S" ${selectedTier === 'S' ? 'selected' : ''}>S</option>
                         <option value="A+" ${selectedTier === 'A+' ? 'selected' : ''}>A+</option>
                         <option value="A" ${selectedTier === 'A' ? 'selected' : ''}>A</option>
+                        <option value="B+" ${selectedTier === 'B+' ? 'selected' : ''}>B+</option>
                         <option value="B" ${selectedTier === 'B' ? 'selected' : ''}>B</option>
                         <option value="C" ${selectedTier === 'C' ? 'selected' : ''}>C</option>
                         <option value="D" ${selectedTier === 'D' ? 'selected' : ''}>D</option>
@@ -1506,13 +1537,167 @@
             }
         }
 
+        // 투표 이력 모달 열기 (관리자 전용)
+        async function openVoteHistoryModal() {
+            if (!db) {
+                alert('Firebase가 초기화되지 않았습니다.');
+                return;
+            }
+            
+            if (!isAdmin) {
+                alert('관리자만 접근할 수 있습니다.');
+                return;
+            }
+            
+            try {
+                // 모든 투표 데이터 가져오기
+                let votesSnapshot;
+                try {
+                    votesSnapshot = await db.collection('votes')
+                        .orderBy('timestamp', 'desc')
+                        .get();
+                } catch (error) {
+                    // timestamp 인덱스가 없거나 timestamp 필드가 없으면 전체 가져오기
+                    console.warn('timestamp로 정렬 실패, 전체 데이터 가져오기:', error);
+                    votesSnapshot = await db.collection('votes').get();
+                }
+                
+                if (votesSnapshot.empty) {
+                    document.getElementById('voteHistoryContent').innerHTML = 
+                        '<div style="text-align: center; padding: 40px; color: #999;">아직 투표가 없습니다.</div>';
+                    document.getElementById('voteHistoryModal').classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                    return;
+                }
+                
+                const allVotes = votesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                // 디바이스별로 그룹화
+                const votesByDevice = {};
+                allVotes.forEach(vote => {
+                    if (!votesByDevice[vote.deviceId]) {
+                        votesByDevice[vote.deviceId] = [];
+                    }
+                    votesByDevice[vote.deviceId].push(vote);
+                });
+                
+                // 총 투표 수 표시
+                const totalVoteCount = Object.keys(votesByDevice).length;
+                document.getElementById('totalVoteCount').textContent = totalVoteCount;
+                
+                // 테이블 생성
+                const tableContainer = document.getElementById('voteHistoryTable');
+                tableContainer.innerHTML = '';
+                
+                // 선수 목록 가져오기 (정렬)
+                const sortedPlayers = [...players].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                
+                // 테이블 생성
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.style.marginTop = '20px';
+                table.style.fontSize = '0.9em';
+                
+                // 헤더 행
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                headerRow.style.backgroundColor = '#667eea';
+                headerRow.style.color = 'white';
+                
+                const playerHeader = document.createElement('th');
+                playerHeader.textContent = '선수 이름';
+                playerHeader.style.padding = '12px';
+                playerHeader.style.textAlign = 'left';
+                playerHeader.style.border = '1px solid #ddd';
+                headerRow.appendChild(playerHeader);
+                
+                // 각 디바이스별 헤더 추가
+                const deviceIds = Object.keys(votesByDevice);
+                deviceIds.forEach((deviceId, index) => {
+                    const deviceHeader = document.createElement('th');
+                    deviceHeader.textContent = `투표 ${index + 1}`;
+                    deviceHeader.style.padding = '12px';
+                    deviceHeader.style.textAlign = 'center';
+                    deviceHeader.style.border = '1px solid #ddd';
+                    deviceHeader.style.minWidth = '80px';
+                    headerRow.appendChild(deviceHeader);
+                });
+                
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+                
+                // 본문
+                const tbody = document.createElement('tbody');
+                
+                sortedPlayers.forEach((player, playerIndex) => {
+                    const row = document.createElement('tr');
+                    row.style.backgroundColor = playerIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    
+                    // 선수 이름 셀
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = player.name;
+                    nameCell.style.padding = '10px 12px';
+                    nameCell.style.border = '1px solid #ddd';
+                    nameCell.style.fontWeight = '600';
+                    row.appendChild(nameCell);
+                    
+                    // 각 디바이스별 투표 셀
+                    deviceIds.forEach(deviceId => {
+                        const voteCell = document.createElement('td');
+                        voteCell.style.padding = '10px';
+                        voteCell.style.border = '1px solid #ddd';
+                        voteCell.style.textAlign = 'center';
+                        
+                        const deviceVotes = votesByDevice[deviceId];
+                        const playerVote = deviceVotes.find(v => v.playerName === player.name);
+                        
+                        if (playerVote) {
+                            const tierBadge = document.createElement('span');
+                            tierBadge.className = `tier-badge tier-${playerVote.tier.replace('+', 'plus')}`;
+                            tierBadge.textContent = playerVote.tier;
+                            tierBadge.style.display = 'inline-block';
+                            voteCell.appendChild(tierBadge);
+                        } else {
+                            voteCell.textContent = '-';
+                            voteCell.style.color = '#ccc';
+                        }
+                        
+                        row.appendChild(voteCell);
+                    });
+                    
+                    tbody.appendChild(row);
+                });
+                
+                table.appendChild(tbody);
+                tableContainer.appendChild(table);
+                
+                // 모달 표시
+                document.getElementById('voteHistoryModal').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+            } catch (error) {
+                console.error('투표 이력 로드 실패:', error);
+                alert('투표 이력을 불러오는데 실패했습니다: ' + error.message);
+            }
+        }
+        
+        // 투표 이력 모달 닫기
+        function closeVoteHistoryModal() {
+            document.getElementById('voteHistoryModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
         // 티어표 렌더링
         function renderTierTable() {
             const tierList = document.getElementById('tierList');
             tierList.innerHTML = '';
 
             // 티어 순서
-            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             
             tierOrder.forEach(tier => {
                 const tierPlayers = players.filter(p => p.tier === tier);
@@ -1824,7 +2009,7 @@
             const used = new Set();
             
             // 티어별로 선수 분류
-            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             
             // 티어별로 선수 분류
             function groupByTier(playerList) {
@@ -1885,7 +2070,7 @@
         // 티어별 분배 개선 (특정 티어가 한 팀에 몰리지 않도록)
         function improveTierDistribution(teams) {
             const criticalTiers = ['S', 'A+', 'D'];
-            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             
             for (let iteration = 0; iteration < 200; iteration++) {
                 let improved = false;
@@ -2008,7 +2193,7 @@
 
         // 티어별 분배 점수 계산 (낮을수록 좋음)
         function calculateTierDistributionScore(teams) {
-            const tierOrder = ['S', 'A+', 'A', 'B', 'C', 'D'];
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             const criticalTiers = ['S', 'A+', 'D']; // 한 팀에 몰리면 안 되는 티어
             let score = 0;
             
