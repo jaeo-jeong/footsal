@@ -809,11 +809,17 @@
         function calculateTierFromVotes(votes) {
             if (!votes || votes.length === 0) return 'B';
             
+            // "모름" 투표는 제외하고 계산
+            const validVotes = votes.filter(vote => vote.tier !== '모름');
+            
+            // 유효한 투표가 없으면 기본값 B 반환
+            if (validVotes.length === 0) return 'B';
+            
             const tierWeights = { 'S': 7, 'A+': 6, 'A': 5, 'B+': 4, 'B': 3, 'C': 2, 'D': 1 };
             const weightToTier = { 7: 'S', 6: 'A+', 5: 'A', 4: 'B+', 3: 'B', 2: 'C', 1: 'D' };
             
-            const totalWeight = votes.reduce((sum, vote) => sum + (tierWeights[vote.tier] || 3), 0);
-            const avgWeight = totalWeight / votes.length;
+            const totalWeight = validVotes.reduce((sum, vote) => sum + (tierWeights[vote.tier] || 3), 0);
+            const avgWeight = totalWeight / validVotes.length;
             
             // 가장 가까운 티어로 반올림
             const roundedWeight = Math.round(avgWeight);
@@ -1435,6 +1441,7 @@
                         <option value="B" ${selectedTier === 'B' ? 'selected' : ''}>B</option>
                         <option value="C" ${selectedTier === 'C' ? 'selected' : ''}>C</option>
                         <option value="D" ${selectedTier === 'D' ? 'selected' : ''}>D</option>
+                        <option value="모름" ${selectedTier === '모름' ? 'selected' : ''}>모름</option>
                     </select>
                 `;
                 voteGrid.appendChild(voteItem);
@@ -1656,11 +1663,17 @@
                         const playerVote = deviceVotes.find(v => v.playerName === player.name);
                         
                         if (playerVote) {
-                            const tierBadge = document.createElement('span');
-                            tierBadge.className = `tier-badge tier-${playerVote.tier.replace('+', 'plus')}`;
-                            tierBadge.textContent = playerVote.tier;
-                            tierBadge.style.display = 'inline-block';
-                            voteCell.appendChild(tierBadge);
+                            if (playerVote.tier === '모름') {
+                                voteCell.textContent = '모름';
+                                voteCell.style.color = '#999';
+                                voteCell.style.fontStyle = 'italic';
+                            } else {
+                                const tierBadge = document.createElement('span');
+                                tierBadge.className = `tier-badge tier-${playerVote.tier.replace('+', 'plus')}`;
+                                tierBadge.textContent = playerVote.tier;
+                                tierBadge.style.display = 'inline-block';
+                                voteCell.appendChild(tierBadge);
+                            }
                         } else {
                             voteCell.textContent = '-';
                             voteCell.style.color = '#ccc';
