@@ -263,11 +263,49 @@
         .player-info {
             display: flex;
             flex-direction: column;
+            flex: 1;
         }
 
         .player-tier {
             font-size: 0.85em;
             opacity: 0.9;
+        }
+
+        .player-move-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .move-player-select {
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        .move-player-select option {
+            background: #667eea;
+            color: white;
+        }
+
+        .move-player-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 0.85em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .move-player-btn:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
 
 
@@ -2411,6 +2449,45 @@
             }
         }
         
+        // 선수 이동 함수
+        function movePlayerToTeam(playerName, fromTeamIndex, toTeamIndex) {
+            if (!isAdmin) {
+                alert('관리자만 선수를 이동할 수 있습니다.');
+                return;
+            }
+            
+            if (!currentTeamsData || !currentTeamSizes) {
+                alert('팀 구성이 없습니다.');
+                return;
+            }
+            
+            if (fromTeamIndex === toTeamIndex) {
+                return; // 같은 팀으로 이동할 필요 없음
+            }
+            
+            // 선수 찾기
+            const fromTeam = currentTeamsData[fromTeamIndex];
+            const playerIndex = fromTeam.findIndex(p => p.name === playerName);
+            
+            if (playerIndex === -1) {
+                alert('선수를 찾을 수 없습니다.');
+                return;
+            }
+            
+            const player = fromTeam[playerIndex];
+            
+            // 선수 이동
+            fromTeam.splice(playerIndex, 1);
+            currentTeamsData[toTeamIndex].push(player);
+            
+            // 팀 크기 업데이트
+            currentTeamSizes[fromTeamIndex]--;
+            currentTeamSizes[toTeamIndex]++;
+            
+            // 팀 정보 다시 렌더링
+            renderTeams(currentTeamsData, currentTeamSizes);
+        }
+
         // 팀 렌더링
         function renderTeams(teams, teamSizes) {
             // 현재 팀 정보 저장 (티어 숨기기 토글용)
@@ -2435,6 +2512,9 @@
                 const tierSum = sortedTeam.reduce((sum, p) => sum + tierWeights[p.tier], 0);
                 const tierAverage = team.length > 0 ? (tierSum / team.length).toFixed(2) : 0;
 
+                // 다른 팀 목록 생성 (현재 팀 제외)
+                const otherTeams = teams.map((_, idx) => idx).filter(idx => idx !== index);
+
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
                     <div class="team-stats">
@@ -2447,12 +2527,46 @@
                                 <div class="player-info">
                                     <div>${player.name}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span>` : ''}</div>
                                 </div>
+                                ${isAdmin ? `
+                                    <div class="player-move-controls">
+                                        <select class="move-player-select" id="moveSelect_${index}_${player.name}" onchange="event.stopPropagation()">
+                                            <option value="">이동할 팀 선택</option>
+                                            ${otherTeams.map(teamIdx => `<option value="${teamIdx}">팀 ${teamIdx + 1}</option>`).join('')}
+                                        </select>
+                                        <button class="move-player-btn" onclick="event.stopPropagation(); handleMovePlayer('${player.name}', ${index})">이동</button>
+                                    </div>
+                                ` : ''}
                             </li>
                         `).join('')}
                     </ul>
                 `;
                 container.appendChild(teamDiv);
             });
+        }
+
+        // 선수 이동 처리 함수
+        function handleMovePlayer(playerName, fromTeamIndex) {
+            if (!isAdmin) {
+                alert('관리자만 선수를 이동할 수 있습니다.');
+                return;
+            }
+            
+            const selectId = `moveSelect_${fromTeamIndex}_${playerName}`;
+            const selectElement = document.getElementById(selectId);
+            
+            if (!selectElement) {
+                alert('이동할 팀을 선택할 수 없습니다.');
+                return;
+            }
+            
+            const toTeamIndex = parseInt(selectElement.value);
+            
+            if (isNaN(toTeamIndex)) {
+                alert('이동할 팀을 선택해주세요.');
+                return;
+            }
+            
+            movePlayerToTeam(playerName, fromTeamIndex, toTeamIndex);
         }
 
         // 초기 렌더링
