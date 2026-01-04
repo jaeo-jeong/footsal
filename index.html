@@ -258,6 +258,21 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.2s;
+        }
+
+        .team-player.draggable {
+            cursor: move;
+        }
+
+        .team-player.draggable:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(5px);
+        }
+
+        .team-player.dragging {
+            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .player-info {
@@ -271,41 +286,18 @@
             opacity: 0.9;
         }
 
-        .player-move-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .move-player-select {
-            padding: 6px 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            font-size: 0.85em;
-            cursor: pointer;
-        }
-
-        .move-player-select option {
-            background: #667eea;
-            color: white;
-        }
-
-        .move-player-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.3);
-            color: white;
-            font-size: 0.85em;
-            cursor: pointer;
-            font-weight: 600;
+        .team {
             transition: all 0.2s;
         }
 
-        .move-player-btn:hover {
-            background: rgba(255, 255, 255, 0.5);
+        .team.drag-over {
+            background: linear-gradient(135deg, #7c8ff0 0%, #8a5fb8 100%);
+            border: 3px dashed rgba(255, 255, 255, 0.8);
+            transform: scale(1.02);
+        }
+
+        .team-players {
+            min-height: 50px;
         }
 
 
@@ -2488,6 +2480,10 @@
             renderTeams(currentTeamsData, currentTeamSizes);
         }
 
+        // 드래그 앤 드롭 관련 전역 변수
+        let draggedPlayer = null;
+        let draggedFromTeamIndex = null;
+
         // 팀 렌더링
         function renderTeams(teams, teamSizes) {
             // 현재 팀 정보 저장 (티어 숨기기 토글용)
@@ -2500,6 +2496,7 @@
             teams.forEach((team, index) => {
                 const teamDiv = document.createElement('div');
                 teamDiv.className = 'team';
+                teamDiv.setAttribute('data-team-index', index);
                 
                 // 티어 순으로 정렬
                 const sortedTeam = [...team].sort((a, b) => {
@@ -2512,61 +2509,81 @@
                 const tierSum = sortedTeam.reduce((sum, p) => sum + tierWeights[p.tier], 0);
                 const tierAverage = team.length > 0 ? (tierSum / team.length).toFixed(2) : 0;
 
-                // 다른 팀 목록 생성 (현재 팀 제외)
-                const otherTeams = teams.map((_, idx) => idx).filter(idx => idx !== index);
-
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
                     <div class="team-stats">
                         <div>티어 합: ${tierSum}</div>
                         <div>인원당 평균: ${tierAverage}</div>
                     </div>
-                    <ul class="team-players">
+                    <ul class="team-players" data-team-index="${index}">
                         ${sortedTeam.map(player => `
-                            <li class="team-player">
+                            <li class="team-player ${isAdmin ? 'draggable' : ''}" 
+                                draggable="${isAdmin ? 'true' : 'false'}"
+                                data-player-name="${player.name}"
+                                data-team-index="${index}">
                                 <div class="player-info">
                                     <div>${player.name}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span>` : ''}</div>
                                 </div>
-                                ${isAdmin ? `
-                                    <div class="player-move-controls">
-                                        <select class="move-player-select" id="moveSelect_${index}_${player.name}" onchange="event.stopPropagation()">
-                                            <option value="">이동할 팀 선택</option>
-                                            ${otherTeams.map(teamIdx => `<option value="${teamIdx}">팀 ${teamIdx + 1}</option>`).join('')}
-                                        </select>
-                                        <button class="move-player-btn" onclick="event.stopPropagation(); handleMovePlayer('${player.name}', ${index})">이동</button>
-                                    </div>
-                                ` : ''}
                             </li>
                         `).join('')}
                     </ul>
                 `;
                 container.appendChild(teamDiv);
+                
+                // 관리자인 경우 드래그 앤 드롭 이벤트 설정
+                if (isAdmin) {
+                    setupDragAndDrop(teamDiv, index);
+                }
             });
         }
 
-        // 선수 이동 처리 함수
-        function handleMovePlayer(playerName, fromTeamIndex) {
-            if (!isAdmin) {
-                alert('관리자만 선수를 이동할 수 있습니다.');
-                return;
-            }
+        // 드래그 앤 드롭 이벤트 설정
+        function setupDragAndDrop(teamDiv, teamIndex) {
+            const playersList = teamDiv.querySelector('.team-players');
             
-            const selectId = `moveSelect_${fromTeamIndex}_${playerName}`;
-            const selectElement = document.getElementById(selectId);
+            // 선수 항목에 드래그 이벤트
+            playersList.querySelectorAll('.team-player.draggable').forEach(playerEl => {
+                playerEl.addEventListener('dragstart', function(e) {
+                    draggedPlayer = this.getAttribute('data-player-name');
+                    draggedFromTeamIndex = parseInt(this.getAttribute('data-team-index'));
+                    this.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', this.innerHTML);
+                });
+                
+                playerEl.addEventListener('dragend', function(e) {
+                    this.classList.remove('dragging');
+                    // 모든 팀의 drag-over 클래스 제거
+                    document.querySelectorAll('.team').forEach(team => {
+                        team.classList.remove('drag-over');
+                    });
+                });
+            });
             
-            if (!selectElement) {
-                alert('이동할 팀을 선택할 수 없습니다.');
-                return;
-            }
+            // 팀 영역에 드롭 이벤트
+            teamDiv.addEventListener('dragover', function(e) {
+                if (draggedPlayer && draggedFromTeamIndex !== teamIndex) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    this.classList.add('drag-over');
+                }
+            });
             
-            const toTeamIndex = parseInt(selectElement.value);
+            teamDiv.addEventListener('dragleave', function(e) {
+                this.classList.remove('drag-over');
+            });
             
-            if (isNaN(toTeamIndex)) {
-                alert('이동할 팀을 선택해주세요.');
-                return;
-            }
-            
-            movePlayerToTeam(playerName, fromTeamIndex, toTeamIndex);
+            teamDiv.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                
+                if (draggedPlayer && draggedFromTeamIndex !== null && draggedFromTeamIndex !== teamIndex) {
+                    movePlayerToTeam(draggedPlayer, draggedFromTeamIndex, teamIndex);
+                }
+                
+                draggedPlayer = null;
+                draggedFromTeamIndex = null;
+            });
         }
 
         // 초기 렌더링
