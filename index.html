@@ -514,6 +514,28 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        
+        /* 승/무/패 입력 박스 스타일 */
+        .record-input {
+            width: 50px;
+            padding: 8px 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 0.95em;
+        }
+        
+        /* number input 스피너 제거 */
+        .record-input::-webkit-inner-spin-button,
+        .record-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .record-input {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
     </style>
 </head>
 <body>
@@ -1361,21 +1383,24 @@
                                        onchange="updatePlayerById('${playerId}', 'win', parseInt(this.value) || 0)" 
                                        onclick="event.stopPropagation()"
                                        ${recordInputDisabled}
-                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       class="record-input"
+                                       style="${recordInputStyle}"
                                        placeholder="승">
                                 <span style="font-weight: 600;">/</span>
                                 <input type="number" min="0" value="${draw}" 
                                        onchange="updatePlayerById('${playerId}', 'draw', parseInt(this.value) || 0)" 
                                        onclick="event.stopPropagation()"
                                        ${recordInputDisabled}
-                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       class="record-input"
+                                       style="${recordInputStyle}"
                                        placeholder="무">
                                 <span style="font-weight: 600;">/</span>
                                 <input type="number" min="0" value="${loss}" 
                                        onchange="updatePlayerById('${playerId}', 'loss', parseInt(this.value) || 0)" 
                                        onclick="event.stopPropagation()"
                                        ${recordInputDisabled}
-                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       class="record-input"
+                                       style="${recordInputStyle}"
                                        placeholder="패">
                             </div>
                         </div>
