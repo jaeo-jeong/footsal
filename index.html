@@ -2197,13 +2197,26 @@
             return teams;
         }
 
-        // 티어별 분배 개선 (특정 티어가 한 팀에 몰리지 않도록)
+        // 티어별 분배 개선 (인원당 평균도 고려)
         function improveTierDistribution(teams) {
             const criticalTiers = ['S', 'A+', 'D'];
             const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             
+            function getTeamTierAverage(team) {
+                if (team.length === 0) return 0;
+                const sum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                return sum / team.length;
+            }
+            
+            function getAverageVariance(teams) {
+                const averages = teams.map(team => getTeamTierAverage(team));
+                const avg = averages.reduce((a, b) => a + b, 0) / averages.length;
+                return averages.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / averages.length;
+            }
+            
             for (let iteration = 0; iteration < 200; iteration++) {
                 let improved = false;
+                const currentAvgVariance = getAverageVariance(teams);
                 
                 // 각 티어별로 확인
                 tierOrder.forEach(tier => {
@@ -2233,14 +2246,21 @@
                                         maxTeam[i] = minTeam[j];
                                         minTeam[j] = temp;
                                         
-                                        // 개선되었는지 확인
+                                        // 인원당 평균 밸런스 개선 확인
+                                        const newAvgVariance = getAverageVariance(teams);
+                                        
+                                        // 티어 분배 개선 확인
                                         const newTierCounts = teams.map(team => 
                                             team.filter(p => p.tier === tier).length
                                         );
                                         const newMaxCount = Math.max(...newTierCounts);
                                         const newMinCount = Math.min(...newTierCounts);
                                         
-                                        if (newMaxCount - newMinCount < maxCount - minCount) {
+                                        // 인원당 평균 밸런스가 개선되거나, 티어 분배가 개선되고 인원당 평균이 나빠지지 않으면 수용
+                                        const tierDistributionImproved = (newMaxCount - newMinCount < maxCount - minCount);
+                                        const avgBalanceImproved = (newAvgVariance < currentAvgVariance);
+                                        
+                                        if (avgBalanceImproved || (tierDistributionImproved && newAvgVariance <= currentAvgVariance * 1.1)) {
                                             improved = true;
                                             break;
                                         } else {
@@ -2279,11 +2299,11 @@
                 return variance;
             }
 
-            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록)
+            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록, 하지만 인원당 평균도 고려)
             improveTierDistribution(teams);
 
-            // 여러 번 시도하여 전체 티어 합 밸런스 개선
-            for (let iteration = 0; iteration < 150; iteration++) {
+            // 여러 번 시도하여 전체 티어 합 밸런스 개선 (인원당 평균 우선)
+            for (let iteration = 0; iteration < 200; iteration++) {
                 const currentScore = calculateTeamDifference(teams);
                 
                 // 모든 팀 쌍에 대해 교체 시도
@@ -2327,7 +2347,7 @@
             }
         }
 
-        // 티어별 분배 점수 계산 (낮을수록 좋음)
+        // 티어별 분배 점수 계산 (낮을수록 좋음, 인원당 평균 밸런스 우선)
         function calculateTierDistributionScore(teams) {
             const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             const criticalTiers = ['S', 'A+', 'D']; // 한 팀에 몰리면 안 되는 티어
@@ -2342,18 +2362,18 @@
                 // 팀 간 분배의 분산 계산
                 const avg = tierCounts.reduce((a, b) => a + b, 0) / tierCounts.length;
                 const variance = tierCounts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / tierCounts.length;
-                score += variance * 10; // 티어 분배 불균형 페널티
+                score += variance * 5; // 티어 분배 불균형 페널티 (기존 10에서 5로 감소)
                 
-                // S, A+, D 티어는 한 팀에 몰리면 큰 페널티
+                // S, A+, D 티어는 한 팀에 몰리면 큰 페널티 (하지만 인원당 평균 밸런스가 우선)
                 if (criticalTiers.includes(tier)) {
                     const maxCount = Math.max(...tierCounts);
                     const minCount = Math.min(...tierCounts);
                     if (maxCount - minCount > 1) {
-                        score += (maxCount - minCount - 1) * 100; // 큰 페널티
+                        score += (maxCount - minCount - 1) * 50; // 큰 페널티 (기존 100에서 50으로 감소)
                     }
                     // 한 팀에 2명 이상 몰리면 추가 페널티
                     if (maxCount >= 2) {
-                        score += (maxCount - 1) * 50;
+                        score += (maxCount - 1) * 25; // 추가 페널티 (기존 50에서 25로 감소)
                     }
                 }
             });
