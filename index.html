@@ -613,6 +613,10 @@
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
                 <button class="btn btn-primary" onclick="generateFutsalTeams()">풋살팀 구성</button>
                 <button class="btn btn-primary" onclick="generateSoccerTeams()">축구팀 구성</button>
+                <label style="display: flex; align-items: center; gap: 8px; margin-left: 10px; cursor: pointer;">
+                    <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
+                </label>
             </div>
             <div class="teams-container" id="teamsContainer"></div>
         </div>
@@ -774,35 +778,35 @@
 
         // 기본 선수 데이터
         const defaultPlayers = [
-            { name: '정재오', tier: 'B' },
-            { name: '강신재', tier: 'B' },
-            { name: '장건호', tier: 'B' },
-            { name: '김관영', tier: 'B' },
-            { name: '김상욱', tier: 'B' },
-            { name: '김승현', tier: 'B' },
-            { name: '김태연', tier: 'B' },
-            { name: '김동현', tier: 'B' },
-            { name: '문용혁', tier: 'B' },
-            { name: '문찬우', tier: 'B' },
-            { name: '문태영', tier: 'B' },
-            { name: '박찬영', tier: 'B' },
-            { name: '박찬혁', tier: 'B' },
-            { name: '배기정', tier: 'B' },
-            { name: '하상우', tier: 'B' },
-            { name: '김성호', tier: 'B' },
-            { name: '신현우', tier: 'B' },
-            { name: '옥준혁', tier: 'B' },
-            { name: '우승훈', tier: 'B' },
-            { name: '이도경', tier: 'B' },
-            { name: '이신원', tier: 'B' },
-            { name: '이준순', tier: 'B' },
-            { name: '이창준', tier: 'B' },
-            { name: '장재혁', tier: 'B' },
-            { name: '정기헌', tier: 'B' },
-            { name: '정우진', tier: 'B' },
-            { name: '전근우', tier: 'B' },
-            { name: '전은호', tier: 'B' },
-            { name: '박상윤', tier: 'B' }
+            { name: '정재오', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '강신재', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '장건호', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김관영', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김상욱', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김승현', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김태연', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김동현', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '문용혁', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '문찬우', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '문태영', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '박찬영', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '박찬혁', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '배기정', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '하상우', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '김성호', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '신현우', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '옥준혁', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '우승훈', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '이도경', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '이신원', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '이준순', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '이창준', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '장재혁', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '정기헌', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '정우진', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '전근우', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '전은호', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '박상윤', tier: 'B', win: 0, draw: 0, loss: 0 }
         ];
 
         // 투표 평균으로 티어 계산
@@ -861,6 +865,13 @@
         
         // 투표 데이터
         let voteData = {};
+        
+        // 티어 표시 여부
+        let showTier = true;
+        
+        // 현재 표시된 팀 정보 저장 (티어 숨기기 토글용)
+        let currentTeamsData = null;
+        let currentTeamSizes = null;
         
         // 페이지 로드 시 초기화
         async function init() {
@@ -1059,7 +1070,18 @@
                     players = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     console.log('기본 선수 데이터 추가 완료, 선수 수:', players.length);
                 } else {
-                    players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    players = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        // win, draw, loss가 없는 경우 기본값 0으로 설정
+                        return {
+                            id: doc.id,
+                            name: data.name,
+                            tier: data.tier,
+                            win: data.win !== undefined ? data.win : 0,
+                            draw: data.draw !== undefined ? data.draw : 0,
+                            loss: data.loss !== undefined ? data.loss : 0
+                        };
+                    });
                     console.log('선수 목록 로드 완료, 선수 수:', players.length);
                 }
                 
@@ -1095,13 +1117,35 @@
                 const batch = db.batch();
                 defaultPlayers.forEach(player => {
                     const docRef = db.collection('players').doc();
-                    batch.set(docRef, player);
+                    // win, draw, loss가 없는 경우 기본값 0으로 설정
+                    const playerData = {
+                        name: player.name,
+                        tier: player.tier,
+                        win: player.win || 0,
+                        draw: player.draw || 0,
+                        loss: player.loss || 0
+                    };
+                    batch.set(docRef, playerData);
                 });
                 await batch.commit();
             } catch (error) {
                 console.error('기본 선수 데이터 초기화 실패:', error);
                 throw error;
             }
+        }
+        
+        // 승률 계산 함수
+        function calculateWinRate(player) {
+            const win = player.win || 0;
+            const draw = player.draw || 0;
+            const loss = player.loss || 0;
+            const total = win + draw + loss;
+            
+            if (total === 0) {
+                return 0;
+            }
+            
+            return ((win / total) * 100).toFixed(1);
         }
         
         // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
@@ -1137,7 +1181,15 @@
                     // 초기 로드가 아닌 경우에만 처리
                     if (change.type === 'added' || change.type === 'modified') {
                         hasChanges = true;
-                        const playerData = { id: change.doc.id, ...change.doc.data() };
+                        const data = change.doc.data();
+                        const playerData = {
+                            id: change.doc.id,
+                            name: data.name,
+                            tier: data.tier,
+                            win: data.win !== undefined ? data.win : 0,
+                            draw: data.draw !== undefined ? data.draw : 0,
+                            loss: data.loss !== undefined ? data.loss : 0
+                        };
                         const index = players.findIndex(p => p.id === change.doc.id);
                         if (index >= 0) {
                             players[index] = playerData;
@@ -1272,6 +1324,15 @@
                     ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayerById('${playerId}')">삭제</button>`
                     : '';
                 
+                const win = player.win || 0;
+                const draw = player.draw || 0;
+                const loss = player.loss || 0;
+                const winRate = calculateWinRate(player);
+                
+                // 승/무/패 입력 필드 (관리자만 수정 가능)
+                const recordInputDisabled = isAdmin ? '' : 'disabled';
+                const recordInputStyle = isAdmin ? '' : 'background: #f0f0f0; cursor: not-allowed;';
+                
                 card.innerHTML = `
                     <div class="player-name">
                         <input type="checkbox" class="player-checkbox" 
@@ -1292,6 +1353,31 @@
                                 <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
                                 <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
                             </select>
+                        </div>
+                        <div class="field-group">
+                            <label>승/무/패 (승률: ${winRate}%)</label>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <input type="number" min="0" value="${win}" 
+                                       onchange="updatePlayerById('${playerId}', 'win', parseInt(this.value) || 0)" 
+                                       onclick="event.stopPropagation()"
+                                       ${recordInputDisabled}
+                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       placeholder="승">
+                                <span style="font-weight: 600;">/</span>
+                                <input type="number" min="0" value="${draw}" 
+                                       onchange="updatePlayerById('${playerId}', 'draw', parseInt(this.value) || 0)" 
+                                       onclick="event.stopPropagation()"
+                                       ${recordInputDisabled}
+                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       placeholder="무">
+                                <span style="font-weight: 600;">/</span>
+                                <input type="number" min="0" value="${loss}" 
+                                       onchange="updatePlayerById('${playerId}', 'loss', parseInt(this.value) || 0)" 
+                                       onclick="event.stopPropagation()"
+                                       ${recordInputDisabled}
+                                       style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; ${recordInputStyle}"
+                                       placeholder="패">
+                            </div>
                         </div>
                         ${deleteButtonHtml}
                     </div>
@@ -1763,7 +1849,13 @@
             try {
                 // Firebase에 추가만 하고, 로컬 배열에는 추가하지 않음
                 // 실시간 리스너가 자동으로 추가해줄 것임
-                await db.collection('players').add({ name, tier });
+                await db.collection('players').add({ 
+                    name, 
+                    tier,
+                    win: 0,
+                    draw: 0,
+                    loss: 0
+                });
                 
                 // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
                 document.getElementById('newPlayerName').value = '';
@@ -2250,8 +2342,21 @@
             return variance + tierDistributionScore;
         }
 
+        // 티어 표시/숨기기 토글
+        function toggleTierVisibility() {
+            showTier = !document.getElementById('hideTierCheckbox').checked;
+            // 현재 표시된 팀이 있으면 다시 렌더링
+            if (currentTeamsData && currentTeamSizes) {
+                renderTeams(currentTeamsData, currentTeamSizes);
+            }
+        }
+        
         // 팀 렌더링
         function renderTeams(teams, teamSizes) {
+            // 현재 팀 정보 저장 (티어 숨기기 토글용)
+            currentTeamsData = teams;
+            currentTeamSizes = teamSizes;
+            
             const container = document.getElementById('teamsContainer');
             container.innerHTML = '';
 
@@ -2259,7 +2364,15 @@
                 const teamDiv = document.createElement('div');
                 teamDiv.className = 'team';
                 
-                const tierSum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                // 티어 순으로 정렬
+                const sortedTeam = [...team].sort((a, b) => {
+                    const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
+                    const aIndex = tierOrder.indexOf(a.tier);
+                    const bIndex = tierOrder.indexOf(b.tier);
+                    return aIndex - bIndex;
+                });
+                
+                const tierSum = sortedTeam.reduce((sum, p) => sum + tierWeights[p.tier], 0);
 
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
@@ -2267,10 +2380,10 @@
                         <div>티어 합: ${tierSum}</div>
                     </div>
                     <ul class="team-players">
-                        ${team.map(player => `
+                        ${sortedTeam.map(player => `
                             <li class="team-player">
                                 <div class="player-info">
-                                    <div>${player.name} <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span></div>
+                                    <div>${player.name}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span>` : ''}</div>
                                 </div>
                             </li>
                         `).join('')}
