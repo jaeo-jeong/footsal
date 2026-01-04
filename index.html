@@ -2272,7 +2272,65 @@
                 const teamTierSum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
                 return teamTierSum / team.length;
             }
-
+            
+            // 인원이 같은 경우 티어 합이 정확히 같도록 먼저 최적화
+            const teamSizes = teams.map(team => team.length);
+            const allSameSize = teamSizes.every(size => size === teamSizes[0]);
+            
+            if (allSameSize) {
+                // 인원이 같으면 티어 합 차이를 최소화
+                for (let iteration = 0; iteration < 200; iteration++) {
+                    const teamSums = teams.map(team => team.reduce((sum, p) => sum + tierWeights[p.tier], 0));
+                    const maxSum = Math.max(...teamSums);
+                    const minSum = Math.min(...teamSums);
+                    const diff = maxSum - minSum;
+                    
+                    // 티어 합이 정확히 같거나, 차이가 1 이하이고 더 이상 개선이 안 되면 종료
+                    if (diff === 0 || (diff <= 1 && iteration > 50)) {
+                        // 티어 분배만 개선
+                        improveTierDistribution(teams);
+                        break;
+                    }
+                    
+                    let improved = false;
+                    for (let i = 0; i < teams.length; i++) {
+                        for (let j = i + 1; j < teams.length; j++) {
+                            const team1 = teams[i];
+                            const team2 = teams[j];
+                            const sum1 = teamSums[i];
+                            const sum2 = teamSums[j];
+                            
+                            // 티어 합 차이를 줄이는 방향으로 교체
+                            for (const p1 of team1) {
+                                for (const p2 of team2) {
+                                    if (p1.tier !== p2.tier) {
+                                        const diff1 = tierWeights[p1.tier] - tierWeights[p2.tier];
+                                        const newSum1 = sum1 - diff1;
+                                        const newSum2 = sum2 + diff1;
+                                        const newDiff = Math.abs(newSum1 - newSum2);
+                                        const oldDiff = Math.abs(sum1 - sum2);
+                                        
+                                        if (newDiff < oldDiff) {
+                                            const idx1 = team1.indexOf(p1);
+                                            const idx2 = team2.indexOf(p2);
+                                            team1[idx1] = p2;
+                                            team2[idx2] = p1;
+                                            improved = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (improved) break;
+                            }
+                            if (improved) break;
+                        }
+                        if (improved) break;
+                    }
+                    
+                    if (!improved) break;
+                }
+            }
+            
             // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록)
             improveTierDistribution(teams);
 
@@ -2288,7 +2346,7 @@
                 }, 0) / teams.length;
                 
                 // 티어 분배 점수 추가
-                const currentTierDistributionScore = calculateTierDistributionScore(teams);
+                const currentTierDistributionScore = calculateTierDistributionScore(teams) * 0.1;
                 const currentScore = currentVariance + currentTierDistributionScore;
                 
                 // 모든 팀 쌍에 대해 교체 시도
@@ -2389,10 +2447,31 @@
                 return sum + Math.pow(diff, 2);
             }, 0) / teams.length;
             
-            // 티어 분배 점수 추가
-            const tierDistributionScore = calculateTierDistributionScore(teams);
+            // 인원이 같은 경우 티어 합 차이에 페널티 (차이가 작을수록 페널티 감소)
+            const teamSizes = teams.map(team => team.length);
+            const allSameSize = teamSizes.every(size => size === teamSizes[0]);
+            let sizePenalty = 0;
+            if (allSameSize) {
+                // 인원이 같으면 티어 합도 최대한 같아야 함
+                const teamSums = teams.map(team => team.reduce((sum, p) => sum + tierWeights[p.tier], 0));
+                const maxSum = Math.max(...teamSums);
+                const minSum = Math.min(...teamSums);
+                const diff = maxSum - minSum;
+                
+                // 차이가 0이면 페널티 없음, 차이가 클수록 큰 페널티
+                // 차이가 1 이하면 작은 페널티 (정확히 같게 만들 수 없는 경우 허용)
+                // 차이가 2 이상이면 큰 페널티
+                if (diff > 1) {
+                    sizePenalty = Math.pow(diff, 2) * 1000; // 큰 페널티
+                } else if (diff === 1) {
+                    sizePenalty = 10; // 작은 페널티 (정확히 같게 만들 수 없는 경우 허용)
+                }
+            }
             
-            return variance + tierDistributionScore;
+            // 티어 분배 점수 추가 (가중치를 줄임)
+            const tierDistributionScore = calculateTierDistributionScore(teams) * 0.1;
+            
+            return variance + sizePenalty + tierDistributionScore;
         }
 
         // 티어 표시/숨기기 토글
