@@ -4181,26 +4181,63 @@
             document.body.style.overflow = 'hidden';
         }
 
+        function autoAssignPositions(starters, prefix) {
+            const positions = starters.map((_, i) => document.getElementById(`${prefix}_pos_${i}`).value);
+            const noneIndices = positions.map((p, i) => p === 'NONE' ? i : -1).filter(i => i !== -1);
+            if (noneIndices.length === 0) return positions;
+
+            const fieldCount = Math.max(1, starters.length - 1);
+            const formations = getFormationsForCount(fieldCount);
+            const fm = formations[0];
+            const slots = [];
+            for (let i = 0; i < fm.d; i++) slots.push('DF');
+            for (let i = 0; i < fm.m; i++) slots.push('MF');
+            for (let i = 0; i < fm.f; i++) slots.push('FW');
+
+            // 이미 지정된 포지션 차감
+            const assigned = { GK: 0, DF: 0, MF: 0, FW: 0 };
+            positions.forEach(p => { if (p !== 'NONE') assigned[p]++; });
+
+            const needed = [];
+            if (assigned['GK'] === 0 && noneIndices.length > 0) needed.push('GK');
+            ['DF', 'MF', 'FW'].forEach(pos => {
+                const limit = pos === 'DF' ? fm.d : pos === 'MF' ? fm.m : fm.f;
+                for (let i = assigned[pos]; i < limit; i++) needed.push(pos);
+            });
+
+            // 남는 미정 슬롯은 MF로 채움
+            while (needed.length < noneIndices.length) needed.push('MF');
+            // 미정 선수가 더 적으면 필요한 만큼만
+            while (needed.length > noneIndices.length) needed.pop();
+
+            // 랜덤 셔플
+            for (let i = needed.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [needed[i], needed[j]] = [needed[j], needed[i]];
+            }
+
+            noneIndices.forEach((idx, i) => { positions[idx] = needed[i]; });
+            return positions;
+        }
+
         function startFmWithPositions() {
             if (!fmSelectedTeams || !fmPositionState) return;
             const { teamA, teamB, nameA, nameB } = fmSelectedTeams;
 
-            const enrichedA = fmPositionState.a.starters.map((pIdx, i) => {
-                let pos = document.getElementById(`a_pos_${i}`).value;
-                if (pos === 'NONE') pos = 'MF';
-                return { ...teamA[pIdx], position: pos, isSub: false };
-            });
+            const positionsA = autoAssignPositions(fmPositionState.a.starters, 'a');
+            const enrichedA = fmPositionState.a.starters.map((pIdx, i) => ({
+                ...teamA[pIdx], position: positionsA[i], isSub: false
+            }));
             const subsA = fmPositionState.a.subs.map(pIdx => ({
                 ...teamA[pIdx],
                 position: 'SUB',
                 isSub: true
             }));
 
-            const enrichedB = fmPositionState.b.starters.map((pIdx, i) => {
-                let pos = document.getElementById(`b_pos_${i}`).value;
-                if (pos === 'NONE') pos = 'MF';
-                return { ...teamB[pIdx], position: pos, isSub: false };
-            });
+            const positionsB = autoAssignPositions(fmPositionState.b.starters, 'b');
+            const enrichedB = fmPositionState.b.starters.map((pIdx, i) => ({
+                ...teamB[pIdx], position: positionsB[i], isSub: false
+            }));
             const subsB = fmPositionState.b.subs.map(pIdx => ({
                 ...teamB[pIdx],
                 position: 'SUB',
