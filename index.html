@@ -3921,7 +3921,13 @@
         }
 
         function applyFmFormation(prefix) {
-            // 포메이션 선택만 저장, 포지션은 변경하지 않음 (게임 시작 시 자동 배정)
+            if (!fmPositionState) return;
+            const state = fmPositionState[prefix];
+            const starterCount = state.starters.length;
+            for (let i = 0; i < starterCount; i++) {
+                const el = document.getElementById(`${prefix}_pos_${i}`);
+                if (el) el.value = 'NONE';
+            }
         }
 
         function enforceFmFormation(prefix, changedIdx) {
