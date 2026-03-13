@@ -996,6 +996,274 @@
             background: #f8f9fa;
             border-radius: 4px;
         }
+
+        /* ===== 풋살 FM 스타일 ===== */
+        .fm-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+        }
+        .fm-modal.active { display: flex; }
+        .fm-modal-content {
+            background: #1a1a2e;
+            color: #eee;
+            width: 95%;
+            max-width: 700px;
+            max-height: 95vh;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .fm-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+        .fm-header-close {
+            background: none; border: none; color: white;
+            font-size: 1.4em; cursor: pointer; padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .fm-header-close:hover { background: rgba(255,255,255,0.2); }
+        .fm-scoreboard {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #2d1b69, #16213e);
+        }
+        .fm-team-info {
+            text-align: center;
+            flex: 1;
+            min-width: 0;
+        }
+        .fm-team-name {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .fm-team-avg {
+            font-size: 0.8em;
+            color: #aaa;
+        }
+        .fm-score {
+            font-size: 2.8em;
+            font-weight: 800;
+            letter-spacing: 8px;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(102,126,234,0.6);
+            min-width: 100px;
+            text-align: center;
+        }
+        .fm-time {
+            text-align: center;
+            font-size: 0.9em;
+            color: #bbb;
+            padding: 6px 0 0;
+        }
+        .fm-rosters {
+            display: flex;
+            gap: 10px;
+            padding: 10px 15px;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+        .fm-roster-col {
+            flex: 1;
+            min-width: 0;
+        }
+        .fm-roster-col h4 {
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+        .fm-roster-player {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 3px 6px;
+            font-size: 0.82em;
+            border-radius: 4px;
+            margin-bottom: 2px;
+        }
+        .fm-roster-player.has-goal { background: rgba(102,126,234,0.2); }
+        .fm-roster-player.has-card-yellow { border-left: 3px solid #ffd93d; }
+        .fm-roster-player.has-card-red { border-left: 3px solid #ff4444; opacity: 0.5; }
+        .fm-roster-icons { font-size: 0.85em; }
+        .fm-commentary {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 12px 15px;
+            border-top: 1px solid #333;
+            border-bottom: 1px solid #333;
+        }
+        .fm-commentary-title {
+            font-size: 0.85em;
+            color: #888;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .fm-event {
+            padding: 6px 10px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            font-size: 0.88em;
+            animation: fmFadeIn 0.3s ease;
+        }
+        @keyframes fmFadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fm-event-goal { background: rgba(102,126,234,0.25); border-left: 3px solid #667eea; font-weight: 700; }
+        .fm-event-save { background: rgba(77,182,172,0.2); border-left: 3px solid #4ecdc4; }
+        .fm-event-card { background: rgba(255,217,61,0.15); border-left: 3px solid #ffd93d; }
+        .fm-event-card-red { background: rgba(255,68,68,0.2); border-left: 3px solid #ff4444; }
+        .fm-event-foul { background: rgba(150,150,150,0.15); }
+        .fm-event-chance { background: rgba(255,165,0,0.15); border-left: 3px solid #ffa500; }
+        .fm-event-possession { color: #777; font-size: 0.82em; }
+        .fm-event-half { background: rgba(255,255,255,0.1); text-align: center; font-weight: 700; padding: 10px; }
+        .fm-event-corner { background: rgba(100,200,100,0.1); }
+        .fm-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 15px;
+            background: #111;
+            flex-wrap: wrap;
+        }
+        .fm-controls .btn {
+            padding: 8px 16px;
+            font-size: 0.85em;
+            border-radius: 6px;
+            min-height: 36px;
+        }
+        .fm-btn-speed {
+            background: #333; color: #ccc; border: 1px solid #555;
+        }
+        .fm-btn-speed.active {
+            background: #667eea; color: white; border-color: #667eea;
+        }
+        .fm-btn-action {
+            background: #444; color: #ddd; border: 1px solid #666;
+        }
+        .fm-btn-action:hover { background: #555; }
+        /* FM 결과 화면 */
+        .fm-result {
+            padding: 20px;
+            text-align: center;
+        }
+        .fm-result h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        .fm-result-score {
+            font-size: 2.2em;
+            font-weight: 800;
+            margin: 10px 0;
+        }
+        .fm-result-mvp {
+            background: linear-gradient(135deg, #667eea22, #764ba222);
+            border: 1px solid #667eea44;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 12px 0;
+            font-size: 1em;
+        }
+        .fm-result-stats {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 6px 12px;
+            margin: 15px auto;
+            max-width: 350px;
+            font-size: 0.9em;
+        }
+        .fm-stat-label { color: #aaa; text-align: center; }
+        .fm-stat-left { text-align: right; }
+        .fm-stat-right { text-align: left; }
+        .fm-result-goals {
+            text-align: left;
+            margin: 12px auto;
+            max-width: 350px;
+            font-size: 0.88em;
+        }
+        .fm-result-goals div { padding: 3px 0; }
+        .fm-result-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .fm-pk-table {
+            margin: 10px auto;
+            font-size: 0.9em;
+            border-collapse: collapse;
+        }
+        .fm-pk-table td, .fm-pk-table th {
+            padding: 4px 10px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        /* FM 셋업 모달 */
+        .fm-setup-content {
+            background: #1a1a2e;
+            color: #eee;
+            max-width: 400px;
+            width: 90%;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        .fm-setup-content h3 {
+            text-align: center;
+            margin-bottom: 16px;
+            color: #667eea;
+        }
+        .fm-setup-team-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #2a2a4a;
+            color: #eee;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.95em;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .fm-setup-team-btn:hover { border-color: #667eea; }
+        .fm-setup-team-btn.selected { border-color: #667eea; background: #333366; }
+        @media (max-width: 768px) {
+            .fm-modal-content {
+                width: 100%;
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            .fm-score { font-size: 2em; letter-spacing: 4px; min-width: 80px; }
+            .fm-rosters { max-height: 110px; }
+            .fm-scoreboard { padding: 12px; gap: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -1142,6 +1410,57 @@
             <div id="teamActions" class="team-actions" style="display: none;">
                 <button class="btn btn-secondary" onclick="copyTeamsToClipboard()">클립보드 복사</button>
                 <button class="btn btn-secondary" onclick="showTeamHistory()">이전 팀 보기</button>
+                <button class="btn btn-primary" onclick="openFutsalFMSetup()">풋살 FM 시뮬레이션</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FM 셋업 모달 (팀 선택) -->
+    <div id="fmSetupModal" class="fm-modal" onclick="if(event.target===this)closeFmSetup()">
+        <div class="fm-setup-content">
+            <h3>풋살 FM - 팀 선택</h3>
+            <p style="text-align:center;color:#aaa;margin-bottom:14px;font-size:0.9em;">경기할 두 팀을 선택하세요</p>
+            <div id="fmSetupTeamList"></div>
+            <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;">
+                <button class="btn btn-primary" onclick="startFmFromSetup()">경기 시작</button>
+                <button class="btn btn-secondary" onclick="closeFmSetup()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FM 매치 모달 -->
+    <div id="fmMatchModal" class="fm-modal">
+        <div class="fm-modal-content">
+            <div class="fm-header">
+                <span>풋살 FM</span>
+                <button class="fm-header-close" onclick="closeFmMatchModal()">&times;</button>
+            </div>
+            <div id="fmMatchBody">
+                <div class="fm-scoreboard" id="fmScoreboard">
+                    <div class="fm-team-info">
+                        <div class="fm-team-name" id="fmTeamAName">팀1</div>
+                        <div class="fm-team-avg" id="fmTeamAAvg"></div>
+                    </div>
+                    <div>
+                        <div class="fm-score" id="fmScoreDisplay">0 - 0</div>
+                        <div class="fm-time" id="fmTimeDisplay">경기 준비 중</div>
+                    </div>
+                    <div class="fm-team-info">
+                        <div class="fm-team-name" id="fmTeamBName">팀2</div>
+                        <div class="fm-team-avg" id="fmTeamBAvg"></div>
+                    </div>
+                </div>
+                <div class="fm-rosters" id="fmRosters"></div>
+                <div class="fm-commentary" id="fmCommentary">
+                    <div class="fm-commentary-title">경기 중계</div>
+                </div>
+                <div class="fm-controls" id="fmControls">
+                    <button class="btn fm-btn-speed" onclick="setFmSpeed('slow')">느림</button>
+                    <button class="btn fm-btn-speed active" onclick="setFmSpeed('normal')">보통</button>
+                    <button class="btn fm-btn-speed" onclick="setFmSpeed('fast')">빠름</button>
+                    <button class="btn fm-btn-action" onclick="toggleFmPause()" id="fmPauseBtn">일시정지</button>
+                    <button class="btn fm-btn-action" onclick="skipToEnd()">스킵</button>
+                </div>
             </div>
         </div>
     </div>
@@ -3311,6 +3630,741 @@
         }
 
         // 초기 렌더링은 waitForFirebaseAndInit()에서 처리
+
+        // ===== 풋살 FM 시뮬레이션 엔진 =====
+        let fmState = null;
+        let fmInterval = null;
+        let fmTimeout = null;
+        let fmSpeed = 1000; // ms per tick
+        let fmPaused = false;
+        let fmSetupSelected = [];
+
+        const FM_SPEEDS = { slow: 2000, normal: 1000, fast: 400 };
+        const FM_HALF_TICKS = 20;
+        const FM_MAX_COMMENTARY = 50;
+
+        const FM_COMMENTARY = {
+            goal: [
+                "골! {scorer}의 강력한 슛이 골망을 흔듭니다!",
+                "골! {scorer}의 정확한 마무리! 멋진 득점입니다!",
+                "골! {scorer}! 골대 구석으로 꽂히는 슛!",
+                "골! {scorer}의 환상적인 골!",
+                "골! {scorer}가 침착하게 골을 넣었습니다!"
+            ],
+            goalAssist: [
+                "{assist}의 절묘한 어시스트! {scorer}가 마무리합니다!",
+                "{assist}의 패스를 받은 {scorer}! 골!",
+                "{assist}가 찔러준 공, {scorer}의 득점!",
+                "{scorer} 골! {assist}의 도움이 빛납니다!"
+            ],
+            save: [
+                "{keeper}의 선방! 위험한 순간을 막아냅니다!",
+                "{keeper}가 몸을 날려 막아냅니다!",
+                "{keeper}의 반사적인 세이브!",
+                "{keeper}! 대단한 선방입니다!"
+            ],
+            miss: [
+                "{player}의 슛! 아쉽게 빗나갑니다.",
+                "{player}가 슛을 날렸지만 골대를 벗어납니다.",
+                "{player}의 강슛! 골대 위로 넘어갑니다.",
+                "{player}의 슈팅, 아깝게 빗나갔습니다."
+            ],
+            corner: [
+                "{team}의 코너킥! 기회를 만들어봅니다.",
+                "코너킥! {team}이 공격 기회를 잡습니다."
+            ],
+            foul: [
+                "{player}의 거친 태클! 프리킥이 선언됩니다.",
+                "{player}의 반칙! 상대에게 프리킥.",
+                "{player}가 상대를 걸어 넘어뜨립니다. 파울!"
+            ],
+            yellowCard: [
+                "{player}에게 경고! 옐로카드가 제시됩니다.",
+                "{player} 옐로카드! 거친 플레이에 대한 경고."
+            ],
+            redCard: [
+                "{player}에게 퇴장! 레드카드! {team}이 한 명 줄어듭니다.",
+                "레드카드! {player} 퇴장! 수적 열세에 놓입니다."
+            ],
+            chance: [
+                "{team}의 위험한 공격! 찬스입니다!",
+                "{team}이 빠르게 역습합니다! 위기 상황!",
+                "{team}이 상대 진영 깊숙이 침투합니다!"
+            ],
+            possession: [
+                "{team}이 중원에서 공을 돌립니다.",
+                "{team}이 점유율을 유지하며 패스를 이어갑니다.",
+                "볼 소유 {team}. 천천히 기회를 엿봅니다.",
+                "{team}이 수비 라인에서 빌드업을 시작합니다."
+            ],
+            halfTime: ["전반전 종료! 하프타임입니다."],
+            fullTime: ["경기 종료! 풀타임 휘슬이 울립니다."],
+            kickOff: ["경기 시작! 킥오프!"],
+            secondHalf: ["후반전 시작!"]
+        };
+
+        function openFutsalFMSetup() {
+            if (!currentTeamsData || currentTeamsData.length < 2) {
+                showToast('먼저 팀을 구성해주세요 (최소 2팀)', 'error');
+                return;
+            }
+            if (currentTeamsData.length === 2) {
+                openFutsalFM(currentTeamsData[0], currentTeamsData[1], '팀 1', '팀 2');
+                return;
+            }
+            // 3팀 이상: 셋업 모달
+            fmSetupSelected = [];
+            const list = document.getElementById('fmSetupTeamList');
+            list.innerHTML = '';
+            currentTeamsData.forEach((team, i) => {
+                const avg = (team.reduce((s, p) => s + tierWeights[p.tier], 0) / team.length).toFixed(1);
+                const btn = document.createElement('button');
+                btn.className = 'fm-setup-team-btn';
+                btn.innerHTML = `<strong>팀 ${i + 1}</strong> (${team.map(p => p.name).join(', ')}) <span style="color:#aaa;font-size:0.85em;">평균 ${avg}</span>`;
+                btn.onclick = () => {
+                    const idx = fmSetupSelected.indexOf(i);
+                    if (idx > -1) {
+                        fmSetupSelected.splice(idx, 1);
+                        btn.classList.remove('selected');
+                    } else {
+                        if (fmSetupSelected.length >= 2) {
+                            const oldIdx = fmSetupSelected.shift();
+                            list.children[oldIdx].classList.remove('selected');
+                        }
+                        fmSetupSelected.push(i);
+                        btn.classList.add('selected');
+                    }
+                };
+                list.appendChild(btn);
+            });
+            document.getElementById('fmSetupModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFmSetup() {
+            document.getElementById('fmSetupModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function startFmFromSetup() {
+            if (fmSetupSelected.length !== 2) {
+                showToast('두 팀을 선택해주세요', 'error');
+                return;
+            }
+            const [a, b] = fmSetupSelected;
+            closeFmSetup();
+            openFutsalFM(currentTeamsData[a], currentTeamsData[b], `팀 ${a + 1}`, `팀 ${b + 1}`);
+        }
+
+        function openFutsalFM(teamA, teamB, nameA, nameB) {
+            fmState = initFmState(teamA, teamB, nameA, nameB);
+            fmPaused = false;
+            fmSpeed = FM_SPEEDS.normal;
+            document.querySelectorAll('.fm-btn-speed').forEach((btn, i) => {
+                btn.classList.toggle('active', i === 1);
+            });
+            document.getElementById('fmPauseBtn').textContent = '일시정지';
+            document.getElementById('fmMatchModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            renderFmInitial();
+            // 킥오프 후 시뮬레이션 시작
+            addFmEvent({ type: 'kickOff', minute: 0, text: FM_COMMENTARY.kickOff[0] });
+            renderFmTick();
+            fmInterval = setInterval(simulateTick, fmSpeed);
+        }
+
+        function initFmState(teamA, teamB, nameA, nameB) {
+            const strA = calculateTeamStrength(teamA);
+            const strB = calculateTeamStrength(teamB);
+            return {
+                teamA: teamA.map(p => ({ ...p, goals: 0, assists: 0, saves: 0, yellowCards: 0, redCard: false })),
+                teamB: teamB.map(p => ({ ...p, goals: 0, assists: 0, saves: 0, yellowCards: 0, redCard: false })),
+                nameA, nameB,
+                strA, strB,
+                scoreA: 0, scoreB: 0,
+                half: 1,
+                tick: 0,
+                events: [],
+                stats: {
+                    possA: 0, possB: 0,
+                    shotsA: 0, shotsB: 0,
+                    foulsA: 0, foulsB: 0,
+                    cornersA: 0, cornersB: 0,
+                    yellowsA: 0, yellowsB: 0,
+                    redsA: 0, redsB: 0
+                },
+                finished: false
+            };
+        }
+
+        function calculateTeamStrength(team) {
+            if (!team.length) return 1;
+            const total = team.reduce((s, p) => s + tierWeights[p.tier], 0);
+            return total / team.length;
+        }
+
+        function simulateTick() {
+            if (fmPaused || !fmState || fmState.finished) return;
+            fmState.tick++;
+            const minute = fmState.half === 1 ? fmState.tick : FM_HALF_TICKS + fmState.tick;
+
+            if (fmState.tick > FM_HALF_TICKS) {
+                if (fmState.half === 1) {
+                    handleHalfTime();
+                    return;
+                } else {
+                    handleFullTime();
+                    return;
+                }
+            }
+
+            const evt = generateMatchEvent(minute);
+            addFmEvent(evt);
+            applyEvent(evt);
+            renderFmTick();
+        }
+
+        function generateMatchEvent(minute) {
+            const st = fmState;
+            const totalStr = st.strA + st.strB;
+            const ratioA = st.strA / totalStr;
+            const ratioB = st.strB / totalStr;
+
+            // 어느 팀 공격인지 결정 (전력비 기반)
+            const attackA = Math.random() < ratioA;
+            const atkTeam = attackA ? 'A' : 'B';
+            const defTeam = attackA ? 'B' : 'A';
+            const atkPlayers = attackA ? st.teamA : st.teamB;
+            const defPlayers = attackA ? st.teamB : st.teamA;
+            const atkName = attackA ? st.nameA : st.nameB;
+            const defName = attackA ? st.nameB : st.nameA;
+
+            const activePlayers = atkPlayers.filter(p => !p.redCard);
+            const activeDefenders = defPlayers.filter(p => !p.redCard);
+
+            // 점유 통계
+            if (attackA) st.stats.possA++; else st.stats.possB++;
+
+            const roll = Math.random();
+            let cumulative = 0;
+
+            // 골 확률: 기본 ~6%, 전력비 보정, 최대 12%
+            const baseGoalRate = 0.06;
+            const atkRatio = attackA ? ratioA : ratioB;
+            const goalRate = Math.min(baseGoalRate * (atkRatio * 2), 0.12);
+            cumulative += goalRate;
+            if (roll < cumulative) {
+                const scorer = selectWeightedPlayer(activePlayers, 'attack');
+                if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
+                // 어시스트 75% 확률
+                let assist = null;
+                let text;
+                if (Math.random() < 0.75 && activePlayers.length > 1) {
+                    const assistCandidates = activePlayers.filter(p => p.name !== scorer.name);
+                    assist = selectWeightedPlayer(assistCandidates, 'attack');
+                    text = randomFrom(FM_COMMENTARY.goalAssist).replace('{scorer}', scorer.name).replace('{assist}', assist.name);
+                } else {
+                    text = randomFrom(FM_COMMENTARY.goal).replace('{scorer}', scorer.name);
+                }
+                return { type: 'goal', minute, team: atkTeam, scorer: scorer.name, assist: assist ? assist.name : null, text };
+            }
+
+            // 선방 ~8%
+            cumulative += 0.08;
+            if (roll < cumulative) {
+                const keeper = selectWeightedPlayer(activeDefenders, 'defense');
+                if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
+                const text = randomFrom(FM_COMMENTARY.save).replace('{keeper}', keeper.name);
+                return { type: 'save', minute, team: defTeam, player: keeper.name, text };
+            }
+
+            // 슛 빗나감 ~10%
+            cumulative += 0.10;
+            if (roll < cumulative) {
+                const shooter = selectWeightedPlayer(activePlayers, 'attack');
+                if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
+                const text = randomFrom(FM_COMMENTARY.miss).replace('{player}', shooter.name);
+                return { type: 'miss', minute, team: atkTeam, player: shooter.name, text };
+            }
+
+            // 코너킥 ~5%
+            cumulative += 0.05;
+            if (roll < cumulative) {
+                if (attackA) st.stats.cornersA++; else st.stats.cornersB++;
+                const text = randomFrom(FM_COMMENTARY.corner).replace('{team}', atkName);
+                return { type: 'corner', minute, team: atkTeam, text };
+            }
+
+            // 파울 ~8%
+            cumulative += 0.08;
+            if (roll < cumulative) {
+                const fouler = selectWeightedPlayer(activeDefenders, 'foul');
+                if (attackA) st.stats.foulsB++; else st.stats.foulsA++;
+                const text = randomFrom(FM_COMMENTARY.foul).replace('{player}', fouler.name);
+                return { type: 'foul', minute, team: defTeam, player: fouler.name, text };
+            }
+
+            // 옐로카드 ~2%
+            cumulative += 0.02;
+            if (roll < cumulative) {
+                const carder = selectWeightedPlayer(activeDefenders, 'foul');
+                if (attackA) st.stats.yellowsB++; else st.stats.yellowsA++;
+                const text = randomFrom(FM_COMMENTARY.yellowCard).replace('{player}', carder.name);
+                return { type: 'yellowCard', minute, team: defTeam, player: carder.name, text };
+            }
+
+            // 레드카드 ~0.3%
+            cumulative += 0.003;
+            if (roll < cumulative) {
+                const carder = selectWeightedPlayer(activeDefenders, 'foul');
+                if (attackA) st.stats.redsB++; else st.stats.redsA++;
+                const teamName = attackA ? st.nameB : st.nameA;
+                const text = randomFrom(FM_COMMENTARY.redCard).replace('{player}', carder.name).replace('{team}', teamName);
+                return { type: 'redCard', minute, team: defTeam, player: carder.name, text };
+            }
+
+            // 위험한 공격 ~8%
+            cumulative += 0.08;
+            if (roll < cumulative) {
+                const text = randomFrom(FM_COMMENTARY.chance).replace('{team}', atkName);
+                return { type: 'chance', minute, team: atkTeam, text };
+            }
+
+            // 나머지: 점유
+            const text = randomFrom(FM_COMMENTARY.possession).replace('{team}', atkName);
+            return { type: 'possession', minute, team: atkTeam, text };
+        }
+
+        function selectWeightedPlayer(players, context) {
+            if (!players.length) return { name: '알 수 없음', tier: 'C' };
+            const weights = players.map(p => {
+                let w = tierWeights[p.tier] || 3;
+                if (context === 'foul') w = 12 - w; // 낮은 티어 = 파울 확률 높음
+                return Math.max(w, 0.5);
+            });
+            const total = weights.reduce((s, w) => s + w, 0);
+            let r = Math.random() * total;
+            for (let i = 0; i < players.length; i++) {
+                r -= weights[i];
+                if (r <= 0) return players[i];
+            }
+            return players[players.length - 1];
+        }
+
+        function randomFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function addFmEvent(evt) {
+            fmState.events.unshift(evt);
+            if (fmState.events.length > FM_MAX_COMMENTARY) fmState.events.pop();
+        }
+
+        function applyEvent(evt) {
+            const st = fmState;
+            const players = evt.team === 'A' ? st.teamA : st.teamB;
+            switch (evt.type) {
+                case 'goal':
+                    if (evt.team === 'A') st.scoreA++; else st.scoreB++;
+                    const scorer = players.find(p => p.name === evt.scorer);
+                    if (scorer) scorer.goals++;
+                    if (evt.assist) {
+                        const assister = players.find(p => p.name === evt.assist);
+                        if (assister) assister.assists++;
+                    }
+                    break;
+                case 'save':
+                    const keeper = players.find(p => p.name === evt.player);
+                    if (keeper) keeper.saves++;
+                    break;
+                case 'yellowCard':
+                    const yp = players.find(p => p.name === evt.player);
+                    if (yp) {
+                        yp.yellowCards++;
+                        if (yp.yellowCards >= 2) yp.redCard = true;
+                    }
+                    break;
+                case 'redCard':
+                    const rp = players.find(p => p.name === evt.player);
+                    if (rp) rp.redCard = true;
+                    break;
+            }
+        }
+
+        function handleHalfTime() {
+            clearInterval(fmInterval);
+            fmInterval = null;
+            addFmEvent({ type: 'halfTime', minute: FM_HALF_TICKS, text: FM_COMMENTARY.halfTime[0] });
+            renderFmTick();
+            fmTimeout = setTimeout(() => {
+                if (!fmState) return;
+                fmState.half = 2;
+                fmState.tick = 0;
+                addFmEvent({ type: 'secondHalf', minute: FM_HALF_TICKS, text: FM_COMMENTARY.secondHalf[0] });
+                renderFmTick();
+                fmInterval = setInterval(simulateTick, fmSpeed);
+            }, fmSpeed * 2);
+        }
+
+        function handleFullTime() {
+            clearInterval(fmInterval);
+            fmInterval = null;
+            addFmEvent({ type: 'fullTime', minute: FM_HALF_TICKS * 2, text: FM_COMMENTARY.fullTime[0] });
+            renderFmTick();
+            fmState.finished = true;
+
+            if (fmState.scoreA === fmState.scoreB) {
+                fmTimeout = setTimeout(() => { if (fmState) simulatePKs(); }, fmSpeed * 2);
+            } else {
+                fmTimeout = setTimeout(() => { if (fmState) showFmResult(); }, fmSpeed * 2);
+            }
+        }
+
+        function simulatePKs() {
+            const st = fmState;
+            const pkA = []; const pkB = [];
+            // 퇴장 선수 제외, 전원 퇴장 시 전체 선수 사용
+            let playersA = st.teamA.filter(p => !p.redCard);
+            let playersB = st.teamB.filter(p => !p.redCard);
+            if (!playersA.length) playersA = st.teamA;
+            if (!playersB.length) playersB = st.teamB;
+
+            function pkSuccess(player) {
+                const w = tierWeights[player.tier] || 3;
+                const rate = 0.6 + (w / 10) * 0.3; // 60% ~ 90%
+                return Math.random() < rate;
+            }
+
+            // 5 라운드
+            for (let i = 0; i < 5; i++) {
+                const kA = playersA[i % playersA.length];
+                const kB = playersB[i % playersB.length];
+                pkA.push({ player: kA.name, success: pkSuccess(kA) });
+                pkB.push({ player: kB.name, success: pkSuccess(kB) });
+            }
+
+            // 5라운드 후 승자 판정
+            let scorePA = pkA.filter(p => p.success).length;
+            let scorePB = pkB.filter(p => p.success).length;
+
+            // 서든데스
+            let round = 5;
+            while (scorePA === scorePB) {
+                const kA = playersA[round % playersA.length];
+                const kB = playersB[round % playersB.length];
+                const rA = { player: kA.name, success: pkSuccess(kA) };
+                const rB = { player: kB.name, success: pkSuccess(kB) };
+                pkA.push(rA); pkB.push(rB);
+                if (rA.success) scorePA++;
+                if (rB.success) scorePB++;
+                round++;
+                if (round > 20) {
+                    // 안전장치: 강제로 한 쪽에 승리 부여
+                    if (scorePA === scorePB) scorePA++;
+                    break;
+                }
+            }
+
+            st.pk = { pkA, pkB, scorePA, scorePB };
+
+            // PK 이벤트 추가
+            addFmEvent({
+                type: 'halfTime', minute: 'PK',
+                text: `승부차기! ${st.nameA} ${scorePA} - ${scorePB} ${st.nameB}`
+            });
+            renderFmTick();
+            showFmResult();
+        }
+
+        function calculateMVP() {
+            const st = fmState;
+            const allPlayers = [
+                ...st.teamA.map(p => ({ ...p, team: st.nameA })),
+                ...st.teamB.map(p => ({ ...p, team: st.nameB }))
+            ];
+            let best = null;
+            let bestScore = -1;
+            allPlayers.forEach(p => {
+                const score = (p.goals || 0) * 3 + (p.assists || 0) * 2 + (p.saves || 0) * 1;
+                if (score > bestScore) { bestScore = score; best = p; }
+            });
+            return best;
+        }
+
+        function showFmResult() {
+            const st = fmState;
+            const mvp = calculateMVP();
+            const totalPoss = st.stats.possA + st.stats.possB || 1;
+            const possAP = Math.round(st.stats.possA / totalPoss * 100);
+            const possBP = 100 - possAP;
+
+            // 골 기록
+            const goalEvents = st.events.filter(e => e.type === 'goal').reverse();
+            let goalsHtml = '';
+            goalEvents.forEach(e => {
+                const teamName = e.team === 'A' ? st.nameA : st.nameB;
+                const assistText = e.assist ? ` (${e.assist} 도움)` : '';
+                goalsHtml += `<div>${e.minute}' ⚽ ${e.scorer}${assistText} - ${teamName}</div>`;
+            });
+
+            // PK 결과
+            let pkHtml = '';
+            if (st.pk) {
+                pkHtml = `<div style="margin:12px 0"><strong>승부차기 ${st.pk.scorePA} - ${st.pk.scorePB}</strong></div>`;
+                pkHtml += '<table class="fm-pk-table"><tr><th>' + st.nameA + '</th><th>R</th><th>' + st.nameB + '</th></tr>';
+                const maxR = Math.max(st.pk.pkA.length, st.pk.pkB.length);
+                for (let i = 0; i < maxR; i++) {
+                    const a = st.pk.pkA[i];
+                    const b = st.pk.pkB[i];
+                    pkHtml += `<tr>
+                        <td>${a ? (a.success ? '⚽' : '❌') + ' ' + a.player : ''}</td>
+                        <td style="color:#888">${i + 1}</td>
+                        <td>${b ? (b.success ? '⚽' : '❌') + ' ' + b.player : ''}</td>
+                    </tr>`;
+                }
+                pkHtml += '</table>';
+            }
+
+            let winner = '';
+            if (st.pk) {
+                winner = st.pk.scorePA > st.pk.scorePB ? st.nameA : st.nameB;
+            } else {
+                winner = st.scoreA > st.scoreB ? st.nameA : st.nameB;
+            }
+
+            const body = document.getElementById('fmMatchBody');
+            body.innerHTML = `
+                <div class="fm-result">
+                    <h2>경기 종료</h2>
+                    <div style="color:#aaa;margin-bottom:6px;">${st.nameA} vs ${st.nameB}</div>
+                    <div class="fm-result-score">${st.scoreA} - ${st.scoreB}</div>
+                    ${pkHtml}
+                    <div style="font-size:1.1em;margin:8px 0;color:#ffd93d;">🏆 ${winner} 승리!</div>
+                    ${mvp ? `<div class="fm-result-mvp">⭐ MVP: <strong>${mvp.name}</strong> (${mvp.team})<br><span style="font-size:0.85em;color:#aaa;">골 ${mvp.goals || 0} / 도움 ${mvp.assists || 0} / 선방 ${mvp.saves || 0}</span></div>` : ''}
+                    <div class="fm-result-stats">
+                        <div class="fm-stat-left">${possAP}%</div><div class="fm-stat-label">점유율</div><div class="fm-stat-right">${possBP}%</div>
+                        <div class="fm-stat-left">${st.stats.shotsA}</div><div class="fm-stat-label">슈팅</div><div class="fm-stat-right">${st.stats.shotsB}</div>
+                        <div class="fm-stat-left">${st.stats.cornersA}</div><div class="fm-stat-label">코너킥</div><div class="fm-stat-right">${st.stats.cornersB}</div>
+                        <div class="fm-stat-left">${st.stats.foulsA}</div><div class="fm-stat-label">파울</div><div class="fm-stat-right">${st.stats.foulsB}</div>
+                        <div class="fm-stat-left">${st.stats.yellowsA}</div><div class="fm-stat-label">경고</div><div class="fm-stat-right">${st.stats.yellowsB}</div>
+                        <div class="fm-stat-left">${st.stats.redsA}</div><div class="fm-stat-label">퇴장</div><div class="fm-stat-right">${st.stats.redsB}</div>
+                    </div>
+                    ${goalsHtml ? `<div class="fm-result-goals"><strong>골 기록</strong>${goalsHtml}</div>` : '<div style="color:#888;margin:10px 0;">득점 없음</div>'}
+                    <div class="fm-result-buttons">
+                        <button class="btn btn-primary" onclick="replayFm()">다시하기</button>
+                        <button class="btn btn-secondary" onclick="closeFmMatchModal()">닫기</button>
+                    </div>
+                </div>
+            `;
+
+            // localStorage 저장
+            saveFmResult(st, winner);
+        }
+
+        function saveFmResult(st, winner) {
+            try {
+                const history = JSON.parse(localStorage.getItem('fmHistory') || '[]');
+                history.unshift({
+                    date: new Date().toISOString(),
+                    teamA: st.nameA, teamB: st.nameB,
+                    scoreA: st.scoreA, scoreB: st.scoreB,
+                    pk: st.pk ? { scorePA: st.pk.scorePA, scorePB: st.pk.scorePB } : null,
+                    winner
+                });
+                if (history.length > 50) history.length = 50;
+                localStorage.setItem('fmHistory', JSON.stringify(history));
+            } catch (e) { /* ignore storage errors */ }
+        }
+
+        function replayFm() {
+            closeFmMatchModal();
+            openFutsalFMSetup();
+        }
+
+        // === 렌더링 함수 ===
+
+        function renderFmInitial() {
+            const st = fmState;
+            document.getElementById('fmTeamAName').textContent = st.nameA;
+            document.getElementById('fmTeamBName').textContent = st.nameB;
+            document.getElementById('fmTeamAAvg').textContent = `평균 ${st.strA.toFixed(1)}`;
+            document.getElementById('fmTeamBAvg').textContent = `평균 ${st.strB.toFixed(1)}`;
+            document.getElementById('fmScoreDisplay').textContent = '0 - 0';
+            document.getElementById('fmTimeDisplay').textContent = '전반전 0:00';
+            document.getElementById('fmCommentary').innerHTML = '<div class="fm-commentary-title">경기 중계</div>';
+            renderFmRosters();
+        }
+
+        function renderFmRosters() {
+            const st = fmState;
+            const container = document.getElementById('fmRosters');
+            function renderCol(team, name) {
+                let html = `<div class="fm-roster-col"><h4>${name}</h4>`;
+                team.forEach(p => {
+                    let cls = 'fm-roster-player';
+                    if (p.goals > 0) cls += ' has-goal';
+                    if (p.redCard) cls += ' has-card-red';
+                    else if (p.yellowCards > 0) cls += ' has-card-yellow';
+                    const tierCls = 'tier-' + p.tier.replace('+', 'plus');
+                    let icons = '';
+                    for (let i = 0; i < p.goals; i++) icons += '⚽';
+                    for (let i = 0; i < p.assists; i++) icons += '🅰️';
+                    for (let i = 0; i < p.yellowCards; i++) icons += '🟨';
+                    if (p.redCard) icons += '🟥';
+                    for (let i = 0; i < p.saves; i++) icons += '🧤';
+                    html += `<div class="${cls}">
+                        <span>${p.name} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                        <span class="fm-roster-icons">${icons}</span>
+                    </div>`;
+                });
+                html += '</div>';
+                return html;
+            }
+            container.innerHTML = renderCol(st.teamA, st.nameA) + renderCol(st.teamB, st.nameB);
+        }
+
+        function renderFmTick() {
+            const st = fmState;
+            // 스코어
+            document.getElementById('fmScoreDisplay').textContent = `${st.scoreA} - ${st.scoreB}`;
+            // 시간
+            const minute = st.half === 1 ? st.tick : FM_HALF_TICKS + st.tick;
+            const halfLabel = st.half === 1 ? '전반전' : '후반전';
+            document.getElementById('fmTimeDisplay').textContent = `${halfLabel} ${minute}:00`;
+            // 로스터 갱신
+            renderFmRosters();
+            // 코멘터리
+            const commEl = document.getElementById('fmCommentary');
+            let html = '<div class="fm-commentary-title">경기 중계</div>';
+            st.events.forEach(evt => {
+                let cls = 'fm-event';
+                switch (evt.type) {
+                    case 'goal': cls += ' fm-event-goal'; break;
+                    case 'save': cls += ' fm-event-save'; break;
+                    case 'yellowCard': cls += ' fm-event-card'; break;
+                    case 'redCard': cls += ' fm-event-card-red'; break;
+                    case 'foul': cls += ' fm-event-foul'; break;
+                    case 'chance': cls += ' fm-event-chance'; break;
+                    case 'possession': cls += ' fm-event-possession'; break;
+                    case 'halfTime': case 'fullTime': case 'kickOff': case 'secondHalf': cls += ' fm-event-half'; break;
+                    case 'corner': cls += ' fm-event-corner'; break;
+                }
+                const minuteStr = typeof evt.minute === 'number' ? `${evt.minute}'` : evt.minute;
+                html += `<div class="${cls}">${minuteStr} ${evt.text}</div>`;
+            });
+            commEl.innerHTML = html;
+        }
+
+        // === 제어 함수 ===
+
+        const FM_SPEED_LABELS = { slow: '느림', normal: '보통', fast: '빠름' };
+
+        function setFmSpeed(speed) {
+            fmSpeed = FM_SPEEDS[speed] || FM_SPEEDS.normal;
+            const targetLabel = FM_SPEED_LABELS[speed];
+            const controls = document.getElementById('fmControls');
+            if (controls) {
+                controls.querySelectorAll('.fm-btn-speed').forEach(btn => {
+                    btn.classList.toggle('active', btn.textContent === targetLabel);
+                });
+            }
+            if (fmInterval && !fmPaused) {
+                clearInterval(fmInterval);
+                fmInterval = setInterval(simulateTick, fmSpeed);
+            }
+        }
+
+        function toggleFmPause() {
+            fmPaused = !fmPaused;
+            document.getElementById('fmPauseBtn').textContent = fmPaused ? '계속' : '일시정지';
+        }
+
+        function skipToEnd() {
+            if (!fmState || fmState.finished) return;
+            clearInterval(fmInterval);
+            fmInterval = null;
+            // 남은 틱 즉시 처리
+            while (!fmState.finished) {
+                fmState.tick++;
+                const minute = fmState.half === 1 ? fmState.tick : FM_HALF_TICKS + fmState.tick;
+
+                if (fmState.tick > FM_HALF_TICKS) {
+                    if (fmState.half === 1) {
+                        addFmEvent({ type: 'halfTime', minute: FM_HALF_TICKS, text: FM_COMMENTARY.halfTime[0] });
+                        fmState.half = 2;
+                        fmState.tick = 0;
+                        addFmEvent({ type: 'secondHalf', minute: FM_HALF_TICKS, text: FM_COMMENTARY.secondHalf[0] });
+                        continue;
+                    } else {
+                        addFmEvent({ type: 'fullTime', minute: FM_HALF_TICKS * 2, text: FM_COMMENTARY.fullTime[0] });
+                        fmState.finished = true;
+                        break;
+                    }
+                }
+                const evt = generateMatchEvent(minute);
+                addFmEvent(evt);
+                applyEvent(evt);
+            }
+            renderFmTick();
+            if (fmState.scoreA === fmState.scoreB) {
+                simulatePKs();
+            } else {
+                showFmResult();
+            }
+        }
+
+        function closeFmMatchModal() {
+            if (fmInterval) {
+                clearInterval(fmInterval);
+                fmInterval = null;
+            }
+            if (fmTimeout) {
+                clearTimeout(fmTimeout);
+                fmTimeout = null;
+            }
+            fmState = null;
+            fmPaused = false;
+            document.getElementById('fmMatchModal').classList.remove('active');
+            document.body.style.overflow = '';
+            // 매치 바디 원복
+            document.getElementById('fmMatchBody').innerHTML = `
+                <div class="fm-scoreboard" id="fmScoreboard">
+                    <div class="fm-team-info">
+                        <div class="fm-team-name" id="fmTeamAName">팀1</div>
+                        <div class="fm-team-avg" id="fmTeamAAvg"></div>
+                    </div>
+                    <div>
+                        <div class="fm-score" id="fmScoreDisplay">0 - 0</div>
+                        <div class="fm-time" id="fmTimeDisplay">경기 준비 중</div>
+                    </div>
+                    <div class="fm-team-info">
+                        <div class="fm-team-name" id="fmTeamBName">팀2</div>
+                        <div class="fm-team-avg" id="fmTeamBAvg"></div>
+                    </div>
+                </div>
+                <div class="fm-rosters" id="fmRosters"></div>
+                <div class="fm-commentary" id="fmCommentary">
+                    <div class="fm-commentary-title">경기 중계</div>
+                </div>
+                <div class="fm-controls" id="fmControls">
+                    <button class="btn fm-btn-speed" onclick="setFmSpeed('slow')">느림</button>
+                    <button class="btn fm-btn-speed active" onclick="setFmSpeed('normal')">보통</button>
+                    <button class="btn fm-btn-speed" onclick="setFmSpeed('fast')">빠름</button>
+                    <button class="btn fm-btn-action" onclick="toggleFmPause()" id="fmPauseBtn">일시정지</button>
+                    <button class="btn fm-btn-action" onclick="skipToEnd()">스킵</button>
+                </div>
+            `;
+        }
+
+        // ESC 키로 FM 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (document.getElementById('fmMatchModal').classList.contains('active')) {
+                    closeFmMatchModal();
+                } else if (document.getElementById('fmSetupModal').classList.contains('active')) {
+                    closeFmSetup();
+                }
+            }
+        });
+
     </script>
 </body>
 </html>
