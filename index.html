@@ -1110,7 +1110,7 @@
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 12px 15px;
+            padding: 0 15px 12px;
             border-top: 1px solid #333;
             border-bottom: 1px solid #333;
         }
@@ -1122,7 +1122,7 @@
             position: sticky;
             top: 0;
             background: #1a1a2e;
-            padding: 4px 0;
+            padding: 12px 0 4px;
             z-index: 1;
         }
         .fm-event {
@@ -1145,6 +1145,7 @@
         .fm-event-possession { color: #777; font-size: 0.82em; }
         .fm-event-half { background: rgba(255,255,255,0.1); text-align: center; font-weight: 700; padding: 10px; }
         .fm-event-corner { background: rgba(100,200,100,0.1); }
+        .fm-event-sub { background: rgba(100,200,255,0.15); border-left: 3px solid #64c8ff; }
         #fmMatchBody {
             display: flex;
             flex-direction: column;
@@ -1161,6 +1162,7 @@
             justify-content: center;
             gap: 8px;
             padding: 12px 15px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
             background: #111;
             flex-wrap: wrap;
         }
@@ -1313,6 +1315,11 @@
             cursor: pointer;
             flex-shrink: 0;
         }
+        .fm-pos-select:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #252540;
+        }
         .fm-formation-row {
             display: flex;
             align-items: center;
@@ -1344,6 +1351,46 @@
             color: #888;
             margin-bottom: 12px;
         }
+        .fm-pos-section-label {
+            font-size: 0.78em;
+            color: #999;
+            padding: 6px 0 4px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        .fm-pos-sub-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            margin-bottom: 3px;
+            background: #222240;
+            border-radius: 8px;
+            opacity: 0.7;
+        }
+        .fm-pos-swap-btn {
+            padding: 2px 8px;
+            font-size: 0.72em;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #ccc;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .fm-pos-swap-btn:hover { background: #444; border-color: #667eea; }
+        .fm-roster-player.is-sub { opacity: 0.5; font-style: italic; }
+        .fm-sub-badge {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.65em;
+            font-weight: 700;
+            background: #666;
+            color: #ccc;
+            margin-right: 3px;
+        }
         .fm-pos-badge {
             display: inline-block;
             padding: 1px 5px;
@@ -1358,17 +1405,50 @@
         .fm-pos-MF { background: #2ecc71; }
         .fm-pos-FW { background: #e74c3c; }
         @media (max-width: 768px) {
+            .fm-modal {
+                align-items: stretch;
+            }
             .fm-modal-content {
                 width: 100%;
                 height: 100vh;
+                height: 100dvh;
                 max-height: 100vh;
+                max-height: 100dvh;
                 border-radius: 0;
+                max-width: 100%;
             }
-            .fm-score { font-size: 2em; letter-spacing: 4px; min-width: 80px; }
-            .fm-rosters { max-height: 110px; }
-            .fm-scoreboard { padding: 12px; gap: 10px; }
+            .fm-header { padding: 10px 16px; font-size: 1.05em; }
+            .fm-score { font-size: 1.8em; letter-spacing: 4px; min-width: 70px; }
+            .fm-scoreboard { padding: 10px 12px; gap: 8px; }
+            .fm-team-name { font-size: 0.95em; }
+            .fm-team-avg { font-size: 0.72em; }
+            .fm-rosters { max-height: 90px; padding: 6px 10px; gap: 6px; }
+            .fm-roster-player { padding: 2px 4px; font-size: 0.75em; }
+            .fm-commentary { padding: 0 10px 8px; }
+            .fm-commentary-title { padding: 8px 0 4px; }
+            .fm-event { padding: 4px 8px; font-size: 0.82em; }
+            .fm-pos-swap-btn { padding: 1px 6px; font-size: 0.68em; }
+            .fm-pos-sub-row { padding: 3px 6px; }
+            .fm-pos-section-label { font-size: 0.72em; }
+            .fm-controls {
+                padding: 8px 10px;
+                padding-bottom: max(8px, env(safe-area-inset-bottom));
+                gap: 6px;
+            }
+            .fm-controls .btn { padding: 7px 12px; font-size: 0.8em; min-height: 32px; }
             .fm-pos-teams { flex-direction: column; gap: 12px; }
+            .fm-setup-content {
+                max-height: 90vh;
+                max-height: 90dvh;
+                overflow-y: auto;
+                width: 95%;
+            }
             .fm-setup-content.fm-setup-wide { max-width: 95%; }
+            .fm-result { padding: 14px 12px; }
+            .fm-result h2 { font-size: 1.2em; }
+            .fm-result-score { font-size: 1.8em; }
+            .fm-result-mvp { padding: 10px; font-size: 0.9em; }
+            .fm-result-stats { font-size: 0.82em; gap: 4px 10px; }
         }
     </style>
 </head>
@@ -3737,6 +3817,7 @@
         let fmPaused = false;
         let fmSetupSelected = [];
         let fmSelectedTeams = null;
+        let fmPositionState = null;
 
         const FM_SPEEDS = { slow: 2000, normal: 1000, fast: 400 };
         const FM_HALF_TICKS = 20;
@@ -3849,24 +3930,68 @@
         }
 
         function applyFmFormation(prefix) {
-            if (!fmSelectedTeams) return;
-            const team = prefix === 'a' ? fmSelectedTeams.teamA : fmSelectedTeams.teamB;
+            if (!fmPositionState) return;
+            const state = fmPositionState[prefix];
+            const starterCount = state.starters.length;
             const select = document.getElementById(prefix + '_formation');
+            if (!select) return;
             const idx = parseInt(select.value);
+            if (idx === -1) return;
+
             const formations = fmFormationData[prefix];
             if (!formations || !formations[idx]) return;
             const fm = formations[idx];
             let pi = 0;
             document.getElementById(`${prefix}_pos_${pi}`).value = 'GK'; pi++;
-            for (let i = 0; i < fm.d && pi < team.length; i++, pi++)
+            for (let i = 0; i < fm.d && pi < starterCount; i++, pi++)
                 document.getElementById(`${prefix}_pos_${pi}`).value = 'DF';
-            for (let i = 0; i < fm.m && pi < team.length; i++, pi++)
+            for (let i = 0; i < fm.m && pi < starterCount; i++, pi++)
                 document.getElementById(`${prefix}_pos_${pi}`).value = 'MF';
-            for (let i = 0; i < fm.f && pi < team.length; i++, pi++)
+            for (let i = 0; i < fm.f && pi < starterCount; i++, pi++)
                 document.getElementById(`${prefix}_pos_${pi}`).value = 'FW';
-            while (pi < team.length) {
+            while (pi < starterCount) {
                 document.getElementById(`${prefix}_pos_${pi}`).value = 'MF'; pi++;
             }
+        }
+
+        function enforceFmFormation(prefix, changedIdx) {
+            if (!fmPositionState) return;
+            const state = fmPositionState[prefix];
+            const starterCount = state.starters.length;
+            const formEl = document.getElementById(`${prefix}_formation`);
+            if (!formEl) return;
+            const formIdx = parseInt(formEl.value);
+            if (formIdx === -1) return;
+
+            const formations = fmFormationData[prefix];
+            if (!formations || !formations[formIdx]) return;
+            const fm = formations[formIdx];
+            const limits = { GK: 1, DF: fm.d, MF: fm.m, FW: fm.f };
+
+            const positions = [];
+            for (let i = 0; i < starterCount; i++) {
+                positions.push(document.getElementById(`${prefix}_pos_${i}`).value);
+            }
+
+            const counts = { GK: 0, DF: 0, MF: 0, FW: 0 };
+            positions.forEach(p => counts[p]++);
+
+            const changedPos = positions[changedIdx];
+            if (counts[changedPos] <= limits[changedPos]) return;
+
+            let displaceIdx = -1;
+            for (let i = 0; i < starterCount; i++) {
+                if (i !== changedIdx && positions[i] === changedPos) {
+                    displaceIdx = i;
+                    break;
+                }
+            }
+            if (displaceIdx === -1) return;
+
+            const vacantPos = FM_POSITIONS.find(pos => counts[pos] < limits[pos]);
+            if (!vacantPos) return;
+
+            document.getElementById(`${prefix}_pos_${displaceIdx}`).value = vacantPos;
         }
 
         // === 셋업 플로우 ===
@@ -3931,62 +4056,128 @@
             );
         }
 
+        function renderFmPositionColumn(prefix) {
+            const team = prefix === 'a' ? fmSelectedTeams.teamA : fmSelectedTeams.teamB;
+            const name = prefix === 'a' ? fmSelectedTeams.nameA : fmSelectedTeams.nameB;
+            const state = fmPositionState[prefix];
+            const formations = fmFormationData[prefix];
+            const starterCount = state.starters.length;
+            const positions = getDefaultPositions(starterCount);
+
+            let html = `<h4>${name}</h4>`;
+            html += `<div class="fm-formation-row">
+                <label>포메이션</label>
+                <select class="fm-formation-select" id="${prefix}_formation" onchange="applyFmFormation('${prefix}')">
+                    ${formations.map((f, i) => `<option value="${i}">${f.name}</option>`).join('')}
+                    <option value="-1">자유 배치</option>
+                </select>
+            </div>`;
+
+            html += `<div class="fm-pos-section-label">선발 (${starterCount}명)</div>`;
+            state.starters.forEach((pIdx, i) => {
+                const p = team[pIdx];
+                const tierCls = 'tier-' + p.tier.replace('+', 'plus');
+                html += `<div class="fm-pos-row">
+                    <span class="fm-pos-name">${p.name} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                    <select class="fm-pos-select" id="${prefix}_pos_${i}" onchange="enforceFmFormation('${prefix}',${i})">
+                        ${FM_POSITIONS.map(pos =>
+                            `<option value="${pos}" ${positions[i] === pos ? 'selected' : ''}>${FM_POS_LABELS[pos]}</option>`
+                        ).join('')}
+                    </select>
+                    ${starterCount > 2 ? `<button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},false)">↓</button>` : ''}
+                </div>`;
+            });
+
+            if (state.subs.length > 0) {
+                html += `<div class="fm-pos-section-label" style="margin-top:8px;">교체 (${state.subs.length}명)</div>`;
+                state.subs.forEach(pIdx => {
+                    const p = team[pIdx];
+                    const tierCls = 'tier-' + p.tier.replace('+', 'plus');
+                    html += `<div class="fm-pos-sub-row">
+                        <span class="fm-pos-name">${p.name} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                        <button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},true)">↑</button>
+                    </div>`;
+                });
+            }
+            return html;
+        }
+
+        function fmSwapPlayer(prefix, playerIdx, toStarter) {
+            const state = fmPositionState[prefix];
+            const maxStarters = fmPositionState.maxStarters;
+
+            if (toStarter) {
+                if (state.starters.length >= maxStarters) {
+                    const lastStarter = state.starters.pop();
+                    state.subs.unshift(lastStarter);
+                }
+                state.subs = state.subs.filter(idx => idx !== playerIdx);
+                state.starters.push(playerIdx);
+            } else {
+                if (state.starters.length <= 2) {
+                    showToast('최소 2명의 선발이 필요합니다', 'error');
+                    return;
+                }
+                state.starters = state.starters.filter(idx => idx !== playerIdx);
+                state.subs.unshift(playerIdx);
+            }
+
+            const fieldCount = Math.max(1, state.starters.length - 1);
+            fmFormationData[prefix] = getFormationsForCount(fieldCount);
+
+            const col = document.getElementById(`fmPosCol_${prefix}`);
+            col.innerHTML = renderFmPositionColumn(prefix);
+            applyFmFormation(prefix);
+        }
+
         function showFmPositionSetup(teamA, teamB, nameA, nameB) {
             fmSelectedTeams = { teamA, teamB, nameA, nameB };
-            const posA = getDefaultPositions(teamA.length);
-            const posB = getDefaultPositions(teamB.length);
 
-            // 풋살/축구 판별: 모든 팀이 7명 이하면 풋살
             const maxSize = Math.max(teamA.length, teamB.length);
             const isFutsal = maxSize <= 7;
+            const maxStarters = isFutsal ? 6 : 11;
             const modeLabel = isFutsal ? '풋살' : '축구';
 
-            // 포메이션 옵션 계산
-            const fieldA = Math.max(1, teamA.length - 1);
-            const fieldB = Math.max(1, teamB.length - 1);
+            function sortIndicesByTier(team) {
+                const indices = team.map((_, i) => i);
+                indices.sort((a, b) => (tierWeights[team[b].tier] || 0) - (tierWeights[team[a].tier] || 0));
+                return indices;
+            }
+
+            const sortedA = sortIndicesByTier(teamA);
+            const sortedB = sortIndicesByTier(teamB);
+
+            fmPositionState = {
+                a: {
+                    starters: sortedA.slice(0, Math.min(teamA.length, maxStarters)),
+                    subs: sortedA.slice(Math.min(teamA.length, maxStarters))
+                },
+                b: {
+                    starters: sortedB.slice(0, Math.min(teamB.length, maxStarters)),
+                    subs: sortedB.slice(Math.min(teamB.length, maxStarters))
+                },
+                maxStarters: maxStarters
+            };
+
+            const fieldA = Math.max(1, fmPositionState.a.starters.length - 1);
+            const fieldB = Math.max(1, fmPositionState.b.starters.length - 1);
             fmFormationData.a = getFormationsForCount(fieldA);
             fmFormationData.b = getFormationsForCount(fieldB);
 
-            function renderFormationSelect(formations, prefix) {
-                return `<div class="fm-formation-row">
-                    <label>포메이션</label>
-                    <select class="fm-formation-select" id="${prefix}_formation" onchange="applyFmFormation('${prefix}')">
-                        ${formations.map((f, i) => `<option value="${i}">${f.name}</option>`).join('')}
-                    </select>
-                </div>`;
-            }
-
-            function renderTeamPos(team, positions, prefix) {
-                let html = '';
-                team.forEach((p, i) => {
-                    const tierCls = 'tier-' + p.tier.replace('+', 'plus');
-                    html += `<div class="fm-pos-row">
-                        <span class="fm-pos-name">${p.name} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
-                        <select class="fm-pos-select" id="${prefix}_pos_${i}">
-                            ${FM_POSITIONS.map(pos =>
-                                `<option value="${pos}" ${positions[i] === pos ? 'selected' : ''}>${FM_POS_LABELS[pos]}</option>`
-                            ).join('')}
-                        </select>
-                    </div>`;
-                });
-                return html;
-            }
+            const startersA = Math.min(teamA.length, maxStarters);
+            const startersB = Math.min(teamB.length, maxStarters);
 
             const content = document.getElementById('fmSetupContent');
             content.classList.add('fm-setup-wide');
             content.innerHTML = `
                 <h3>시뮬레이션 - 포지션 설정</h3>
-                <div class="fm-mode-label">${modeLabel} 모드 (${teamA.length}vs${teamB.length})</div>
+                <div class="fm-mode-label">${modeLabel} 모드 (${startersA}vs${startersB})</div>
                 <div class="fm-pos-teams">
-                    <div class="fm-pos-team-col">
-                        <h4>${nameA}</h4>
-                        ${renderFormationSelect(fmFormationData.a, 'a')}
-                        ${renderTeamPos(teamA, posA, 'a')}
+                    <div class="fm-pos-team-col" id="fmPosCol_a">
+                        ${renderFmPositionColumn('a')}
                     </div>
-                    <div class="fm-pos-team-col">
-                        <h4>${nameB}</h4>
-                        ${renderFormationSelect(fmFormationData.b, 'b')}
-                        ${renderTeamPos(teamB, posB, 'b')}
+                    <div class="fm-pos-team-col" id="fmPosCol_b">
+                        ${renderFmPositionColumn('b')}
                     </div>
                 </div>
                 <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;">
@@ -3997,27 +4188,45 @@
 
             document.getElementById('fmSetupModal').classList.add('active');
             document.body.style.overflow = 'hidden';
+            applyFmFormation('a');
+            applyFmFormation('b');
         }
 
         function startFmWithPositions() {
-            if (!fmSelectedTeams) return;
+            if (!fmSelectedTeams || !fmPositionState) return;
             const { teamA, teamB, nameA, nameB } = fmSelectedTeams;
-            const enrichedA = teamA.map((p, i) => ({
-                ...p,
-                position: document.getElementById(`a_pos_${i}`).value
+
+            const enrichedA = fmPositionState.a.starters.map((pIdx, i) => ({
+                ...teamA[pIdx],
+                position: document.getElementById(`a_pos_${i}`).value,
+                isSub: false
             }));
-            const enrichedB = teamB.map((p, i) => ({
-                ...p,
-                position: document.getElementById(`b_pos_${i}`).value
+            const subsA = fmPositionState.a.subs.map(pIdx => ({
+                ...teamA[pIdx],
+                position: 'SUB',
+                isSub: true
             }));
+
+            const enrichedB = fmPositionState.b.starters.map((pIdx, i) => ({
+                ...teamB[pIdx],
+                position: document.getElementById(`b_pos_${i}`).value,
+                isSub: false
+            }));
+            const subsB = fmPositionState.b.subs.map(pIdx => ({
+                ...teamB[pIdx],
+                position: 'SUB',
+                isSub: true
+            }));
+
             closeFmSetup();
-            openFutsalFM(enrichedA, enrichedB, nameA, nameB);
+            openFutsalFM([...enrichedA, ...subsA], [...enrichedB, ...subsB], nameA, nameB);
         }
 
         function closeFmSetup() {
             document.getElementById('fmSetupModal').classList.remove('active');
             document.body.style.overflow = '';
             fmSelectedTeams = null;
+            fmPositionState = null;
         }
 
         // === 매치 시작 ===
@@ -4060,9 +4269,10 @@
         }
 
         function calculateTeamStrength(team) {
-            if (!team.length) return 1;
-            const total = team.reduce((s, p) => s + tierWeights[p.tier], 0);
-            return total / team.length;
+            const starters = team.filter(p => !p.isSub);
+            if (!starters.length) return 1;
+            const total = starters.reduce((s, p) => s + tierWeights[p.tier], 0);
+            return total / starters.length;
         }
 
         // === 시뮬레이션 틱 ===
@@ -4101,8 +4311,8 @@
             const defPlayers = attackA ? st.teamB : st.teamA;
             const atkName = attackA ? st.nameA : st.nameB;
 
-            const activePlayers = atkPlayers.filter(p => !p.redCard);
-            const activeDefenders = defPlayers.filter(p => !p.redCard);
+            const activePlayers = atkPlayers.filter(p => !p.redCard && !p.isSub);
+            const activeDefenders = defPlayers.filter(p => !p.redCard && !p.isSub);
 
             if (attackA) st.stats.possA++; else st.stats.possB++;
 
@@ -4114,7 +4324,8 @@
             const goalRate = Math.min(baseGoalRate * (atkRatio * 2), 0.12);
             cumulative += goalRate;
             if (roll < cumulative) {
-                const scorer = selectWeightedPlayer(activePlayers, 'attack');
+                const atkFieldPlayers = activePlayers.filter(p => p.position !== 'GK');
+                const scorer = selectWeightedPlayer(atkFieldPlayers.length > 0 ? atkFieldPlayers : activePlayers, 'attack');
                 if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
                 let assist = null;
                 let text;
@@ -4130,7 +4341,8 @@
 
             cumulative += 0.08;
             if (roll < cumulative) {
-                const keeper = selectWeightedPlayer(activeDefenders, 'defense');
+                const gks = activeDefenders.filter(p => p.position === 'GK');
+                const keeper = gks.length > 0 ? gks[0] : selectWeightedPlayer(activeDefenders, 'defense');
                 if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
                 const text = randomFrom(FM_COMMENTARY.save).replace('{keeper}', keeper.name);
                 return { type: 'save', minute, team: defTeam, player: keeper.name, text };
@@ -4138,7 +4350,8 @@
 
             cumulative += 0.10;
             if (roll < cumulative) {
-                const shooter = selectWeightedPlayer(activePlayers, 'attack');
+                const missFieldPlayers = activePlayers.filter(p => p.position !== 'GK');
+                const shooter = selectWeightedPlayer(missFieldPlayers.length > 0 ? missFieldPlayers : activePlayers, 'attack');
                 if (attackA) { st.stats.shotsA++; } else { st.stats.shotsB++; }
                 const text = randomFrom(FM_COMMENTARY.miss).replace('{player}', shooter.name);
                 return { type: 'miss', minute, team: atkTeam, player: shooter.name, text };
@@ -4244,10 +4457,31 @@
 
         // === 하프/풀타임 ===
 
+        function performAutoSubstitution(teamKey, minute) {
+            const st = fmState;
+            const players = teamKey === 'A' ? st.teamA : st.teamB;
+            const teamName = teamKey === 'A' ? st.nameA : st.nameB;
+            const subs = players.filter(p => p.isSub && !p.redCard);
+            const starters = players.filter(p => !p.isSub && !p.redCard && p.position !== 'GK');
+            if (subs.length === 0 || starters.length === 0) return;
+            const sub = subs[0];
+            const outPlayer = starters[Math.floor(Math.random() * starters.length)];
+            sub.isSub = false;
+            sub.position = outPlayer.position;
+            outPlayer.isSub = true;
+            outPlayer.position = 'SUB';
+            addFmEvent({
+                type: 'substitution', minute, team: teamKey,
+                text: `교체! ${teamName} - ${sub.name} IN ↔ ${outPlayer.name} OUT`
+            });
+        }
+
         function handleHalfTime() {
             clearInterval(fmInterval);
             fmInterval = null;
             addFmEvent({ type: 'halfTime', minute: FM_HALF_TICKS, text: FM_COMMENTARY.halfTime[0] });
+            performAutoSubstitution('A', FM_HALF_TICKS);
+            performAutoSubstitution('B', FM_HALF_TICKS);
             renderFmTick();
             fmTimeout = setTimeout(() => {
                 if (!fmState) return;
@@ -4279,9 +4513,11 @@
         function simulatePKs() {
             const st = fmState;
             const pkA = []; const pkB = [];
-            let playersA = st.teamA.filter(p => !p.redCard);
-            let playersB = st.teamB.filter(p => !p.redCard);
+            let playersA = st.teamA.filter(p => !p.redCard && !p.isSub);
+            let playersB = st.teamB.filter(p => !p.redCard && !p.isSub);
+            if (!playersA.length) playersA = st.teamA.filter(p => !p.isSub);
             if (!playersA.length) playersA = st.teamA;
+            if (!playersB.length) playersB = st.teamB.filter(p => !p.isSub);
             if (!playersB.length) playersB = st.teamB;
 
             function pkSuccess(player) {
@@ -4457,8 +4693,10 @@
             const st = fmState;
             const container = document.getElementById('fmRosters');
             function renderCol(team, name) {
+                const starters = team.filter(p => !p.isSub);
+                const subs = team.filter(p => p.isSub);
                 let html = `<div class="fm-roster-col"><h4>${name}</h4>`;
-                team.forEach(p => {
+                starters.forEach(p => {
                     let cls = 'fm-roster-player';
                     if (p.goals > 0) cls += ' has-goal';
                     if (p.redCard) cls += ' has-card-red';
@@ -4476,6 +4714,18 @@
                         <span class="fm-roster-icons">${icons}</span>
                     </div>`;
                 });
+                if (subs.length > 0) {
+                    html += '<div style="font-size:0.68em;color:#666;margin-top:3px;padding-left:4px;">교체</div>';
+                    subs.forEach(p => {
+                        const tierCls = 'tier-' + p.tier.replace('+', 'plus');
+                        let icons = '';
+                        if (p.redCard) icons += '🟥';
+                        html += `<div class="fm-roster-player is-sub">
+                            <span><span class="fm-sub-badge">SUB</span>${p.name} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                            <span class="fm-roster-icons">${icons}</span>
+                        </div>`;
+                    });
+                }
                 html += '</div>';
                 return html;
             }
@@ -4503,6 +4753,7 @@
                     case 'possession': cls += ' fm-event-possession'; break;
                     case 'halfTime': case 'fullTime': case 'kickOff': case 'secondHalf': cls += ' fm-event-half'; break;
                     case 'corner': cls += ' fm-event-corner'; break;
+                    case 'substitution': cls += ' fm-event-sub'; break;
                 }
                 const minuteStr = typeof evt.minute === 'number' ? `${evt.minute}'` : evt.minute;
                 html += `<div class="${cls}">${minuteStr} ${evt.text}</div>`;
@@ -4544,6 +4795,8 @@
                 if (fmState.tick > FM_HALF_TICKS) {
                     if (fmState.half === 1) {
                         addFmEvent({ type: 'halfTime', minute: FM_HALF_TICKS, text: FM_COMMENTARY.halfTime[0] });
+                        performAutoSubstitution('A', FM_HALF_TICKS);
+                        performAutoSubstitution('B', FM_HALF_TICKS);
                         fmState.half = 2;
                         fmState.tick = 0;
                         addFmEvent({ type: 'secondHalf', minute: FM_HALF_TICKS, text: FM_COMMENTARY.secondHalf[0] });
