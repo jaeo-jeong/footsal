@@ -3822,8 +3822,8 @@
         const FM_SPEEDS = { slow: 2000, normal: 1000, fast: 400 };
         const FM_HALF_TICKS = 20;
         const FM_MAX_COMMENTARY = 50;
-        const FM_POSITIONS = ['GK', 'DF', 'MF', 'FW'];
-        const FM_POS_LABELS = { GK: '골키퍼', DF: '수비', MF: '미드', FW: '공격' };
+        const FM_POSITIONS = ['NONE', 'GK', 'DF', 'MF', 'FW'];
+        const FM_POS_LABELS = { NONE: '미정', GK: '골키퍼', DF: '수비', MF: '미드', FW: '공격' };
         const FM_POS_WEIGHTS = {
             attack:  { GK: 0.3, DF: 1, MF: 3, FW: 5 },
             assist:  { GK: 0.2, DF: 1.5, MF: 5, FW: 3 },
@@ -3917,16 +3917,7 @@
 
         function getDefaultPositions(count) {
             if (count <= 0) return [];
-            if (count === 1) return ['GK'];
-            const fieldCount = count - 1;
-            const formations = getFormationsForCount(fieldCount);
-            const fm = formations[0];
-            const pos = ['GK'];
-            for (let i = 0; i < fm.d; i++) pos.push('DF');
-            for (let i = 0; i < fm.m; i++) pos.push('MF');
-            for (let i = 0; i < fm.f; i++) pos.push('FW');
-            while (pos.length < count) pos.push('MF');
-            return pos;
+            return Array(count).fill('NONE');
         }
 
         function applyFmFormation(prefix) {
@@ -4068,8 +4059,8 @@
             html += `<div class="fm-formation-row">
                 <label>포메이션</label>
                 <select class="fm-formation-select" id="${prefix}_formation" onchange="applyFmFormation('${prefix}')">
+                    <option value="-1" selected>자유 배치</option>
                     ${formations.map((f, i) => `<option value="${i}">${f.name}</option>`).join('')}
-                    <option value="-1">자유 배치</option>
                 </select>
             </div>`;
 
@@ -4084,7 +4075,7 @@
                             `<option value="${pos}" ${positions[i] === pos ? 'selected' : ''}>${FM_POS_LABELS[pos]}</option>`
                         ).join('')}
                     </select>
-                    ${starterCount > 2 ? `<button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},false)">↓</button>` : ''}
+                    ${starterCount > 2 && starterCount < fmPositionState.maxStarters ? `<button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},false)">↓</button>` : ''}
                 </div>`;
             });
 
@@ -4188,30 +4179,28 @@
 
             document.getElementById('fmSetupModal').classList.add('active');
             document.body.style.overflow = 'hidden';
-            applyFmFormation('a');
-            applyFmFormation('b');
         }
 
         function startFmWithPositions() {
             if (!fmSelectedTeams || !fmPositionState) return;
             const { teamA, teamB, nameA, nameB } = fmSelectedTeams;
 
-            const enrichedA = fmPositionState.a.starters.map((pIdx, i) => ({
-                ...teamA[pIdx],
-                position: document.getElementById(`a_pos_${i}`).value,
-                isSub: false
-            }));
+            const enrichedA = fmPositionState.a.starters.map((pIdx, i) => {
+                let pos = document.getElementById(`a_pos_${i}`).value;
+                if (pos === 'NONE') pos = 'MF';
+                return { ...teamA[pIdx], position: pos, isSub: false };
+            });
             const subsA = fmPositionState.a.subs.map(pIdx => ({
                 ...teamA[pIdx],
                 position: 'SUB',
                 isSub: true
             }));
 
-            const enrichedB = fmPositionState.b.starters.map((pIdx, i) => ({
-                ...teamB[pIdx],
-                position: document.getElementById(`b_pos_${i}`).value,
-                isSub: false
-            }));
+            const enrichedB = fmPositionState.b.starters.map((pIdx, i) => {
+                let pos = document.getElementById(`b_pos_${i}`).value;
+                if (pos === 'NONE') pos = 'MF';
+                return { ...teamB[pIdx], position: pos, isSub: false };
+            });
             const subsB = fmPositionState.b.subs.map(pIdx => ({
                 ...teamB[pIdx],
                 position: 'SUB',
