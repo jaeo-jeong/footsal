@@ -382,6 +382,44 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+                border-radius: 12px;
+            }
+
+            h1 {
+                font-size: 1.6em;
+                margin-bottom: 5px;
+            }
+
+            .subtitle {
+                font-size: 0.95em;
+                margin-bottom: 20px;
+            }
+
+            .section-title {
+                font-size: 1.2em;
+            }
+
+            .top-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .top-buttons .btn {
+                margin-left: 0 !important;
+                flex: 1 1 auto;
+                min-width: 120px;
+                padding: 10px 12px;
+                font-size: 0.85em;
+            }
+
             .form-row {
                 grid-template-columns: 1fr;
             }
@@ -389,19 +427,108 @@
             .players-grid {
                 grid-template-columns: 1fr;
             }
-            
+
+            .controls {
+                gap: 8px;
+            }
+
+            .controls .btn {
+                padding: 10px 14px;
+                font-size: 0.85em;
+                flex: 1 1 calc(50% - 8px);
+                text-align: center;
+            }
+
+            .controls label {
+                width: 100%;
+                justify-content: center;
+                margin-left: 0 !important;
+            }
+
+            .teams-container {
+                grid-template-columns: 1fr;
+            }
+
+            .team {
+                padding: 15px;
+            }
+
+            .tier-list {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .vote-grid {
+                grid-template-columns: 1fr;
+            }
+
             .modal-content {
                 padding: 20px;
                 max-height: 85vh;
+                width: 95%;
             }
-            
+
             #voteModal .modal-content {
                 max-height: 85vh;
             }
-            
+
             .modal-title {
                 font-size: 1.2em;
                 margin-bottom: 15px;
+            }
+
+            .btn {
+                padding: 10px 16px;
+                font-size: 0.9em;
+            }
+
+            .add-player-form {
+                padding: 15px;
+            }
+
+            .tier-table {
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                padding: 12px;
+                border-radius: 10px;
+            }
+
+            h1 {
+                font-size: 1.4em;
+            }
+
+            .top-buttons .btn {
+                min-width: 100%;
+                font-size: 0.82em;
+            }
+
+            .controls .btn {
+                flex: 1 1 100%;
+            }
+
+            .tier-list {
+                grid-template-columns: 1fr;
+            }
+
+            .tier-item {
+                padding: 10px;
+            }
+
+            .team-title {
+                font-size: 1.2em;
+            }
+
+            .team-stats {
+                flex-direction: column;
+                gap: 5px;
+                align-items: center;
             }
         }
 
@@ -584,14 +711,14 @@
     <div class="container">
         <h1>⚽ 젓자FC</h1>
         
-        <div style="text-align: center; margin-bottom: 20px;">
+        <div class="top-buttons" style="text-align: center; margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
             <button id="resetBtn" class="btn btn-secondary" onclick="resetToDefault()" style="background: #dc3545; color: white;" disabled>
                 초기값으로 되돌리기
             </button>
-            <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()" style="margin-left: 20px;">
+            <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()">
                 티어 투표하기
             </button>
-            <button id="voteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal()" style="margin-left: 20px; background: #17a2b8; color: white; display: none;">
+            <button id="voteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal()" style="background: #17a2b8; color: white; display: none;">
                 티어 투표 이력 보기
             </button>
         </div>
@@ -665,7 +792,7 @@
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
                 <button class="btn btn-primary" onclick="generateFutsalTeams()">풋살팀 구성</button>
                 <button class="btn btn-primary" onclick="generateSoccerTeams()">축구팀 구성</button>
-                <label style="display: flex; align-items: center; gap: 8px; margin-left: 10px; cursor: pointer;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                     <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 18px; height: 18px; cursor: pointer;">
                     <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
                 </label>
