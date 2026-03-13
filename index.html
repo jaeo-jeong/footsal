@@ -3921,28 +3921,7 @@
         }
 
         function applyFmFormation(prefix) {
-            if (!fmPositionState) return;
-            const state = fmPositionState[prefix];
-            const starterCount = state.starters.length;
-            const select = document.getElementById(prefix + '_formation');
-            if (!select) return;
-            const idx = parseInt(select.value);
-            if (idx === -1) return;
-
-            const formations = fmFormationData[prefix];
-            if (!formations || !formations[idx]) return;
-            const fm = formations[idx];
-            let pi = 0;
-            document.getElementById(`${prefix}_pos_${pi}`).value = 'GK'; pi++;
-            for (let i = 0; i < fm.d && pi < starterCount; i++, pi++)
-                document.getElementById(`${prefix}_pos_${pi}`).value = 'DF';
-            for (let i = 0; i < fm.m && pi < starterCount; i++, pi++)
-                document.getElementById(`${prefix}_pos_${pi}`).value = 'MF';
-            for (let i = 0; i < fm.f && pi < starterCount; i++, pi++)
-                document.getElementById(`${prefix}_pos_${pi}`).value = 'FW';
-            while (pi < starterCount) {
-                document.getElementById(`${prefix}_pos_${pi}`).value = 'MF'; pi++;
-            }
+            // 포메이션 선택만 저장, 포지션은 변경하지 않음 (게임 시작 시 자동 배정)
         }
 
         function enforceFmFormation(prefix, changedIdx) {
@@ -4187,8 +4166,12 @@
             if (noneIndices.length === 0) return positions;
 
             const fieldCount = Math.max(1, starters.length - 1);
-            const formations = getFormationsForCount(fieldCount);
-            const fm = formations[0];
+            const formEl = document.getElementById(`${prefix}_formation`);
+            const formIdx = formEl ? parseInt(formEl.value) : -1;
+            const formations = fmFormationData[prefix];
+            const fm = (formIdx >= 0 && formations && formations[formIdx])
+                ? formations[formIdx]
+                : getFormationsForCount(fieldCount)[0];
             const slots = [];
             for (let i = 0; i < fm.d; i++) slots.push('DF');
             for (let i = 0; i < fm.m; i++) slots.push('MF');
