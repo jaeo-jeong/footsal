@@ -2328,6 +2328,7 @@
 
             // Snake draft 순서 생성 (0→1→2→2→1→0→...)
             const draftOrder = [];
+            const fillCount = Array(numTeams).fill(0);
             let forward = true;
             let assigned = 0;
             const totalNeeded = teamSizes.reduce((a, b) => a + b, 0);
@@ -2337,8 +2338,9 @@
                     : Array.from({length: numTeams}, (_, i) => numTeams - 1 - i);
                 for (const idx of seq) {
                     if (assigned >= totalNeeded) break;
-                    if (teams[idx].length < teamSizes[idx]) {
+                    if (fillCount[idx] < teamSizes[idx]) {
                         draftOrder.push(idx);
+                        fillCount[idx]++;
                         assigned++;
                     }
                 }
@@ -2368,7 +2370,7 @@
 
         // 티어별 분배 개선 (인원당 평균도 고려)
         function improveTierDistribution(teams) {
-            const criticalTiers = ['S', 'A+', 'D'];
+            const criticalTiers = ['S', 'A+', 'C', 'D'];
             const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
             
             function getTeamTierAverage(team) {
@@ -2551,7 +2553,7 @@
         // 티어별 분배 점수 계산 (낮을수록 좋음, 인원당 평균 밸런스 최우선)
         function calculateTierDistributionScore(teams) {
             const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
-            const criticalTiers = ['S', 'A+', 'D']; // 한 팀에 몰리면 안 되는 티어
+            const criticalTiers = ['S', 'A+', 'C', 'D']; // 한 팀에 몰리면 안 되는 티어
             let score = 0;
             
             // 각 티어별로 팀 간 분배 확인
