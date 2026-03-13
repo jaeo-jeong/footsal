@@ -941,14 +941,14 @@
         let isAdmin = false;
         let adminCode = '';
 
-        // 티어 가중치 (높을수록 강함)
+        // 티어 가중치 (높을수록 강함, 비선형 간격)
         const tierWeights = {
-            'S': 7,
-            'A+': 6,
-            'A': 5,
-            'B+': 4,
-            'B': 3,
-            'C': 2,
+            'S': 10,
+            'A+': 8,
+            'A': 6.5,
+            'B+': 5,
+            'B': 4,
+            'C': 2.5,
             'D': 1
         };
 
@@ -991,22 +991,36 @@
         // 투표 평균으로 티어 계산
         function calculateTierFromVotes(votes) {
             if (!votes || votes.length === 0) return 'B';
-            
+
             // "모름" 투표는 제외하고 계산
             const validVotes = votes.filter(vote => vote.tier !== '모름');
-            
+
             // 유효한 투표가 없으면 기본값 B 반환
             if (validVotes.length === 0) return 'B';
-            
-            const tierWeights = { 'S': 7, 'A+': 6, 'A': 5, 'B+': 4, 'B': 3, 'C': 2, 'D': 1 };
-            const weightToTier = { 7: 'S', 6: 'A+', 5: 'A', 4: 'B+', 3: 'B', 2: 'C', 1: 'D' };
-            
-            const totalWeight = validVotes.reduce((sum, vote) => sum + (tierWeights[vote.tier] || 3), 0);
-            const avgWeight = totalWeight / validVotes.length;
-            
-            // 가장 가까운 티어로 반올림
-            const roundedWeight = Math.round(avgWeight);
-            return weightToTier[roundedWeight] || 'B';
+
+            // 가중치 배열로 변환
+            let weights = validVotes.map(vote => tierWeights[vote.tier] || 4);
+
+            // 5명 이상 투표 시 최고/최저 1표씩 제거 (trimmed mean)
+            if (weights.length >= 5) {
+                weights.sort((a, b) => a - b);
+                weights = weights.slice(1, -1);
+            }
+
+            const avgWeight = weights.reduce((sum, w) => sum + w, 0) / weights.length;
+
+            // 가장 가까운 가중치의 티어로 매칭
+            const tiers = Object.entries(tierWeights);
+            let closestTier = 'B';
+            let closestDist = Infinity;
+            for (const [tier, weight] of tiers) {
+                const dist = Math.abs(avgWeight - weight);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestTier = tier;
+                }
+            }
+            return closestTier;
         }
 
         // 디바이스 ID 생성 (클라이언트 측)
@@ -2216,22 +2230,27 @@
             // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
             const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
 
-            // 최적 팀 찾기 (최대 200번 시도, 매번 새로운 랜덤 시드)
+            // 최적 팀 찾기 (최대 100번 시도, 20회 연속 미개선 시 조기 중단)
             let bestTeams = null;
             let bestDiff = Infinity;
+            let noImproveCount = 0;
 
-            for (let attempt = 0; attempt < 200; attempt++) {
+            for (let attempt = 0; attempt < 100; attempt++) {
                 // 매 시도마다 선수 목록을 다시 섞기
                 const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
-                
+
                 const teams = createBalancedTeams(teamSizes, reShuffledList);
                 if (teams) {
                     const diff = calculateTeamDifference(teams);
                     if (diff < bestDiff) {
                         bestDiff = diff;
                         bestTeams = teams;
+                        noImproveCount = 0;
                         // 완벽한 밸런스면 중단
-                        if (diff === 0) break;
+                        if (diff < 0.01) break;
+                    } else {
+                        noImproveCount++;
+                        if (noImproveCount >= 20) break;
                     }
                 }
             }
@@ -2249,7 +2268,7 @@
             // 선택된 선수들만 필터링
             const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
             const totalPlayers = selectedPlayersList.length;
-            
+
             if (totalPlayers < 2) {
                 alert('최소 2명의 선수를 선택해주세요.');
                 return;
@@ -2257,26 +2276,31 @@
 
             // 총 인원에 따른 팀 크기 결정 (2팀으로 나누기)
             const teamSizes = getSoccerTeamSizes(totalPlayers);
-            
+
             // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
             const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
 
-            // 최적 팀 찾기 (최대 200번 시도, 매번 새로운 랜덤 시드)
+            // 최적 팀 찾기 (최대 100번 시도, 20회 연속 미개선 시 조기 중단)
             let bestTeams = null;
             let bestDiff = Infinity;
+            let noImproveCount = 0;
 
-            for (let attempt = 0; attempt < 200; attempt++) {
+            for (let attempt = 0; attempt < 100; attempt++) {
                 // 매 시도마다 선수 목록을 다시 섞기
                 const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
-                
+
                 const teams = createBalancedTeams(teamSizes, reShuffledList);
                 if (teams) {
                     const diff = calculateTeamDifference(teams);
                     if (diff < bestDiff) {
                         bestDiff = diff;
                         bestTeams = teams;
+                        noImproveCount = 0;
                         // 완벽한 밸런스면 중단
-                        if (diff === 0) break;
+                        if (diff < 0.01) break;
+                    } else {
+                        noImproveCount++;
+                        if (noImproveCount >= 20) break;
                     }
                 }
             }
@@ -2289,56 +2313,44 @@
             renderTeams(bestTeams, teamSizes);
         }
 
-        // 밸런스 있는 팀 생성
+        // 밸런스 있는 팀 생성 (Snake Draft)
         function createBalancedTeams(teamSizes, playerList) {
             const numTeams = teamSizes.length;
             const teams = Array(numTeams).fill(null).map(() => []);
-            const used = new Set();
-            
-            // 티어별로 선수 분류
-            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
-            
-            // 티어별로 선수 분류
-            function groupByTier(playerList) {
-                const grouped = {};
-                tierOrder.forEach(tier => {
-                    grouped[tier] = playerList.filter(p => p.tier === tier && !used.has(p.name));
-                });
-                return grouped;
-            }
 
-            // 각 팀에 선수 배정 (티어 균등 분배 고려)
-            for (let teamIdx = 0; teamIdx < numTeams; teamIdx++) {
-                const teamSize = teamSizes[teamIdx];
-                
-                while (teams[teamIdx].length < teamSize) {
-                    const playersByTier = groupByTier(playerList);
-                    let assigned = false;
-                    
-                    // 티어 순서대로 라운드 로빈 방식으로 배정
-                    for (const tier of tierOrder) {
-                        const availablePlayers = playersByTier[tier];
-                        if (availablePlayers.length > 0) {
-                            const player = availablePlayers[0];
-                            teams[teamIdx].push(player);
-                            used.add(player.name);
-                            assigned = true;
-                            break;
-                        }
-                    }
-                    
-                    // 모든 티어에서 선수를 찾지 못한 경우 (이론적으로는 발생하지 않아야 함)
-                    if (!assigned) {
-                        // 남은 선수 중 아무나 배정
-                        const remainingPlayer = playerList.find(p => !used.has(p.name));
-                        if (remainingPlayer) {
-                            teams[teamIdx].push(remainingPlayer);
-                            used.add(remainingPlayer.name);
-                        } else {
-                            return null; // 선수가 부족함
-                        }
+            // 선수를 티어순 정렬, 같은 티어 내 랜덤
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
+            const sorted = [...playerList].sort((a, b) => {
+                const tierDiff = tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
+                if (tierDiff !== 0) return tierDiff;
+                return Math.random() - 0.5;
+            });
+
+            // Snake draft 순서 생성 (0→1→2→2→1→0→...)
+            const draftOrder = [];
+            let forward = true;
+            let assigned = 0;
+            const totalNeeded = teamSizes.reduce((a, b) => a + b, 0);
+            while (assigned < totalNeeded) {
+                const seq = forward
+                    ? Array.from({length: numTeams}, (_, i) => i)
+                    : Array.from({length: numTeams}, (_, i) => numTeams - 1 - i);
+                for (const idx of seq) {
+                    if (assigned >= totalNeeded) break;
+                    if (teams[idx].length < teamSizes[idx]) {
+                        draftOrder.push(idx);
+                        assigned++;
                     }
                 }
+                forward = !forward;
+            }
+
+            // Snake draft로 선수 배정
+            let playerIdx = 0;
+            for (const teamIdx of draftOrder) {
+                if (playerIdx >= sorted.length) break;
+                teams[teamIdx].push(sorted[playerIdx]);
+                playerIdx++;
             }
 
             // 팀 크기 확인
@@ -2439,70 +2451,100 @@
             }
         }
 
-        // 티어 밸런스 최적화
+        // 티어 밸런스 최적화 (Best-Improvement + 3-Way 로테이션)
         function optimizeTierBalance(teams) {
-            function getTeamTierSum(team) {
-                return team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
-            }
-
-            function getTeamTierAverage(team) {
-                if (team.length === 0) return 0;
-                return getTeamTierSum(team) / team.length;
-            }
-
-            function getTeamVariance(teams) {
-                // 인원당 평균 티어를 기준으로 분산 계산
-                const averages = teams.map(team => getTeamTierAverage(team));
-                const avg = averages.reduce((a, b) => a + b, 0) / averages.length;
-                const variance = averages.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / averages.length;
-                return variance;
-            }
-
-            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록, 하지만 인원당 평균도 고려)
+            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록)
             improveTierDistribution(teams);
 
-            // 여러 번 시도하여 전체 티어 합 밸런스 개선 (인원당 평균 우선)
+            // Best-improvement 스왑 + 3-way 로테이션
             for (let iteration = 0; iteration < 200; iteration++) {
                 const currentScore = calculateTeamDifference(teams);
-                
-                // 모든 팀 쌍에 대해 교체 시도
-                let improved = false;
-                
+                let bestScore = currentScore;
+                let bestMove = null;
+
+                // 2-way 스왑: 모든 팀 쌍의 모든 선수 조합 탐색
                 for (let i = 0; i < teams.length; i++) {
                     for (let j = i + 1; j < teams.length; j++) {
-                        const team1 = teams[i];
-                        const team2 = teams[j];
-                        
-                        // 모든 선수 교체 시도
-                        for (const p1 of team1) {
-                            for (const p2 of team2) {
-                                if (p1.tier !== p2.tier) {
-                                    // 교체 시도
-                                    const idx1 = team1.indexOf(p1);
-                                    const idx2 = team2.indexOf(p2);
-                                    team1[idx1] = p2;
-                                    team2[idx2] = p1;
-                                    
-                                    const newScore = calculateTeamDifference(teams);
-                                    if (newScore < currentScore) {
-                                        improved = true;
-                                        break;
-                                    } else {
-                                        // 되돌리기
-                                        team1[idx1] = p1;
-                                        team2[idx2] = p2;
+                        for (let pi = 0; pi < teams[i].length; pi++) {
+                            for (let pj = 0; pj < teams[j].length; pj++) {
+                                if (teams[i][pi].tier === teams[j][pj].tier) continue;
+                                // 스왑 적용
+                                const tmp = teams[i][pi];
+                                teams[i][pi] = teams[j][pj];
+                                teams[j][pj] = tmp;
+                                const score = calculateTeamDifference(teams);
+                                if (score < bestScore) {
+                                    bestScore = score;
+                                    bestMove = { type: '2way', i, j, pi, pj };
+                                }
+                                // 되돌리기
+                                teams[j][pj] = teams[i][pi];
+                                teams[i][pi] = tmp;
+                            }
+                        }
+                    }
+                }
+
+                // 3-way 로테이션: 3팀 이상일 때 A→B, B→C, C→A 및 역방향
+                if (teams.length >= 3) {
+                    for (let a = 0; a < teams.length; a++) {
+                        for (let b = a + 1; b < teams.length; b++) {
+                            for (let c = b + 1; c < teams.length; c++) {
+                                for (let pa = 0; pa < teams[a].length; pa++) {
+                                    for (let pb = 0; pb < teams[b].length; pb++) {
+                                        for (let pc = 0; pc < teams[c].length; pc++) {
+                                            // 정방향: A→B, B→C, C→A
+                                            const sa = teams[a][pa], sb = teams[b][pb], sc = teams[c][pc];
+                                            if (sa.tier === sb.tier && sb.tier === sc.tier) continue;
+                                            teams[a][pa] = sc;
+                                            teams[b][pb] = sa;
+                                            teams[c][pc] = sb;
+                                            let score = calculateTeamDifference(teams);
+                                            if (score < bestScore) {
+                                                bestScore = score;
+                                                bestMove = { type: '3way', a, b, c, pa, pb, pc, dir: 'fwd' };
+                                            }
+                                            // 역방향: A→C, C→B, B→A
+                                            teams[a][pa] = sb;
+                                            teams[b][pb] = sc;
+                                            teams[c][pc] = sa;
+                                            score = calculateTeamDifference(teams);
+                                            if (score < bestScore) {
+                                                bestScore = score;
+                                                bestMove = { type: '3way', a, b, c, pa, pb, pc, dir: 'rev' };
+                                            }
+                                            // 되돌리기
+                                            teams[a][pa] = sa;
+                                            teams[b][pb] = sb;
+                                            teams[c][pc] = sc;
+                                        }
                                     }
                                 }
                             }
-                            if (improved) break;
                         }
-                        
-                        if (improved) break;
                     }
-                    if (improved) break;
                 }
-                
-                if (!improved) break;
+
+                // 최선의 이동 적용
+                if (!bestMove) break;
+                if (bestMove.type === '2way') {
+                    const { i, j, pi, pj } = bestMove;
+                    const tmp = teams[i][pi];
+                    teams[i][pi] = teams[j][pj];
+                    teams[j][pj] = tmp;
+                } else {
+                    const { a, b, c, pa, pb, pc, dir } = bestMove;
+                    const sa = teams[a][pa], sb = teams[b][pb], sc = teams[c][pc];
+                    if (dir === 'fwd') {
+                        teams[a][pa] = sc;
+                        teams[b][pb] = sa;
+                        teams[c][pc] = sb;
+                    } else {
+                        teams[a][pa] = sb;
+                        teams[b][pb] = sc;
+                        teams[c][pc] = sa;
+                    }
+                }
             }
         }
 
