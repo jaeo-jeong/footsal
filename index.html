@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>젓자FC 팀 짜기</title>
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -15,7 +17,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -479,6 +481,7 @@
             .btn {
                 padding: 10px 16px;
                 font-size: 0.9em;
+                min-height: 44px;
             }
 
             .add-player-form {
@@ -487,6 +490,27 @@
 
             .tier-table {
                 padding: 15px;
+            }
+
+            .player-checkbox {
+                width: 24px;
+                height: 24px;
+                min-width: 24px;
+            }
+
+            .player-card {
+                padding: 12px;
+            }
+
+            .player-name {
+                padding: 4px 0;
+            }
+
+            .search-filter-bar {
+                flex-direction: column;
+            }
+            .search-input {
+                width: 100%;
             }
         }
 
@@ -693,13 +717,310 @@
             -moz-appearance: textfield;
             appearance: textfield;
         }
+
+        /* Toast 알림 */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 14px 28px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.95em;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            animation: toastIn 0.35s ease forwards;
+            pointer-events: auto;
+            max-width: 400px;
+            text-align: center;
+        }
+        .toast.toast-out {
+            animation: toastOut 0.3s ease forwards;
+        }
+        .toast-success { background: #28a745; }
+        .toast-error { background: #dc3545; }
+        .toast-warning { background: #f0ad4e; color: #333; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(30px); }
+        }
+
+        /* 커스텀 확인 모달 */
+        .confirm-modal-content {
+            text-align: center;
+        }
+        .confirm-message {
+            font-size: 1.05em;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+
+        /* 오프라인 배너 */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #dc3545;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            z-index: 10000;
+            display: none;
+            font-size: 0.95em;
+        }
+        .offline-banner.show { display: block; }
+
+        /* 선수 검색/필터 */
+        .search-filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 180px;
+            padding: 10px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+        }
+        .search-input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        .tier-filters {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .tier-filter-btn {
+            padding: 6px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85em;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .tier-filter-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        /* 선택 카운터 */
+        .selection-counter {
+            font-size: 1em;
+            color: #666;
+            font-weight: 600;
+            padding: 6px 14px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+        .selection-counter .count {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        /* 밸런스 시각화 */
+        .balance-indicator {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .balance-good { background: rgba(255,255,255,0.25); color: #c8ffc8; }
+        .balance-ok { background: rgba(255,255,255,0.2); color: #fff3cd; }
+        .balance-bad { background: rgba(255,255,255,0.2); color: #ffb3b3; }
+        .tier-dist-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .tier-dist-bar > div {
+            transition: width 0.3s;
+        }
+
+        /* 팀 결과 버튼 영역 */
+        .team-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* 모바일 이동 버튼 */
+        .mobile-move-select {
+            padding: 4px 8px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 5px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 0.8em;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .mobile-move-select option {
+            color: #333;
+            background: white;
+        }
+
+        /* 팀 히스토리 */
+        .team-history-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        .history-item {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .history-item:hover {
+            border-color: #667eea;
+            transform: translateY(-1px);
+        }
+
+        /* 버튼 일관된 스타일 */
+        .btn {
+            position: relative;
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        .btn:focus-visible {
+            outline: 3px solid #667eea;
+            outline-offset: 2px;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(108,117,125,0.3);
+        }
+        .btn-danger:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(220,53,69,0.3);
+        }
+        .btn-success:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+        }
+
+        /* 로딩 스피너 */
+        .btn-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 팀 카드 등장 애니메이션 */
+        @keyframes teamFadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .team-animate {
+            animation: teamFadeIn 0.4s ease forwards;
+            opacity: 0;
+        }
+
+        /* 터치 타겟 개선 */
+        .player-checkbox {
+            width: 22px;
+            height: 22px;
+            min-width: 22px;
+        }
+
+        /* 투표 히스토리 카드 (모바일) */
+        .vote-history-card {
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .vote-history-card-header {
+            font-weight: 700;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .vote-history-card-votes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .vote-history-card-vote {
+            font-size: 0.85em;
+            padding: 3px 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
+    <!-- 오프라인 배너 -->
+    <div id="offlineBanner" class="offline-banner">인터넷 연결을 확인해주세요</div>
+
+    <!-- 토스트 컨테이너 -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- 커스텀 확인 모달 -->
+    <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-title" id="confirmTitle">확인</div>
+            <div class="confirm-message" id="confirmMessage"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="confirmOk">확인</button>
+                <button class="btn btn-secondary" id="confirmCancel">취소</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 관리자 코드 입력 모달 -->
-    <div id="adminModal" class="modal">
+    <div id="adminModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
         <div class="modal-content">
-            <div class="modal-title">관리자 코드 입력</div>
+            <div class="modal-title" id="adminModalTitle">관리자 코드 입력</div>
             <input type="password" id="adminCodeInput" class="modal-input" placeholder="관리자 코드를 입력하세요">
             <div class="modal-buttons">
                 <button class="btn btn-primary" onclick="enterAsAdmin()">관리자로 입장</button>
@@ -729,9 +1050,9 @@
         </div>
 
         <!-- 투표 모달 -->
-        <div id="voteModal" class="modal">
+        <div id="voteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="voteModalTitle">
             <div class="modal-content" style="max-width: 600px;">
-                <div class="modal-title">티어 투표</div>
+                <div class="modal-title" id="voteModalTitle">티어 투표</div>
                 <div id="voteContent"></div>
                 <div class="modal-buttons">
                     <button class="btn btn-primary" onclick="submitVote()">투표 제출</button>
@@ -741,9 +1062,9 @@
         </div>
 
         <!-- 투표 이력 모달 (관리자 전용) -->
-        <div id="voteHistoryModal" class="modal">
+        <div id="voteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="voteHistoryModalTitle">
             <div class="modal-content" style="max-width: 90%; max-height: 90vh;">
-                <div class="modal-title">티어 투표 이력 (관리자 전용)</div>
+                <div class="modal-title" id="voteHistoryModalTitle">티어 투표 이력 (관리자 전용)</div>
                 <div id="voteHistoryContent" style="overflow-y: auto; max-height: calc(90vh - 150px); padding: 20px;">
                     <div id="voteHistoryStats" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                         <h3 style="margin: 0 0 10px 0; font-size: 1.2em;">투표 통계</h3>
@@ -759,7 +1080,22 @@
 
         <div class="section">
             <h2 class="section-title">선수 관리</h2>
-            
+
+            <!-- 선수 검색/필터 -->
+            <div class="search-filter-bar">
+                <input type="text" id="playerSearchInput" class="search-input" placeholder="선수 이름 검색..." oninput="filterPlayers()">
+                <div class="tier-filters" id="tierFilters">
+                    <button class="tier-filter-btn active" onclick="toggleTierFilter('all', this)">전체</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('S', this)">S</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('A+', this)">A+</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('A', this)">A</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('B+', this)">B+</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('B', this)">B</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('C', this)">C</button>
+                    <button class="tier-filter-btn" onclick="toggleTierFilter('D', this)">D</button>
+                </div>
+            </div>
+
             <div class="add-player-form" id="addPlayerForm" style="display: none;">
                 <div class="form-row">
                     <div class="form-group">
@@ -786,18 +1122,27 @@
         </div>
 
         <div class="section">
-            <h2 class="section-title">팀 구성</h2>
+            <h2 class="section-title">팀 구성 <span class="selection-counter" id="selectionCounter">선택: <span class="count">0</span>/<span id="totalPlayerCount">0</span>명</span></h2>
             <div class="controls">
                 <button class="btn btn-secondary" onclick="selectAllPlayers()">전체 선택</button>
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
-                <button class="btn btn-primary" onclick="generateFutsalTeams()">풋살팀 구성</button>
-                <button class="btn btn-primary" onclick="generateSoccerTeams()">축구팀 구성</button>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 18px; height: 18px; cursor: pointer;">
+                <button class="btn btn-primary" id="futsalBtn" onclick="generateFutsalTeams()">풋살팀 구성</button>
+                <button class="btn btn-primary" id="soccerBtn" onclick="generateSoccerTeams()">축구팀 구성</button>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
+                    <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 22px; height: 22px; cursor: pointer;">
                     <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
                 </label>
+                <label style="display: none; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
+                    <input type="checkbox" id="winRateCheckbox" style="width: 22px; height: 22px; cursor: pointer;">
+                    <span style="font-size: 0.95em; color: #333;">승률 가중치 반영</span>
+                </label>
             </div>
+            <div id="teamHistorySection" style="display: none;"></div>
             <div class="teams-container" id="teamsContainer"></div>
+            <div id="teamActions" class="team-actions" style="display: none;">
+                <button class="btn btn-secondary" onclick="copyTeamsToClipboard()">클립보드 복사</button>
+                <button class="btn btn-secondary" onclick="showTeamHistory()">이전 팀 보기</button>
+            </div>
         </div>
     </div>
 
@@ -805,6 +1150,134 @@
     <script src="firebase-config.js"></script>
 
     <script>
+        // ===== 유틸리티 함수 =====
+
+        // 토스트 알림
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('toast-out');
+                toast.addEventListener('animationend', () => toast.remove());
+            }, 3000);
+        }
+
+        // 커스텀 확인 모달
+        function showConfirm(message) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmModal');
+                document.getElementById('confirmMessage').textContent = message;
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                const okBtn = document.getElementById('confirmOk');
+                const cancelBtn = document.getElementById('confirmCancel');
+                function cleanup() {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                    okBtn.removeEventListener('click', onOk);
+                    cancelBtn.removeEventListener('click', onCancel);
+                }
+                function onOk() { cleanup(); resolve(true); }
+                function onCancel() { cleanup(); resolve(false); }
+                okBtn.addEventListener('click', onOk);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        }
+
+        // 디바운스
+        function debounce(fn, delay) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        // 중복 제출 방지
+        let submitting = {};
+
+        // 오프라인 감지
+        window.addEventListener('online', () => {
+            document.getElementById('offlineBanner').classList.remove('show');
+            showToast('인터넷 연결이 복원되었습니다.', 'success');
+        });
+        window.addEventListener('offline', () => {
+            document.getElementById('offlineBanner').classList.add('show');
+        });
+
+        // 선수 검색/필터 상태
+        let searchQuery = '';
+        let tierFilter = 'all';
+
+        // 선택 카운터 업데이트
+        function updateSelectionCounter() {
+            const counterEl = document.querySelector('#selectionCounter .count');
+            const totalEl = document.getElementById('totalPlayerCount');
+            if (counterEl) counterEl.textContent = selectedPlayers.size;
+            if (totalEl) totalEl.textContent = players.length;
+        }
+
+        // 팀 히스토리
+        const TEAM_HISTORY_KEY = 'jeotjaFcTeamHistory';
+        function saveTeamHistory(teams, teamSizes) {
+            const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
+            const entry = {
+                date: new Date().toLocaleString('ko-KR'),
+                teams: teams.map(team => team.map(p => ({ name: p.name, tier: p.tier }))),
+                teamSizes: teamSizes
+            };
+            history.unshift(entry);
+            if (history.length > 5) history.pop();
+            localStorage.setItem(TEAM_HISTORY_KEY, JSON.stringify(history));
+        }
+
+        // 모달 ESC/배경 클릭 닫기 + 포커스 트랩
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modals = document.querySelectorAll('.modal.active');
+                modals.forEach(modal => {
+                    if (modal.id === 'adminModal') return; // admin modal은 ESC로 닫지 않음
+                    if (modal.id === 'confirmModal') {
+                        document.getElementById('confirmCancel').click();
+                        return;
+                    }
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            }
+            // 포커스 트랩
+            if (e.key === 'Tab') {
+                const activeModal = document.querySelector('.modal.active');
+                if (!activeModal) return;
+                const focusable = activeModal.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (focusable.length === 0) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        });
+
+        // 모달 배경 클릭 닫기
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('modal') || !e.target.classList.contains('active')) return;
+            if (e.target.id === 'adminModal') return;
+            if (e.target.id === 'confirmModal') {
+                document.getElementById('confirmCancel').click();
+                return;
+            }
+            e.target.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+
         // Firebase 초기화
         let db;
         let firebaseInitialized = false;
@@ -1106,7 +1579,7 @@
         async function enterAsAdmin() {
             const code = document.getElementById('adminCodeInput').value;
             if (!code) {
-                alert('관리자 코드를 입력해주세요.');
+                showToast('관리자 코드를 입력해주세요.', 'warning');
                 return;
             }
             
@@ -1125,7 +1598,7 @@
                     if (!firebaseInitialized) {
                         console.error('Firebase 초기화 실패');
                         // Firebase 없이도 진행 (기본 데이터 사용)
-                        alert('Firebase 연결에 실패했습니다. 오프라인 모드로 진행합니다.');
+                        showToast('Firebase 연결에 실패했습니다. 오프라인 모드로 진행합니다.', 'warning');
                     }
                 }
                 
@@ -1147,7 +1620,7 @@
                         sortPlayersByName();
                         renderPlayers();
                         renderTierTable();
-                        alert('데이터 로드에 실패했습니다. 오프라인 모드로 진행합니다.');
+                        showToast('데이터 로드에 실패했습니다. 오프라인 모드로 진행합니다.', 'warning');
                     }
                 } else {
                     console.warn('Firebase가 초기화되지 않았습니다. 기본 데이터를 사용합니다.');
@@ -1158,7 +1631,7 @@
                     renderTierTable();
                 }
             } else {
-                alert('잘못된 관리자 코드입니다.');
+                showToast('잘못된 관리자 코드입니다.', 'error');
             }
         }
         
@@ -1395,13 +1868,10 @@
                     }
                 });
                 
-                // 변경사항이 있을 때만 렌더링
                 if (hasChanges) {
-                    // 투표 데이터로 티어 업데이트
                     updateTiersFromVotes().then(() => {
                         sortPlayersByName();
-                        renderPlayers();
-                        renderTierTable();
+                        debouncedRenderPlayers();
                     });
                 }
             }, (error) => {
@@ -1428,7 +1898,7 @@
                 await batch.commit();
             } catch (error) {
                 console.error('선수 목록 저장 실패:', error);
-                alert('저장에 실패했습니다.');
+                showToast('저장에 실패했습니다.', 'error');
             }
         }
         
@@ -1483,15 +1953,24 @@
             });
         }
 
+        // 디바운스된 렌더 함수
+        const debouncedRenderPlayers = debounce(() => renderPlayers(), 300);
+
         // 선수 목록 렌더링
         function renderPlayers() {
-            // 이름 기준으로 정렬
             sortPlayersByName();
-            
+
             const grid = document.getElementById('playersGrid');
             grid.innerHTML = '';
 
-            players.forEach((player, index) => {
+            // 필터링
+            const filtered = players.filter(p => {
+                const matchName = !searchQuery || p.name.toLowerCase().includes(searchQuery);
+                const matchTier = tierFilter === 'all' || p.tier === tierFilter;
+                return matchName && matchTier;
+            });
+
+            filtered.forEach((player, index) => {
                 const card = document.createElement('div');
                 card.className = 'player-card';
                 card.style.cursor = 'pointer';
@@ -1581,8 +2060,8 @@
                 grid.appendChild(card);
             });
             
-            // 티어표도 업데이트
             renderTierTable();
+            updateSelectionCounter();
         }
 
         // 선수 선택 토글
@@ -1592,6 +2071,7 @@
             } else {
                 selectedPlayers.delete(playerName);
             }
+            updateSelectionCounter();
         }
 
         // 전체 선택
@@ -1600,27 +2080,103 @@
                 selectedPlayers.add(player.name);
             });
             renderPlayers();
+            updateSelectionCounter();
         }
 
         // 전체 해제
         function deselectAllPlayers() {
             selectedPlayers.clear();
             renderPlayers();
+            updateSelectionCounter();
+        }
+
+        // 선수 검색/필터
+        function filterPlayers() {
+            searchQuery = (document.getElementById('playerSearchInput').value || '').trim().toLowerCase();
+            renderPlayers();
+        }
+
+        function toggleTierFilter(tier, btn) {
+            tierFilter = tier;
+            document.querySelectorAll('.tier-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderPlayers();
+        }
+
+        // 클립보드 복사
+        function copyTeamsToClipboard() {
+            if (!currentTeamsData) {
+                showToast('팀 결과가 없습니다.', 'warning');
+                return;
+            }
+            let text = '';
+            currentTeamsData.forEach((team, i) => {
+                const tierSum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                const avg = team.length > 0 ? (tierSum / team.length).toFixed(1) : 0;
+                text += `[팀 ${i + 1}] 평균 ${avg}\n`;
+                text += team.map(p => `${p.name}(${p.tier})`).join(', ') + '\n\n';
+            });
+            navigator.clipboard.writeText(text.trim()).then(() => {
+                showToast('클립보드에 복사되었습니다.', 'success');
+            }).catch(() => {
+                showToast('복사에 실패했습니다.', 'error');
+            });
+        }
+
+        // 팀 히스토리 보기
+        function showTeamHistory() {
+            const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
+            const section = document.getElementById('teamHistorySection');
+            if (history.length === 0) {
+                showToast('이전 팀 기록이 없습니다.', 'warning');
+                return;
+            }
+            if (section.style.display === 'block') {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+            section.innerHTML = '<div class="team-history-section"><h3 style="margin-bottom:12px;">이전 팀 기록 (최근 5개)</h3>' +
+                history.map((entry, idx) => {
+                    const summary = entry.teams.map((t, ti) => `팀${ti+1}(${t.length}명)`).join(' / ');
+                    return `<div class="history-item" onclick="restoreTeamHistory(${idx})">
+                        <div style="font-size:0.85em;color:#999;">${entry.date}</div>
+                        <div style="font-weight:600;">${summary}</div>
+                    </div>`;
+                }).join('') + '</div>';
+        }
+
+        function restoreTeamHistory(idx) {
+            const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
+            if (!history[idx]) return;
+            const entry = history[idx];
+            // 현재 players에서 이름으로 매칭
+            const teams = entry.teams.map(team =>
+                team.map(p => {
+                    const found = players.find(pl => pl.name === p.name);
+                    return found || p;
+                })
+            );
+            renderTeams(teams, entry.teamSizes);
+            document.getElementById('teamActions').style.display = 'flex';
+            document.getElementById('teamHistorySection').style.display = 'none';
+            showToast('이전 팀이 복원되었습니다.', 'success');
         }
 
         // 초기값으로 되돌리기
         async function resetToDefault() {
             if (!isAdmin) {
-                alert('관리자만 초기값으로 되돌릴 수 있습니다.');
+                showToast('관리자만 초기값으로 되돌릴 수 있습니다.', 'error');
                 return;
             }
-            
+
             if (!db) {
-                alert('Firebase가 초기화되지 않았습니다.');
+                showToast('Firebase가 초기화되지 않았습니다.', 'error');
                 return;
             }
-            
-            if (confirm('모든 선수 데이터를 초기 상태로 되돌리시겠습니까?\n(추가/수정/삭제한 모든 내용이 초기값으로 복원됩니다)')) {
+
+            const confirmed = await showConfirm('모든 선수 데이터를 초기 상태로 되돌리시겠습니까?\n(추가/수정/삭제한 모든 내용이 초기값으로 복원됩니다)');
+            if (confirmed) {
                 try {
                     // 기존 선수 모두 삭제
                     const playersSnapshot = await db.collection('players').get();
@@ -1651,10 +2207,10 @@
                     // 선수 목록 다시 로드
                     await loadPlayersFromFirebase();
                     
-                    alert('초기값으로 복원되었습니다.');
+                    showToast('초기값으로 복원되었습니다.', 'success');
                 } catch (error) {
                     console.error('초기화 실패:', error);
-                    alert('초기화에 실패했습니다: ' + error.message);
+                    showToast('초기화에 실패했습니다: ' + error.message, 'error');
                 }
             }
         }
@@ -1662,26 +2218,25 @@
         // 투표 모달 열기
         async function openVoteModal() {
             if (!db) {
-                alert('Firebase가 초기화되지 않았습니다. 투표 기능을 사용할 수 없습니다.');
+                showToast('Firebase가 초기화되지 않았습니다. 투표 기능을 사용할 수 없습니다.', 'error');
                 return;
             }
-            
+
             if (players.length === 0) {
-                alert('선수가 없습니다.');
+                showToast('선수가 없습니다.', 'warning');
                 return;
             }
-            
+
             // 투표 상태 확인
             const deviceId = getDeviceId();
             try {
                 const votesSnapshot = await db.collection('votes')
                     .where('deviceId', '==', deviceId)
                     .get();
-                
+
                 if (!votesSnapshot.empty) {
-                    if (!confirm('이미 투표하셨습니다. 다시 투표하시겠습니까?\n(기존 투표는 덮어씌워집니다)')) {
-                        return;
-                    }
+                    const confirmed = await showConfirm('이미 투표하셨습니다. 다시 투표하시겠습니까?\n(기존 투표는 덮어씌워집니다)');
+                    if (!confirmed) return;
                 }
             } catch (error) {
                 console.error('투표 상태 확인 실패:', error);
@@ -1777,9 +2332,15 @@
         
         // 투표 제출
         async function submitVote() {
+            if (submitting['vote']) return;
+            submitting['vote'] = true;
+            // 버튼 비활성화
+            const voteSubmitBtn = document.querySelector('#voteModal .btn-primary');
+            if (voteSubmitBtn) { voteSubmitBtn.disabled = true; voteSubmitBtn.innerHTML = '<span class="btn-spinner"></span>제출 중...'; }
+
             const deviceId = getDeviceId();
             const votes = [];
-            
+
             players.forEach(player => {
                 const select = document.getElementById(`vote_${player.name}`);
                 if (select) {
@@ -1819,22 +2380,25 @@
                 await updateTiersFromVotes();
                 
                 closeVoteModal();
-                alert('투표가 완료되었습니다.');
+                showToast('투표가 완료되었습니다.', 'success');
             } catch (error) {
                 console.error('투표 제출 실패:', error);
-                alert('투표 제출에 실패했습니다.');
+                showToast('투표 제출에 실패했습니다.', 'error');
+            } finally {
+                submitting['vote'] = false;
+                if (voteSubmitBtn) { voteSubmitBtn.disabled = false; voteSubmitBtn.textContent = '투표 제출'; }
             }
         }
 
         // 투표 이력 모달 열기 (관리자 전용)
         async function openVoteHistoryModal() {
             if (!db) {
-                alert('Firebase가 초기화되지 않았습니다.');
+                showToast('Firebase가 초기화되지 않았습니다.', 'error');
                 return;
             }
-            
+
             if (!isAdmin) {
-                alert('관리자만 접근할 수 있습니다.');
+                showToast('관리자만 접근할 수 있습니다.', 'error');
                 return;
             }
             
@@ -1877,106 +2441,71 @@
                 const totalVoteCount = Object.keys(votesByDevice).length;
                 document.getElementById('totalVoteCount').textContent = totalVoteCount;
                 
-                // 테이블 생성
                 const tableContainer = document.getElementById('voteHistoryTable');
                 tableContainer.innerHTML = '';
-                
-                // 선수 목록 가져오기 (정렬)
+
                 const sortedPlayers = [...players].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-                
-                // 테이블 생성
-                const table = document.createElement('table');
-                table.style.width = '100%';
-                table.style.borderCollapse = 'collapse';
-                table.style.marginTop = '20px';
-                table.style.fontSize = '0.9em';
-                
-                // 헤더 행
-                const thead = document.createElement('thead');
-                const headerRow = document.createElement('tr');
-                headerRow.style.backgroundColor = '#667eea';
-                headerRow.style.color = 'white';
-                
-                const playerHeader = document.createElement('th');
-                playerHeader.textContent = '선수 이름';
-                playerHeader.style.padding = '12px';
-                playerHeader.style.textAlign = 'left';
-                playerHeader.style.border = '1px solid #ddd';
-                headerRow.appendChild(playerHeader);
-                
-                // 각 디바이스별 헤더 추가
                 const deviceIds = Object.keys(votesByDevice);
-                deviceIds.forEach((deviceId, index) => {
-                    const deviceHeader = document.createElement('th');
-                    deviceHeader.textContent = `투표 ${index + 1}`;
-                    deviceHeader.style.padding = '12px';
-                    deviceHeader.style.textAlign = 'center';
-                    deviceHeader.style.border = '1px solid #ddd';
-                    deviceHeader.style.minWidth = '80px';
-                    headerRow.appendChild(deviceHeader);
-                });
-                
-                thead.appendChild(headerRow);
-                table.appendChild(thead);
-                
-                // 본문
-                const tbody = document.createElement('tbody');
-                
-                sortedPlayers.forEach((player, playerIndex) => {
-                    const row = document.createElement('tr');
-                    row.style.backgroundColor = playerIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
-                    
-                    // 선수 이름 셀
-                    const nameCell = document.createElement('td');
-                    nameCell.textContent = player.name;
-                    nameCell.style.padding = '10px 12px';
-                    nameCell.style.border = '1px solid #ddd';
-                    nameCell.style.fontWeight = '600';
-                    row.appendChild(nameCell);
-                    
-                    // 각 디바이스별 투표 셀
-                    deviceIds.forEach(deviceId => {
-                        const voteCell = document.createElement('td');
-                        voteCell.style.padding = '10px';
-                        voteCell.style.border = '1px solid #ddd';
-                        voteCell.style.textAlign = 'center';
-                        
-                        const deviceVotes = votesByDevice[deviceId];
-                        const playerVote = deviceVotes.find(v => v.playerName === player.name);
-                        
-                        if (playerVote) {
-                            if (playerVote.tier === '모름') {
-                                voteCell.textContent = '모름';
-                                voteCell.style.color = '#999';
-                                voteCell.style.fontStyle = 'italic';
-                            } else {
-                                const tierBadge = document.createElement('span');
-                                tierBadge.className = `tier-badge tier-${playerVote.tier.replace('+', 'plus')}`;
-                                tierBadge.textContent = playerVote.tier;
-                                tierBadge.style.display = 'inline-block';
-                                voteCell.appendChild(tierBadge);
-                            }
-                        } else {
-                            voteCell.textContent = '-';
-                            voteCell.style.color = '#ccc';
-                        }
-                        
-                        row.appendChild(voteCell);
+                const isMobileView = window.innerWidth <= 480;
+
+                if (isMobileView) {
+                    // 모바일: 카드 형태
+                    sortedPlayers.forEach(player => {
+                        const card = document.createElement('div');
+                        card.className = 'vote-history-card';
+                        let votesHtml = '';
+                        deviceIds.forEach((deviceId, di) => {
+                            const dv = votesByDevice[deviceId];
+                            const pv = dv.find(v => v.playerName === player.name);
+                            const label = pv ? (pv.tier === '모름' ? '<span style="color:#999">모름</span>' : `<span class="tier-badge tier-${pv.tier.replace('+','plus')}">${pv.tier}</span>`) : '-';
+                            votesHtml += `<span class="vote-history-card-vote">투표${di+1}: ${label}</span>`;
+                        });
+                        card.innerHTML = `<div class="vote-history-card-header">${player.name}</div><div class="vote-history-card-votes">${votesHtml}</div>`;
+                        tableContainer.appendChild(card);
                     });
-                    
-                    tbody.appendChild(row);
-                });
-                
-                table.appendChild(tbody);
-                tableContainer.appendChild(table);
-                
-                // 모달 표시
+                } else {
+                    // 데스크톱: 테이블 형태
+                    const table = document.createElement('table');
+                    table.style.cssText = 'width:100%;border-collapse:collapse;margin-top:20px;font-size:0.9em;';
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    headerRow.style.cssText = 'background-color:#667eea;color:white;';
+                    headerRow.innerHTML = '<th style="padding:12px;text-align:left;border:1px solid #ddd;">선수 이름</th>' +
+                        deviceIds.map((_, i) => `<th style="padding:12px;text-align:center;border:1px solid #ddd;min-width:80px;">투표 ${i+1}</th>`).join('');
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    const tbody = document.createElement('tbody');
+                    sortedPlayers.forEach((player, pi) => {
+                        const row = document.createElement('tr');
+                        row.style.backgroundColor = pi % 2 === 0 ? '#fff' : '#f8f9fa';
+                        let cells = `<td style="padding:10px 12px;border:1px solid #ddd;font-weight:600;">${player.name}</td>`;
+                        deviceIds.forEach(deviceId => {
+                            const dv = votesByDevice[deviceId];
+                            const pv = dv.find(v => v.playerName === player.name);
+                            if (pv) {
+                                if (pv.tier === '모름') {
+                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#999;font-style:italic;">모름</td>`;
+                                } else {
+                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;"><span class="tier-badge tier-${pv.tier.replace('+','plus')}">${pv.tier}</span></td>`;
+                                }
+                            } else {
+                                cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#ccc;">-</td>`;
+                            }
+                        });
+                        row.innerHTML = cells;
+                        tbody.appendChild(row);
+                    });
+                    table.appendChild(tbody);
+                    tableContainer.appendChild(table);
+                }
+
                 document.getElementById('voteHistoryModal').classList.add('active');
                 document.body.style.overflow = 'hidden';
                 
             } catch (error) {
                 console.error('투표 이력 로드 실패:', error);
-                alert('투표 이력을 불러오는데 실패했습니다: ' + error.message);
+                showToast('투표 이력을 불러오는데 실패했습니다: ' + error.message, 'error');
             }
         }
         
@@ -2018,71 +2547,70 @@
 
         // 선수 추가
         async function addPlayer() {
+            if (submitting['addPlayer']) return;
+
             if (!isAdmin) {
-                alert('관리자만 선수를 추가할 수 있습니다.');
+                showToast('관리자만 선수를 추가할 수 있습니다.', 'error');
                 return;
             }
-            
+
             if (!db || typeof db === 'undefined') {
-                alert('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.');
-                console.error('db 상태:', db);
+                showToast('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.', 'error');
                 return;
             }
-            
+
             const name = document.getElementById('newPlayerName').value.trim();
             const tier = document.getElementById('newPlayerTier').value;
 
             if (!name) {
-                alert('이름을 입력해주세요.');
+                showToast('이름을 입력해주세요.', 'warning');
                 return;
             }
 
             if (players.some(p => p.name === name)) {
-                alert('이미 존재하는 선수입니다.');
+                showToast('이미 존재하는 선수입니다.', 'warning');
                 return;
             }
 
+            submitting['addPlayer'] = true;
             try {
-                // Firebase에 추가만 하고, 로컬 배열에는 추가하지 않음
-                // 실시간 리스너가 자동으로 추가해줄 것임
-                await db.collection('players').add({ 
-                    name, 
+                await db.collection('players').add({
+                    name,
                     tier,
                     win: 0,
                     draw: 0,
                     loss: 0
                 });
-                
-                // 새로 추가된 선수는 체크 해제 상태 (자동 선택 안 함)
                 document.getElementById('newPlayerName').value = '';
-                // renderPlayers()는 실시간 리스너가 자동으로 호출함
+                showToast(`${name} 선수가 추가되었습니다.`, 'success');
             } catch (error) {
                 console.error('선수 추가 실패:', error);
-                alert('선수 추가에 실패했습니다: ' + error.message);
+                showToast('선수 추가에 실패했습니다: ' + error.message, 'error');
+            } finally {
+                submitting['addPlayer'] = false;
             }
         }
 
         // 선수 정보 업데이트 (ID로)
         async function updatePlayerById(playerId, field, value) {
             if (!isAdmin) {
-                alert('관리자만 선수 정보를 수정할 수 있습니다.');
+                showToast('관리자만 선수 정보를 수정할 수 있습니다.', 'error');
                 return;
             }
-            
+
             if (!db || typeof db === 'undefined') {
-                alert('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.');
-                console.error('db 상태:', db);
+                showToast('Firebase가 초기화되지 않았습니다.', 'error');
                 return;
             }
-            
+
             if (!playerId) {
-                alert('선수 정보를 찾을 수 없습니다.');
+                showToast('선수 정보를 찾을 수 없습니다.', 'error');
                 return;
             }
-            
+
             const player = players.find(p => p.id === playerId);
             if (!player) {
-                alert('선수 정보를 찾을 수 없습니다.');
+                showToast('선수 정보를 찾을 수 없습니다.', 'error');
                 return;
             }
             
@@ -2093,35 +2621,36 @@
                 renderTierTable(); // 티어표 업데이트
             } catch (error) {
                 console.error('선수 정보 업데이트 실패:', error);
-                alert('업데이트에 실패했습니다: ' + error.message);
+                showToast('업데이트에 실패했습니다: ' + error.message, 'error');
             }
         }
 
         // 선수 삭제 (ID로)
         async function deletePlayerById(playerId) {
             if (!isAdmin) {
-                alert('관리자만 선수를 삭제할 수 있습니다.');
+                showToast('관리자만 선수를 삭제할 수 있습니다.', 'error');
                 return;
             }
-            
+
             if (!db) {
-                alert('Firebase가 초기화되지 않았습니다.');
+                showToast('Firebase가 초기화되지 않았습니다.', 'error');
                 return;
             }
-            
+
             if (!playerId) {
-                alert('선수 정보를 찾을 수 없습니다.');
+                showToast('선수 정보를 찾을 수 없습니다.', 'error');
                 return;
             }
-            
+
             const player = players.find(p => p.id === playerId);
             if (!player) {
-                alert('선수 정보를 찾을 수 없습니다.');
+                showToast('선수 정보를 찾을 수 없습니다.', 'error');
                 return;
             }
-            
+
             const playerName = player.name;
-            if (confirm(`${playerName} 선수를 삭제하시겠습니까?`)) {
+            const confirmed = await showConfirm(`${playerName} 선수를 삭제하시겠습니까?`);
+            if (confirmed) {
                 try {
                     // 선택 목록에서도 제거
                     selectedPlayers.delete(playerName);
@@ -2146,7 +2675,7 @@
                     // renderPlayers()는 실시간 리스너가 자동으로 호출함
                 } catch (error) {
                     console.error('선수 삭제 실패:', error);
-                    alert('삭제에 실패했습니다: ' + error.message);
+                    showToast('삭제에 실패했습니다: ' + error.message, 'error');
                 }
             }
         }
@@ -2203,114 +2732,104 @@
         }
 
         // 풋살팀 구성 생성
-        function generateFutsalTeams() {
-            // 선택된 선수들만 필터링
-            const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
-            const totalPlayers = selectedPlayersList.length;
-            
-            if (totalPlayers < 10) {
-                alert('최소 10명의 선수를 선택해주세요.');
-                return;
-            }
-
-            // 29명 이상일 때 경고
-            if (totalPlayers >= 29) {
-                alert('그냥 축구를 하세요');
-                return;
-            }
-
-            // 총 인원에 따른 팀 크기 결정
-            const teamSizes = getFutsalTeamSizes(totalPlayers);
-            
-            if (!teamSizes) {
-                alert('풋살팀 구성이 불가능한 인원 수입니다.');
-                return;
-            }
-            
-            // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
-            const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
-
-            // 최적 팀 찾기 (최대 100번 시도, 20회 연속 미개선 시 조기 중단)
-            let bestTeams = null;
-            let bestDiff = Infinity;
-            let noImproveCount = 0;
-
-            for (let attempt = 0; attempt < 100; attempt++) {
-                // 매 시도마다 선수 목록을 다시 섞기
-                const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
-
-                const teams = createBalancedTeams(teamSizes, reShuffledList);
-                if (teams) {
-                    const diff = calculateTeamDifference(teams);
-                    if (diff < bestDiff) {
-                        bestDiff = diff;
-                        bestTeams = teams;
-                        noImproveCount = 0;
-                        // 완벽한 밸런스면 중단
-                        if (diff < 0.01) break;
-                    } else {
-                        noImproveCount++;
-                        if (noImproveCount >= 20) break;
-                    }
+        // 승률 가중치 반영 함수
+        function getEffectiveWeight(player) {
+            let weight = tierWeights[player.tier] || 4;
+            if (document.getElementById('winRateCheckbox') && document.getElementById('winRateCheckbox').checked) {
+                const wr = parseFloat(calculateWinRate(player));
+                const total = (player.win || 0) + (player.draw || 0) + (player.loss || 0);
+                if (total >= 3) {
+                    if (wr >= 70) weight += 0.5;
+                    else if (wr <= 30) weight -= 0.5;
                 }
             }
-
-            if (!bestTeams) {
-                alert('팀 구성을 실패했습니다. 선수 수를 확인해주세요.');
-                return;
-            }
-
-            renderTeams(bestTeams, teamSizes);
+            return weight;
         }
 
-        // 축구팀 구성 생성
+        // 공통 팀 생성 로직 (로딩 스피너 포함)
+        function runTeamGeneration(selectedPlayersList, teamSizes, btnId) {
+            const btn = document.getElementById(btnId);
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-spinner"></span>생성 중...';
+
+            setTimeout(() => {
+                const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
+                let bestTeams = null;
+                let bestDiff = Infinity;
+                let noImproveCount = 0;
+
+                for (let attempt = 0; attempt < 100; attempt++) {
+                    const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
+                    const teams = createBalancedTeams(teamSizes, reShuffledList);
+                    if (teams) {
+                        const diff = calculateTeamDifference(teams);
+                        if (diff < bestDiff) {
+                            bestDiff = diff;
+                            bestTeams = teams;
+                            noImproveCount = 0;
+                            if (diff < 0.01) break;
+                        } else {
+                            noImproveCount++;
+                            if (noImproveCount >= 20) break;
+                        }
+                    }
+                }
+
+                btn.disabled = false;
+                btn.textContent = originalText;
+
+                if (!bestTeams) {
+                    showToast('팀 구성을 실패했습니다. 선수 수를 확인해주세요.', 'error');
+                    return;
+                }
+
+                // 팀 간 평균 차이 계산
+                const avgs = bestTeams.map(t => {
+                    const s = t.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                    return t.length > 0 ? s / t.length : 0;
+                });
+                const maxAvg = Math.max(...avgs);
+                const minAvg = Math.min(...avgs);
+                const avgDiff = (maxAvg - minAvg).toFixed(2);
+
+                renderTeams(bestTeams, teamSizes);
+                saveTeamHistory(bestTeams, teamSizes);
+                document.getElementById('teamActions').style.display = 'flex';
+                showToast(`팀 생성 완료! 평균 차이: ${avgDiff}`, 'success');
+            }, 0);
+        }
+
+        function generateFutsalTeams() {
+            const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
+            const totalPlayers = selectedPlayersList.length;
+
+            if (totalPlayers < 10) {
+                showToast('최소 10명의 선수를 선택해주세요.', 'warning');
+                return;
+            }
+            if (totalPlayers >= 29) {
+                showToast('그냥 축구를 하세요', 'warning');
+                return;
+            }
+            const teamSizes = getFutsalTeamSizes(totalPlayers);
+            if (!teamSizes) {
+                showToast('풋살팀 구성이 불가능한 인원 수입니다.', 'warning');
+                return;
+            }
+            runTeamGeneration(selectedPlayersList, teamSizes, 'futsalBtn');
+        }
+
         function generateSoccerTeams() {
-            // 선택된 선수들만 필터링
             const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
             const totalPlayers = selectedPlayersList.length;
 
             if (totalPlayers < 2) {
-                alert('최소 2명의 선수를 선택해주세요.');
+                showToast('최소 2명의 선수를 선택해주세요.', 'warning');
                 return;
             }
-
-            // 총 인원에 따른 팀 크기 결정 (2팀으로 나누기)
             const teamSizes = getSoccerTeamSizes(totalPlayers);
-
-            // 선택된 선수들을 매번 랜덤하게 섞기 (새로운 팀 구성을 위해)
-            const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
-
-            // 최적 팀 찾기 (최대 100번 시도, 20회 연속 미개선 시 조기 중단)
-            let bestTeams = null;
-            let bestDiff = Infinity;
-            let noImproveCount = 0;
-
-            for (let attempt = 0; attempt < 100; attempt++) {
-                // 매 시도마다 선수 목록을 다시 섞기
-                const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
-
-                const teams = createBalancedTeams(teamSizes, reShuffledList);
-                if (teams) {
-                    const diff = calculateTeamDifference(teams);
-                    if (diff < bestDiff) {
-                        bestDiff = diff;
-                        bestTeams = teams;
-                        noImproveCount = 0;
-                        // 완벽한 밸런스면 중단
-                        if (diff < 0.01) break;
-                    } else {
-                        noImproveCount++;
-                        if (noImproveCount >= 20) break;
-                    }
-                }
-            }
-
-            if (!bestTeams) {
-                alert('팀 구성을 실패했습니다. 선수 수를 확인해주세요.');
-                return;
-            }
-
-            renderTeams(bestTeams, teamSizes);
+            runTeamGeneration(selectedPlayersList, teamSizes, 'soccerBtn');
         }
 
         // 밸런스 있는 팀 생성 (Snake Draft)
@@ -2375,7 +2894,7 @@
             
             function getTeamTierAverage(team) {
                 if (team.length === 0) return 0;
-                const sum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                const sum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 return sum / team.length;
             }
             
@@ -2586,9 +3105,9 @@
 
         // 팀 간 티어 차이 계산 (인원당 평균 기준)
         function calculateTeamDifference(teams) {
-            // 인원당 평균 티어를 계산
+            // 인원당 평균 티어를 계산 (승률 가중치 반영 옵션 적용)
             const averages = teams.map(team => {
-                const sum = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                const sum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 return team.length > 0 ? sum / team.length : 0;
             });
             
@@ -2615,25 +3134,22 @@
         // 선수 이동 함수
         function movePlayerToTeam(playerName, fromTeamIndex, toTeamIndex) {
             if (!isAdmin) {
-                alert('관리자만 선수를 이동할 수 있습니다.');
+                showToast('관리자만 선수를 이동할 수 있습니다.', 'error');
                 return;
             }
-            
+
             if (!currentTeamsData || !currentTeamSizes) {
-                alert('팀 구성이 없습니다.');
+                showToast('팀 구성이 없습니다.', 'error');
                 return;
             }
-            
-            if (fromTeamIndex === toTeamIndex) {
-                return; // 같은 팀으로 이동할 필요 없음
-            }
-            
-            // 선수 찾기
+
+            if (fromTeamIndex === toTeamIndex) return;
+
             const fromTeam = currentTeamsData[fromTeamIndex];
             const playerIndex = fromTeam.findIndex(p => p.name === playerName);
-            
+
             if (playerIndex === -1) {
-                alert('선수를 찾을 수 없습니다.');
+                showToast('선수를 찾을 수 없습니다.', 'error');
                 return;
             }
             
@@ -2657,52 +3173,89 @@
 
         // 팀 렌더링
         function renderTeams(teams, teamSizes) {
-            // 현재 팀 정보 저장 (티어 숨기기 토글용)
             currentTeamsData = teams;
             currentTeamSizes = teamSizes;
-            
+
             const container = document.getElementById('teamsContainer');
             container.innerHTML = '';
 
+            // 팀 간 평균 차이 계산 (밸런스 시각화용)
+            const teamAverages = teams.map(team => {
+                const s = team.reduce((sum, p) => sum + tierWeights[p.tier], 0);
+                return team.length > 0 ? s / team.length : 0;
+            });
+            const maxAvg = Math.max(...teamAverages);
+            const minAvg = Math.min(...teamAverages);
+            const avgDiff = maxAvg - minAvg;
+
+            const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
+            const tierColors = { 'S': '#ff6b6b', 'A+': '#ffa500', 'A': '#ffd93d', 'B+': '#5dd68a', 'B': '#6bcf7f', 'C': '#4ecdc4', 'D': '#95a5a6' };
+            const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const numTeams = teams.length;
+
             teams.forEach((team, index) => {
                 const teamDiv = document.createElement('div');
-                teamDiv.className = 'team';
+                teamDiv.className = 'team team-animate';
+                teamDiv.style.animationDelay = (index * 0.1) + 's';
                 teamDiv.setAttribute('data-team-index', index);
-                
-                // 티어 순으로 정렬
+
                 const sortedTeam = [...team].sort((a, b) => {
-                    const tierOrder = ['S', 'A+', 'A', 'B+', 'B', 'C', 'D'];
-                    const aIndex = tierOrder.indexOf(a.tier);
-                    const bIndex = tierOrder.indexOf(b.tier);
-                    return aIndex - bIndex;
+                    return tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
                 });
-                
+
                 const tierSum = sortedTeam.reduce((sum, p) => sum + tierWeights[p.tier], 0);
                 const tierAverage = team.length > 0 ? (tierSum / team.length).toFixed(2) : 0;
 
+                // 밸런스 표시
+                let balanceClass = 'balance-good';
+                let balanceText = '균형';
+                if (avgDiff >= 1.0) { balanceClass = 'balance-bad'; balanceText = '불균형'; }
+                else if (avgDiff >= 0.5) { balanceClass = 'balance-ok'; balanceText = '보통'; }
+
+                // 티어 분포 바
+                const tierCounts = {};
+                tierOrder.forEach(t => tierCounts[t] = 0);
+                team.forEach(p => { tierCounts[p.tier] = (tierCounts[p.tier] || 0) + 1; });
+                const totalP = team.length || 1;
+                const distBar = tierOrder.map(t => {
+                    const pct = (tierCounts[t] / totalP * 100).toFixed(1);
+                    return tierCounts[t] > 0 ? `<div style="width:${pct}%;background:${tierColors[t]}" title="${t}: ${tierCounts[t]}명"></div>` : '';
+                }).join('');
+
+                // 모바일 이동 옵션
+                const moveOptions = Array.from({length: numTeams}, (_, i) => i)
+                    .filter(i => i !== index)
+                    .map(i => `<option value="${i}">팀 ${i+1}</option>`)
+                    .join('');
+
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
+                    <div class="balance-indicator ${balanceClass}">차이: ${avgDiff.toFixed(2)} (${balanceText})</div>
                     <div class="team-stats">
                         <div>티어 합: ${tierSum}</div>
                         <div>인원당 평균: ${tierAverage}</div>
                     </div>
+                    <div class="tier-dist-bar">${distBar}</div>
                     <ul class="team-players" data-team-index="${index}">
                         ${sortedTeam.map(player => `
-                            <li class="team-player ${isAdmin ? 'draggable' : ''}" 
-                                draggable="${isAdmin ? 'true' : 'false'}"
+                            <li class="team-player ${isAdmin ? 'draggable' : ''}"
+                                draggable="${isAdmin && !isMobile ? 'true' : 'false'}"
                                 data-player-name="${player.name}"
                                 data-team-index="${index}">
                                 <div class="player-info">
                                     <div>${player.name}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus')}">${player.tier}</span>` : ''}</div>
                                 </div>
+                                ${isAdmin && isMobile && numTeams > 1 ? `<select class="mobile-move-select" onchange="if(this.value !== '') { movePlayerToTeam('${player.name}', ${index}, parseInt(this.value)); this.selectedIndex=0; }" onclick="event.stopPropagation()">
+                                    <option value="">이동</option>
+                                    ${moveOptions}
+                                </select>` : ''}
                             </li>
                         `).join('')}
                     </ul>
                 `;
                 container.appendChild(teamDiv);
-                
-                // 관리자인 경우 드래그 앤 드롭 이벤트 설정
-                if (isAdmin) {
+
+                if (isAdmin && !isMobile) {
                     setupDragAndDrop(teamDiv, index);
                 }
             });
@@ -2757,8 +3310,7 @@
             });
         }
 
-        // 초기 렌더링
-        init();
+        // 초기 렌더링은 waitForFirebaseAndInit()에서 처리
     </script>
 </body>
 </html>
