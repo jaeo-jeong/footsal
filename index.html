@@ -3180,7 +3180,7 @@
                 <div id="voteHistoryContent" style="overflow-y: auto; max-height: calc(90vh - 150px); padding: 20px;">
                     <div id="voteHistoryStats" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                         <h3 style="margin: 0 0 10px 0; font-size: 1.2em;">투표 통계</h3>
-                        <p style="margin: 5px 0; font-size: 1em;"><strong>총 투표자 수:</strong> <span id="totalVoteCount">0</span>명 | <strong>총 투표 수:</strong> <span id="totalVoteTotal">0</span>표</p>
+                        <p style="margin: 5px 0; font-size: 1em;"><strong>총 투표자 수:</strong> <span id="totalVoteCount">0</span>명</p>
                     </div>
                     <div id="voteHistoryTable"></div>
                 </div>
@@ -4686,10 +4686,9 @@
                     votesByDevice[vote.deviceId].push(vote);
                 });
                 
-                // 총 투표 수 표시
+                // 총 투표자 수 표시
                 const totalVoterCount = Object.keys(votesByDevice).length;
                 document.getElementById('totalVoteCount').textContent = totalVoterCount;
-                document.getElementById('totalVoteTotal').textContent = allVotes.length;
                 
                 const tableContainer = document.getElementById('voteHistoryTable');
                 tableContainer.innerHTML = '';
