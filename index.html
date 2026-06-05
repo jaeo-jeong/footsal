@@ -733,6 +733,26 @@
             border-radius: 5px;
         }
 
+        /* 황제(👑) 1명 제한: 잠긴 옵션 회색 처리 (지원 브라우저) */
+        .vote-item select option:disabled { color: #bbb; background: #f5f5f5; }
+
+        /* 황제 1명 제한 안내 + 선택된 행 강조 */
+        .emperor-vote-notice {
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f3e9ff, #fff6e0);
+            color: #4a00e0;
+            font-size: 0.9em;
+            text-align: center;
+            font-weight: 600;
+        }
+        .vote-item.emperor-selected {
+            background: linear-gradient(135deg, #f3e9ff, #efe2ff);
+            border-color: #8e2de2;
+            box-shadow: 0 0 0 2px rgba(142, 45, 226, 0.25) inset;
+        }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -4402,6 +4422,35 @@
         }
         
         // 투표 모달 열기
+        // 황제(👑) 투표는 1명만 가능 — 한 명을 황제로 선택하면 나머지 select의 황제 옵션 비활성화
+        function enforceEmperorVoteLimit() {
+            const selects = document.querySelectorAll('#voteGrid .vote-select');
+            const emperorSelect = Array.from(selects).find(s => s.value === '황제');
+            const emperorTaken = !!emperorSelect;
+            const emperorName = emperorSelect ? (emperorSelect.dataset.playerName || '') : '';
+            selects.forEach(s => {
+                const isEmperor = s.value === '황제';
+                // 옵션 잠금 + 자물쇠 표시 (드롭다운 열었을 때)
+                for (const opt of s.options) {
+                    if (opt.value === '황제') {
+                        const lock = emperorTaken && !isEmperor;
+                        opt.disabled = lock;
+                        opt.textContent = lock ? '🔒 👑' : '👑';
+                    }
+                }
+                // 황제로 선택된 행 강조 (드롭다운 안 열어도 보이게)
+                const row = s.closest('.vote-item');
+                if (row) row.classList.toggle('emperor-selected', isEmperor);
+            });
+            // 항상 보이는 안내 문구
+            const notice = document.getElementById('emperorVoteNotice');
+            if (notice) {
+                notice.innerHTML = emperorTaken
+                    ? `👑 황제는 1명만 투표 가능 — 현재 <b>${escapeHtml(emperorName)}</b> 선택됨 (다른 선수는 🔒 잠김)`
+                    : '👑 황제 티어는 1명만 투표할 수 있어요';
+            }
+        }
+
         async function openVoteModal() {
             if (!db) {
                 showToast('Firebase가 초기화되지 않았습니다. 투표 기능을 사용할 수 없습니다.', 'error');
@@ -4445,7 +4494,7 @@
             
             // 투표 UI 생성
             const voteContent = document.getElementById('voteContent');
-            voteContent.innerHTML = '<div class="vote-grid" id="voteGrid"></div>';
+            voteContent.innerHTML = '<div id="emperorVoteNotice" class="emperor-vote-notice"></div><div class="vote-grid" id="voteGrid"></div>';
             
             const voteGrid = document.getElementById('voteGrid');
             players.forEach((player, idx) => {
@@ -4456,7 +4505,7 @@
                 voteItem.className = 'vote-item';
                 voteItem.innerHTML = `
                     <span style="flex: 1; font-weight: 600;">${escapeHtml(player.name)}</span>
-                    <select id="vote_idx_${idx}" class="vote-select" data-player-name="${escapeHtml(player.name)}">
+                    <select id="vote_idx_${idx}" class="vote-select" data-player-name="${escapeHtml(player.name)}" onchange="enforceEmperorVoteLimit()">
                         <option value="황제" ${selectedTier === '황제' ? 'selected' : ''}>👑</option>
                         <option value="S" ${selectedTier === 'S' ? 'selected' : ''}>S</option>
                         <option value="A+" ${selectedTier === 'A+' ? 'selected' : ''}>A+</option>
@@ -4472,6 +4521,9 @@
                 voteGrid.appendChild(voteItem);
             });
             
+            // 황제(👑) 투표는 1명만 — 모달 열 때 초기 상태 반영 (기존 투표 불러온 경우 포함)
+            enforceEmperorVoteLimit();
+
             document.getElementById('voteModal').classList.add('active');
             // 모달이 열릴 때 body 스크롤 막기
             document.body.style.overflow = 'hidden';
@@ -4541,6 +4593,14 @@
                 }
             });
             
+            // 안전장치: 황제(👑)는 1명만 투표 가능
+            if (votes.filter(v => v.tier === '황제').length > 1) {
+                showToast('황제(👑)는 1명만 투표할 수 있습니다.', 'warning');
+                if (voteSubmitBtn) { voteSubmitBtn.disabled = false; voteSubmitBtn.innerHTML = '투표 제출'; }
+                submitting['vote'] = false;
+                return;
+            }
+
             try {
                 // 기존 투표 삭제 (이 디바이스의 모든 투표)
                 const existingVotesSnapshot = await db.collection('votes')
