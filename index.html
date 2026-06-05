@@ -352,6 +352,7 @@
             margin-left: 5px;
         }
 
+        .tier-황제 { background: linear-gradient(135deg, #8e2de2, #4a00e0); color: #ffe9a8; }
         .tier-S { background: #ff6b6b; }
         .tier-Aplus { background: #ffa500; }
         .tier-A { background: #ffd93d; }
@@ -737,27 +738,6 @@
             cursor: not-allowed;
         }
         
-        /* 승/무/패 입력 박스 스타일 */
-        .record-input {
-            width: 50px;
-            padding: 8px 5px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 0.95em;
-        }
-        
-        /* number input 스피너 제거 */
-        .record-input::-webkit-inner-spin-button,
-        .record-input::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        
-        .record-input {
-            -moz-appearance: textfield;
-            appearance: textfield;
-        }
 
         /* Toast 알림 */
         .toast-container {
@@ -3203,6 +3183,7 @@
                 <input type="text" id="playerSearchInput" class="search-input" placeholder="선수 이름 검색..." aria-label="선수 이름 검색" oninput="filterPlayers()">
                 <div class="tier-filters" id="tierFilters">
                     <button class="tier-filter-btn active" aria-pressed="true" onclick="toggleTierFilter('all', this)">전체</button>
+                    <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('황제', this)">👑</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('S', this)">S</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('A+', this)">A+</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('A', this)">A</button>
@@ -3223,6 +3204,7 @@
                     <div class="form-group">
                         <label for="newPlayerTier">티어</label>
                         <select id="newPlayerTier">
+                            <option value="황제">👑</option>
                             <option value="S">S</option>
                             <option value="A+">A+</option>
                             <option value="A">A</option>
@@ -3250,10 +3232,6 @@
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
                     <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 22px; height: 22px; cursor: pointer;">
                     <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
-                </label>
-                <label style="display: none; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
-                    <input type="checkbox" id="winRateCheckbox" style="width: 22px; height: 22px; cursor: pointer;">
-                    <span style="font-size: 0.95em; color: #333;">승률 가중치 반영</span>
                 </label>
             </div>
             <div id="teamHistorySection" style="display: none;"></div>
@@ -3630,6 +3608,7 @@
 
         // 티어 가중치 (높을수록 강함, 비선형 간격)
         const tierWeights = {
+            '황제': 10,
             'S': 10,
             'A+': 8,
             'A': 6.5,
@@ -3639,6 +3618,14 @@
             'C': 2.5,
             'D': 1
         };
+
+        // 투표 집계 전용 점수: 황제를 S 바로 위로 분리 (밸런스 점수 tierWeights는 황제=S=10 유지)
+        const tierVoteScores = { ...tierWeights, '황제': 11 };
+
+        // 티어 화면 표기: 황제는 왕관 아이콘으로 표시 (내부 저장값은 '황제' 유지)
+        function tierLabel(tier) {
+            return tier === '황제' ? '👑' : tier;
+        }
 
         // localStorage 키
         const ADMIN_CODE_KEY = 'jeotjaFcAdminCode';
@@ -3673,7 +3660,9 @@
             { name: '정우진', tier: 'B', win: 0, draw: 0, loss: 0 },
             { name: '전근우', tier: 'B', win: 0, draw: 0, loss: 0 },
             { name: '전은호', tier: 'B', win: 0, draw: 0, loss: 0 },
-            { name: '박상윤', tier: 'B', win: 0, draw: 0, loss: 0 }
+            { name: '박상윤', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '이태주', tier: 'B', win: 0, draw: 0, loss: 0 },
+            { name: '허진명', tier: 'B', win: 0, draw: 0, loss: 0 }
         ];
 
         // 투표 평균으로 티어 계산
@@ -3687,7 +3676,7 @@
             if (validVotes.length === 0) return 'B';
 
             // 가중치 배열로 변환
-            let weights = validVotes.map(vote => tierWeights[vote.tier] || 4);
+            let weights = validVotes.map(vote => tierVoteScores[vote.tier] || 4);
 
             // 5명 이상 투표 시 최고/최저 1표씩 제거 (trimmed mean)
             if (weights.length >= 5) {
@@ -3698,7 +3687,7 @@
             const avgWeight = weights.reduce((sum, w) => sum + w, 0) / weights.length;
 
             // 가장 가까운 가중치의 티어로 매칭
-            const tiers = Object.entries(tierWeights);
+            const tiers = Object.entries(tierVoteScores);
             let closestTier = 'B';
             let closestDist = Infinity;
             for (const [tier, weight] of tiers) {
@@ -3958,19 +3947,6 @@
             }
         }
         
-        // 승률 계산 함수
-        function calculateWinRate(player) {
-            const win = player.win || 0;
-            const draw = player.draw || 0;
-            const loss = player.loss || 0;
-            const total = win + draw + loss;
-            
-            if (total === 0) {
-                return 0;
-            }
-            
-            return parseFloat(((win / total) * 100).toFixed(1));
-        }
         
         // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
         // 실시간 리스너 (중복 방지)
@@ -4176,15 +4152,6 @@
                     ? `<button class="btn btn-danger delete-btn" onclick="event.stopPropagation(); deletePlayerById('${playerId}')">삭제</button>`
                     : '';
 
-                const win = player.win || 0;
-                const draw = player.draw || 0;
-                const loss = player.loss || 0;
-                const winRate = calculateWinRate(player);
-
-                // 승/무/패 입력 필드 (관리자만 수정 가능)
-                const recordInputDisabled = isAdmin ? '' : 'disabled';
-                const recordInputStyle = isAdmin ? '' : 'background: #f0f0f0; cursor: not-allowed;';
-
                 const safeName = escapeHtml(player.name);
                 card.innerHTML = `
                     <div class="player-name">
@@ -4198,6 +4165,7 @@
                         <div class="field-group">
                             <label>티어</label>
                             <select onchange="updatePlayerById('${playerId}', 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
+                                <option value="황제" ${player.tier === '황제' ? 'selected' : ''}>👑</option>
                                 <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
                                 <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
@@ -4207,34 +4175,6 @@
                                 <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
                                 <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
                             </select>
-                        </div>
-                        <div class="field-group">
-                            <label>승/무/패 (승률: ${winRate}%)</label>
-                            <div style="display: flex; gap: 5px; align-items: center;">
-                                <input type="number" min="0" value="${win}"
-                                       onchange="updatePlayerById('${playerId}', 'win', parseInt(this.value) || 0)"
-                                       onclick="event.stopPropagation()"
-                                       ${recordInputDisabled}
-                                       class="record-input"
-                                       style="${recordInputStyle}"
-                                       placeholder="승">
-                                <span style="font-weight: 600;">/</span>
-                                <input type="number" min="0" value="${draw}"
-                                       onchange="updatePlayerById('${playerId}', 'draw', parseInt(this.value) || 0)"
-                                       onclick="event.stopPropagation()"
-                                       ${recordInputDisabled}
-                                       class="record-input"
-                                       style="${recordInputStyle}"
-                                       placeholder="무">
-                                <span style="font-weight: 600;">/</span>
-                                <input type="number" min="0" value="${loss}"
-                                       onchange="updatePlayerById('${playerId}', 'loss', parseInt(this.value) || 0)"
-                                       onclick="event.stopPropagation()"
-                                       ${recordInputDisabled}
-                                       class="record-input"
-                                       style="${recordInputStyle}"
-                                       placeholder="패">
-                            </div>
                         </div>
                         ${deleteButtonHtml}
                     </div>
@@ -4317,7 +4257,7 @@
                 const tierSum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 const avg = team.length > 0 ? (tierSum / team.length).toFixed(1) : 0;
                 text += `[팀 ${i + 1}] 평균 ${avg}\n`;
-                text += team.map(p => showTier ? `${p.name}(${p.tier})` : p.name).join(', ') + '\n\n';
+                text += team.map(p => showTier ? `${p.name}(${tierLabel(p.tier)})` : p.name).join(', ') + '\n\n';
             });
             const textToCopy = text.trim();
             if (navigator.clipboard && window.isSecureContext) {
@@ -4517,6 +4457,7 @@
                 voteItem.innerHTML = `
                     <span style="flex: 1; font-weight: 600;">${escapeHtml(player.name)}</span>
                     <select id="vote_idx_${idx}" class="vote-select" data-player-name="${escapeHtml(player.name)}">
+                        <option value="황제" ${selectedTier === '황제' ? 'selected' : ''}>👑</option>
                         <option value="S" ${selectedTier === 'S' ? 'selected' : ''}>S</option>
                         <option value="A+" ${selectedTier === 'A+' ? 'selected' : ''}>A+</option>
                         <option value="A" ${selectedTier === 'A' ? 'selected' : ''}>A</option>
@@ -4706,7 +4647,7 @@
                         deviceIds.forEach((deviceId, di) => {
                             const dv = votesByDevice[deviceId];
                             const pv = dv.find(v => v.playerName === player.name);
-                            const label = pv ? (pv.tier === '모름' ? '<span style="color:#999">모름</span>' : `<span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${pv.tier}</span>`) : '-';
+                            const label = pv ? (pv.tier === '모름' ? '<span style="color:#999">모름</span>' : `<span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${tierLabel(pv.tier)}</span>`) : '-';
                             votesHtml += `<span class="vote-history-card-vote">투표${di+1}: ${label}</span>`;
                         });
                         card.innerHTML = `<div class="vote-history-card-header">${escapeHtml(player.name)}</div><div class="vote-history-card-votes">${votesHtml}</div>`;
@@ -4736,7 +4677,7 @@
                                 if (pv.tier === '모름') {
                                     cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#999;font-style:italic;">모름</td>`;
                                 } else {
-                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;"><span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${pv.tier}</span></td>`;
+                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;"><span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${tierLabel(pv.tier)}</span></td>`;
                                 }
                             } else {
                                 cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#ccc;">-</td>`;
@@ -4772,7 +4713,7 @@
             tierList.innerHTML = '';
 
             // 티어 순서
-            const tierOrder = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
             
             tierOrder.forEach(tier => {
                 const tierPlayers = players.filter(p => p.tier === tier);
@@ -4782,7 +4723,7 @@
                 
                 tierItem.innerHTML = `
                     <div class="tier-item-header">
-                        <span class="tier-badge tier-${tier.replace('+', 'plus').replace('-', 'minus')} tier-item-label">${tier}</span>
+                        <span class="tier-badge tier-${tier.replace('+', 'plus').replace('-', 'minus')} tier-item-label">${tierLabel(tier)}</span>
                         <span class="tier-item-count">${tierPlayers.length}명</span>
                     </div>
                     <div class="tier-item-players">
@@ -4838,7 +4779,10 @@
                     loss: 0
                 });
                 // 로컬 배열에도 즉시 추가 (리스너 실패 시 대비)
-                players.push({ id: docRef.id, name, tier, win: 0, draw: 0, loss: 0 });
+                // 단, 실시간 리스너가 await 도중 이미 추가했을 수 있으므로 id 중복 방지
+                if (!players.some(p => p.id === docRef.id)) {
+                    players.push({ id: docRef.id, name, tier, win: 0, draw: 0, loss: 0 });
+                }
                 sortPlayersByName();
                 renderPlayers();
                 renderTierTable();
@@ -4995,19 +4939,9 @@
         }
 
         // 풋살팀 구성 생성
-        // 승률 가중치 반영 함수 (DOM 조회 캐싱)
+        // 선수 가중치 (티어 점수 기반)
         function getEffectiveWeight(player) {
-            let weight = tierWeights[player.tier] || 4;
-            const winRateCheckbox = document.getElementById('winRateCheckbox');
-            if (winRateCheckbox && winRateCheckbox.checked) {
-                const wr = parseFloat(calculateWinRate(player));
-                const total = (player.win || 0) + (player.draw || 0) + (player.loss || 0);
-                if (total >= 3) {
-                    if (wr >= 70) weight += 0.5;
-                    else if (wr <= 30) weight -= 0.5;
-                }
-            }
-            return weight;
+            return tierWeights[player.tier] || 4;
         }
 
         // 공통 팀 생성 로직 (로딩 스피너 포함)
@@ -5048,7 +4982,7 @@
                     return;
                 }
 
-                // 팀 간 평균 차이 계산 (승률 가중치 반영)
+                // 팀 간 평균 차이 계산
                 const avgs = bestTeams.map(t => {
                     const s = t.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                     return t.length > 0 ? s / t.length : 0;
@@ -5102,7 +5036,7 @@
             const teams = Array(numTeams).fill(null).map(() => []);
 
             // 선수를 티어순 정렬, 같은 티어 내 랜덤
-            const tierOrder = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
             const sorted = [...playerList].sort((a, b) => {
                 const tierDiff = tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
                 if (tierDiff !== 0) return tierDiff;
@@ -5154,7 +5088,7 @@
         // 티어별 분배 개선 (인원당 평균도 고려)
         function improveTierDistribution(teams) {
             const criticalTiers = ['S', 'A+', 'C', 'D'];
-            const tierOrder = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
             
             function getTeamTierAverage(team) {
                 if (team.length === 0) return 0;
@@ -5336,7 +5270,7 @@
 
         // 티어별 분배 점수 계산 (낮을수록 좋음, 인원당 평균 밸런스 최우선)
         function calculateTierDistributionScore(teams) {
-            const tierOrder = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
             const criticalTiers = ['S', 'A+', 'C', 'D']; // 한 팀에 몰리면 안 되는 티어
             let score = 0;
             
@@ -5370,7 +5304,7 @@
 
         // 팀 간 티어 차이 계산 (인원당 평균 기준)
         function calculateTeamDifference(teams) {
-            // 인원당 평균 티어를 계산 (승률 가중치 반영 옵션 적용)
+            // 인원당 평균 티어를 계산
             const averages = teams.map(team => {
                 const sum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 return team.length > 0 ? sum / team.length : 0;
@@ -5444,7 +5378,7 @@
             const container = document.getElementById('teamsContainer');
             container.innerHTML = '';
 
-            // 팀 간 평균 차이 계산 (밸런스 시각화용, 승률 가중치 반영)
+            // 팀 간 평균 차이 계산 (밸런스 시각화용)
             const teamAverages = teams.map(team => {
                 const s = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 return team.length > 0 ? s / team.length : 0;
@@ -5453,8 +5387,8 @@
             const minAvg = Math.min(...teamAverages);
             const avgDiff = maxAvg - minAvg;
 
-            const tierOrder = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            const tierColors = { 'S': '#ff6b6b', 'A+': '#ffa500', 'A': '#ffd93d', 'A-': '#d4e157', 'B+': '#5dd68a', 'B': '#6bcf7f', 'C': '#4ecdc4', 'D': '#95a5a6' };
+            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierColors = { '황제': '#8e2de2', 'S': '#ff6b6b', 'A+': '#ffa500', 'A': '#ffd93d', 'A-': '#d4e157', 'B+': '#5dd68a', 'B': '#6bcf7f', 'C': '#4ecdc4', 'D': '#95a5a6' };
             const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const numTeams = teams.length;
 
@@ -5508,7 +5442,7 @@
                                 data-player-name="${escapeHtml(player.name)}"
                                 data-team-index="${index}">
                                 <div class="player-info">
-                                    <div>${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus').replace('-', 'minus')}">${player.tier}</span>` : ''}</div>
+                                    <div>${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus').replace('-', 'minus')}">${tierLabel(player.tier)}</span>` : ''}</div>
                                 </div>
                                 ${isAdmin && isMobile && numTeams > 1 ? `<select class="mobile-move-select" onchange="if(this.value !== '') { movePlayerToTeam('${escapeForJsString(player.name)}', ${index}, parseInt(this.value)); this.selectedIndex=0; }" onclick="event.stopPropagation()">
                                     <option value="">이동</option>
@@ -5826,7 +5760,7 @@
                 const p = team[pIdx];
                 const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
                 html += `<div class="fm-pos-row">
-                    <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                    <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
                     <select class="fm-pos-select" id="${prefix}_pos_${i}" onchange="enforceFmFormation('${prefix}',${i})">
                         ${FM_POSITIONS.map(pos =>
                             `<option value="${pos}" ${positions[i] === pos ? 'selected' : ''}>${FM_POS_LABELS[pos]}</option>`
@@ -5842,7 +5776,7 @@
                     const p = team[pIdx];
                     const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
                     html += `<div class="fm-pos-sub-row">
-                        <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                        <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
                         <button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},true)">↑</button>
                     </div>`;
                 });
@@ -6507,7 +6441,7 @@
                     if (p.redCard) icons += '🟥';
                     for (let i = 0; i < p.saves; i++) icons += '🧤';
                     html += `<div class="${cls}">
-                        <span><span class="fm-pos-badge ${posCls}">${p.position || 'MF'}</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                        <span><span class="fm-pos-badge ${posCls}">${p.position || 'MF'}</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
                         <span class="fm-roster-icons">${icons}</span>
                     </div>`;
                 });
@@ -6518,7 +6452,7 @@
                         let icons = '';
                         if (p.redCard) icons += '🟥';
                         html += `<div class="fm-roster-player is-sub">
-                            <span><span class="fm-sub-badge">SUB</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${p.tier}</span></span>
+                            <span><span class="fm-sub-badge">SUB</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
                             <span class="fm-roster-icons">${icons}</span>
                         </div>`;
                     });
