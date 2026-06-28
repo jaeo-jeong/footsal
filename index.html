@@ -3247,6 +3247,15 @@
             <div class="controls">
                 <button class="btn btn-secondary" onclick="selectAllPlayers()">전체 선택</button>
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
+                <label style="display: flex; align-items: center; gap: 6px; min-height: 44px;">
+                    <span style="font-size: 0.95em; color: #333;">팀 수</span>
+                    <select id="teamCountSelect" style="min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.95em; cursor: pointer;">
+                        <option value="auto" selected>자동</option>
+                        <option value="2">2팀</option>
+                        <option value="3">3팀</option>
+                        <option value="4">4팀</option>
+                    </select>
+                </label>
                 <button class="btn btn-primary" id="futsalBtn" onclick="generateFutsalTeams()">풋살팀 구성</button>
                 <button class="btn btn-primary" id="soccerBtn" onclick="generateSoccerTeams()">축구팀 구성</button>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
@@ -4983,8 +4992,20 @@
                     return [teamSize + 1, teamSize];
                 }
             }
-            
+
             return null;
+        }
+
+        // 지정한 팀 수로 인원을 최대한 균등하게 분배 (큰 팀 먼저)
+        // 예: 20명 3팀 → [7,7,6], 20명 4팀 → [5,5,5,5], 16명 3팀 → [6,5,5]
+        function computeEvenTeamSizes(totalPlayers, numTeams) {
+            const base = Math.floor(totalPlayers / numTeams);
+            const remainder = totalPlayers % numTeams;
+            const sizes = [];
+            for (let i = 0; i < numTeams; i++) {
+                sizes.push(i < remainder ? base + 1 : base);
+            }
+            return sizes;
         }
 
         // 축구팀 구성 규칙 (2팀으로 나누기)
@@ -5070,11 +5091,27 @@
                 showToast('그냥 축구를 하세요', 'warning');
                 return;
             }
-            const teamSizes = getFutsalTeamSizes(totalPlayers);
-            if (!teamSizes) {
-                showToast('풋살팀 구성이 불가능한 인원 수입니다.', 'warning');
-                return;
+
+            // 팀 수 선택: '자동'이면 기존 고정 규칙, 숫자면 균등 분배
+            const teamCountSel = document.getElementById('teamCountSelect');
+            const teamCountValue = teamCountSel ? teamCountSel.value : 'auto';
+
+            let teamSizes;
+            if (teamCountValue === 'auto') {
+                teamSizes = getFutsalTeamSizes(totalPlayers);
+                if (!teamSizes) {
+                    showToast('풋살팀 구성이 불가능한 인원 수입니다.', 'warning');
+                    return;
+                }
+            } else {
+                const numTeams = parseInt(teamCountValue, 10);
+                if (totalPlayers < numTeams) {
+                    showToast(`${totalPlayers}명으로는 ${numTeams}팀을 만들 수 없습니다.`, 'warning');
+                    return;
+                }
+                teamSizes = computeEvenTeamSizes(totalPlayers, numTeams);
             }
+
             runTeamGeneration(selectedPlayersList, teamSizes, 'futsalBtn');
         }
 
