@@ -3222,10 +3222,16 @@
             position: fixed;
             z-index: 2000;
             width: 64px;
-            transform: translate(-50%, -50%) scale(1.1);
+            transform: translate(-50%, -50%) scale(1.15);
             pointer-events: none;
             opacity: 0.95;
+            filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45));
         }
+
+        /* 손가락으로 끄는 동안에는 어떤 목록도 따라 움직이지 않게 */
+        body.sb-dragging-touch .sb-body,
+        body.sb-dragging-touch .sb-tray,
+        body.sb-dragging-touch .sb-posrow { overflow: hidden !important; touch-action: none !important; }
 
         .sb-drop-on {
             outline: 3px solid #FF6B35;
@@ -3333,29 +3339,80 @@
             color: #666;
         }
 
+        /* 스크롤이 바깥으로 번지지 않게 (목록을 넘기다 화면 전체가 딸려 움직이는 것 방지) */
+        .sb-body, .sb-tray, .sb-posrow { overscroll-behavior: contain; }
+
+        /* 이미지 저장이 막힌 브라우저용 미리보기 */
+        .sb-preview {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .sb-preview-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; }
+        .sb-preview-hint { color: #fff; font-size: 0.95em; font-weight: 600; text-align: center; }
+        .sb-preview img { max-width: 100%; max-height: 74vh; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
         @media (max-width: 600px) {
             #soccerBoardModal .modal-content {
-                padding: 12px;
+                padding: 10px 12px;
                 width: 100%;
                 max-height: 100vh;
                 max-height: 100dvh;
                 border-radius: 0;
-                gap: 10px;
+                gap: 8px;
             }
-            .sb-head h3 { font-size: 1.1em; }
+            .sb-head h3 { font-size: 1.05em; }
             .sb-toolbar { width: 100%; }
-            .sb-toolbar select { flex: 1; min-width: 0; }
-            .sb-hint { font-size: 0.8em; padding: 7px 10px; }
-            .sb-body { gap: 10px; }
-            /* 경기장을 조금 낮춰 교체/미배치 목록까지 한 화면에 들어오게 */
+            .sb-toolbar select { flex: 1; min-width: 0; min-height: 38px; }
+            .sb-hint { font-size: 0.78em; padding: 6px 10px; line-height: 1.35; }
+            .sb-body { gap: 8px; }
             .sb-pitch { aspect-ratio: 68 / 78; }
             .sb-slot { min-width: 36px; }
             .sb-chip-name { font-size: 0.7em; }
             .sb-chip { padding: 4px 2px 3px; }
-            .sb-tray { min-height: 52px; padding: 6px; }
-            .sb-tray-pool { max-height: 104px; }
-            .sb-foot .sb-btn { flex: 1 1 auto; min-width: 92px; }
-            .sb-summary { width: 100%; margin-bottom: 2px; }
+            .sb-block-title { font-size: 0.85em; margin-bottom: 4px; }
+
+            /* 목록은 한 줄로 옆으로 넘긴다.
+               세로로 쌓아 스크롤하면 화면 전체가 같이 움직여서 경기장으로 끌어다 놓기가 어렵다. */
+            .sb-tray {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                overflow-y: hidden;
+                min-height: 50px;
+                padding: 5px 6px;
+                -webkit-overflow-scrolling: touch;
+            }
+            .sb-tray-pool { max-height: none; }
+            .sb-tray .sb-chip {
+                flex: 0 0 auto;
+                min-width: 58px;
+                padding: 5px 7px;
+                /* 옆으로 쓸면 목록이 넘어가고, 위로 끌면 선수가 딸려 나온다 */
+                touch-action: pan-x;
+            }
+            .sb-tray-empty { white-space: nowrap; }
+
+            /* 포지션 버튼도 한 줄로 */
+            .sb-posbar { padding: 6px 8px; }
+            .sb-posrow { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .sb-posbtn { flex: 0 0 auto; min-height: 32px; padding: 4px 8px; }
+
+            /* 하단 바가 화면을 잡아먹지 않도록 한 줄로 */
+            .sb-foot { gap: 5px; }
+            .sb-foot .sb-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                padding: 8px 4px;
+                font-size: 0.8em;
+                white-space: nowrap;
+            }
+            .sb-summary { display: none; }
         }
     </style>
 </head>
@@ -3630,7 +3687,7 @@
                     </select>
                 </div>
             </div>
-            <div class="sb-hint">경기장 아무 곳에나 <b>끌어다 놓으면</b> 그 자리에 섭니다. 선수를 <b>누르면 포지션</b>을 바꿀 수 있어요. 배치는 이 기기에만 저장됩니다.</div>
+            <div class="sb-hint">경기장에 <b>끌어다 놓으면</b> 그 자리에 섭니다. 선수를 <b>누르면 포지션</b>을 바꿔요. 배치는 이 기기에만 저장됩니다.</div>
             <div class="sb-body">
                 <div class="sb-main">
                     <div class="sb-pitch-wrap">
@@ -3654,9 +3711,9 @@
             </div>
             <div class="sb-foot">
                 <span id="sbCount" class="sb-summary"></span>
-                <button class="sb-btn sb-btn-ghost" onclick="sbShareImage()">이미지 공유</button>
-                <button class="sb-btn sb-btn-ghost" onclick="sbCopyText()">텍스트 복사</button>
-                <button class="sb-btn sb-btn-ghost" onclick="sbAlignToFormation()">위치 정렬</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbShareImage()">이미지</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbCopyText()">텍스트</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbAlignToFormation()">정렬</button>
                 <button class="sb-btn sb-btn-ghost" onclick="sbReset()">초기화</button>
                 <button class="sb-btn sb-btn-primary" onclick="closeSoccerBoard()">닫기</button>
             </div>
@@ -6347,41 +6404,55 @@
                 let moved = false;
                 let ghost = null;
 
+                // 손가락으로 끌 때는 분신을 위로 띄운다. 안 그러면 손가락이 놓을 자리를 가린다.
+                const touchLift = e.pointerType === 'touch' ? 52 : 0;
+                const threshold = e.pointerType === 'touch' ? 6 : 8;
+
                 const onMove = ev => {
+                    if (ev.pointerId !== e.pointerId) return;
                     if (!moved) {
-                        if (Math.abs(ev.clientX - startX) < 8 && Math.abs(ev.clientY - startY) < 8) return;
+                        if (Math.abs(ev.clientX - startX) < threshold && Math.abs(ev.clientY - startY) < threshold) return;
                         moved = true;
                         ghost = el.cloneNode(true);
                         ghost.classList.add('sb-ghost');
                         ghost.classList.remove('sb-picked');
                         document.body.appendChild(ghost);
                         el.classList.add('sb-dragging');
+                        if (touchLift) document.body.classList.add('sb-dragging-touch');
                     }
                     ghost.style.left = ev.clientX + 'px';
-                    ghost.style.top = ev.clientY + 'px';
-                    sbHighlight(sbTargetAt(ev.clientX, ev.clientY));
+                    ghost.style.top = (ev.clientY - touchLift) + 'px';
+                    // 판정은 실제 손가락 위치가 아니라 분신이 있는 자리로 (보이는 대로 놓인다)
+                    sbHighlight(sbTargetAt(ev.clientX, ev.clientY - touchLift));
                 };
 
                 const onUp = ev => {
+                    if (ev.pointerId !== e.pointerId) return;
                     sbActivePointer = null;
-                    el.releasePointerCapture && el.hasPointerCapture(e.pointerId) && el.releasePointerCapture(e.pointerId);
-                    el.removeEventListener('pointermove', onMove);
-                    el.removeEventListener('pointerup', onUp);
-                    el.removeEventListener('pointercancel', onUp);
+                    try {
+                        if (el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+                    } catch (err) { /* 이미 풀렸으면 무시 */ }
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                    document.removeEventListener('pointercancel', onUp);
                     el.classList.remove('sb-dragging');
                     if (ghost) ghost.remove();
+                    document.body.classList.remove('sb-dragging-touch');
                     sbHighlight(null);
                     if (!moved) { sbTap(source); return; }
                     sbDragEndedAt = Date.now();
-                    const target = sbTargetAt(ev.clientX, ev.clientY);
+                    const target = sbTargetAt(ev.clientX, ev.clientY - touchLift);
                     if (target) sbMove(source, target);
                     else renderSoccerBoard();
                 };
 
-                el.setPointerCapture(e.pointerId);
-                el.addEventListener('pointermove', onMove);
-                el.addEventListener('pointerup', onUp);
-                el.addEventListener('pointercancel', onUp);
+                // 리스너를 document 에 건다. 포인터 캡처가 안 되는 상황에서도 끝까지 따라간다.
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+                document.addEventListener('pointercancel', onUp);
+                try {
+                    el.setPointerCapture(e.pointerId);
+                } catch (err) { /* 캡처가 안 되어도 위 리스너로 동작한다 */ }
             });
         }
 
@@ -6860,8 +6931,34 @@
             return canvas;
         }
 
+        // 데이터 URL → Blob (동기). toBlob 을 쓰면 기다리는 사이에 클릭 자격이 풀린다.
+        function sbDataUrlToBlob(dataUrl) {
+            const parts = dataUrl.split(',');
+            const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png';
+            const binary = atob(parts[1]);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Blob([bytes], { type: mime });
+        }
+
+        // 공유도 저장도 안 되는 환경(카톡 내장 브라우저 등)을 위한 마지막 수단.
+        // 이미지를 띄워주고 길게 눌러 앨범에 저장하게 한다.
+        function sbShowImagePreview(dataUrl) {
+            const layer = document.createElement('div');
+            layer.className = 'sb-preview';
+            layer.innerHTML = `
+                <div class="sb-preview-inner">
+                    <p class="sb-preview-hint">이미지를 <b>길게 눌러</b> 저장하세요</p>
+                    <img src="${dataUrl}" alt="전술판">
+                    <button type="button" class="sb-btn sb-btn-primary">닫기</button>
+                </div>`;
+            const close = () => layer.remove();
+            layer.addEventListener('click', e => { if (e.target === layer) close(); });
+            layer.querySelector('button').addEventListener('click', close);
+            document.body.appendChild(layer);
+        }
+
         function sbDownloadImage(blob, fileName) {
-            if (!blob) { showToast('이미지를 만들지 못했습니다.', 'error'); return; }
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -6873,17 +6970,19 @@
             showToast('전술판 이미지를 저장했습니다.', 'success');
         }
 
-        // 일부러 async 로 만들지 않는다.
-        // await 를 한 번이라도 걸면 "방금 사용자가 눌렀다"는 자격이 풀려서 클립보드 복사가 거부된다.
+        // 처음부터 끝까지 동기로 처리한다.
+        // await 를 한 번이라도 걸면 "방금 사용자가 눌렀다"는 자격이 풀려서
+        // 공유 시트도 클립보드 복사도 브라우저가 거부한다.
         function sbShareImage() {
             if (!soccerBoard.onPitch.length) {
                 showToast('경기장에 선수가 없습니다.', 'warning');
                 return;
             }
 
-            let canvas;
+            let dataUrl, blob;
             try {
-                canvas = sbRenderImage();
+                dataUrl = sbRenderImage().toDataURL('image/png');
+                blob = sbDataUrlToBlob(dataUrl);
             } catch (e) {
                 console.warn('전술판 이미지 생성 실패:', e);
                 showToast('이미지를 만들지 못했습니다.', 'error');
@@ -6891,37 +6990,40 @@
             }
 
             const fileName = `젓자FC-전술판-${soccerBoard.formation}.png`;
-            const blobPromise = new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            // 손가락으로 쓰는 기기인지 (PC 에서 OS 공유창을 띄우면 오히려 잘 실패한다)
             const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
-            // PC: 클립보드로 바로 복사. 이미지가 만들어지길 기다리는 동안에도
-            // 자격이 유지되도록 Blob 대신 Promise 를 그대로 넘긴다.
-            if (!isTouch && navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
-                navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
-                    .then(() => showToast('전술판 이미지를 클립보드에 복사했습니다. 붙여넣기 하세요.', 'success'))
-                    .catch(err => {
-                        console.warn('이미지 클립보드 복사 실패:', err);
-                        blobPromise.then(blob => sbDownloadImage(blob, fileName));
-                    });
-                return;
-            }
-
-            // 휴대폰: 공유 시트로
-            blobPromise.then(async blob => {
-                if (!blob) { showToast('이미지를 만들지 못했습니다.', 'error'); return; }
+            // 휴대폰: 공유 시트 → 거기서 "이미지 저장"을 누르면 앨범에 들어간다
+            if (isTouch) {
                 try {
                     const file = new File([blob], fileName, { type: 'image/png' });
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: '젓자FC 전술판' });
+                        navigator.share({ files: [file], title: '젓자FC 전술판' })
+                            .catch(err => {
+                                if (err && err.name === 'AbortError') return;   // 사용자가 취소함
+                                console.warn('공유 실패:', err);
+                                sbShowImagePreview(dataUrl);
+                            });
                         return;
                     }
                 } catch (e) {
-                    if (e && e.name === 'AbortError') return;   // 사용자가 공유를 취소함
-                    console.warn('공유 실패:', e);
+                    console.warn('공유 준비 실패:', e);
                 }
-                sbDownloadImage(blob, fileName);
-            });
+                // 공유를 못 쓰는 브라우저면 이미지를 띄워 길게 눌러 저장하게 한다
+                sbShowImagePreview(dataUrl);
+                return;
+            }
+
+            // PC: 클립보드로 바로 복사
+            if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+                navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+                    .then(() => showToast('전술판 이미지를 클립보드에 복사했습니다. 붙여넣기 하세요.', 'success'))
+                    .catch(err => {
+                        console.warn('이미지 클립보드 복사 실패:', err);
+                        sbDownloadImage(blob, fileName);
+                    });
+                return;
+            }
+            sbDownloadImage(blob, fileName);
         }
 
         // 팀 렌더링
