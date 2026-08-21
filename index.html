@@ -3013,6 +3013,350 @@
         }
         /* Stagger animations for stats - 인라인 animation 속성에서 딜레이 제어 */
         .mg-stat-card { opacity: 0; }
+
+        /* ====== 축구 전술판 ====== */
+        #soccerBoardModal .modal-content {
+            max-width: 620px;
+            width: 96%;
+            max-height: 94vh;
+            padding: 18px;
+            gap: 12px;
+        }
+
+        .sb-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sb-head h3 {
+            font-size: 1.25em;
+            color: #333;
+        }
+
+        .sb-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .sb-toolbar select {
+            min-height: 40px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 0.95em;
+            font-family: inherit;
+            cursor: pointer;
+            background: white;
+        }
+
+        .sb-btn {
+            min-height: 40px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sb-btn-ghost { background: #eef0f6; color: #444; }
+        .sb-btn-ghost:hover { background: #e2e6ef; }
+        .sb-btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .sb-btn-primary:hover { transform: translateY(-1px); }
+
+        .sb-hint {
+            font-size: 0.85em;
+            color: #667eea;
+            background: #f0f2fb;
+            border-radius: 8px;
+            padding: 8px 12px;
+            line-height: 1.45;
+        }
+
+        .sb-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding-right: 4px;
+        }
+
+        .sb-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+        .sb-pitch-wrap { flex: 0 0 auto; display: flex; justify-content: center; }
+        .sb-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+        .sb-block { display: flex; flex-direction: column; min-height: 0; }
+
+        /* 데스크톱은 경기장 왼쪽 / 명단 오른쪽 2단 */
+        @media (min-width: 760px) {
+            #soccerBoardModal .modal-content { max-width: 780px; }
+            .sb-body { flex-direction: row; align-items: flex-start; }
+            /* 포지션 버튼이 펼쳐지며 왼쪽이 넓어지지 않도록 둘 다 0 기준으로 공간을 나눈다 */
+            .sb-main { flex: 1 1 0; min-width: 0; }
+            .sb-side { flex: 1 1 0; min-width: 0; align-self: stretch; }
+            .sb-pitch { width: auto; height: min(60vh, 520px); }
+            .sb-side { flex: 1; }
+            .sb-block-grow { flex: 1; }
+            .sb-block-grow .sb-tray-pool { flex: 1; max-height: none; }
+        }
+
+        /* --- 경기장 --- */
+        .sb-pitch {
+            position: relative;
+            flex: 0 0 auto;
+            width: 100%;
+            max-width: 100%;
+            aspect-ratio: 68 / 92;
+            border-radius: 14px;
+            background:
+                repeating-linear-gradient(
+                    to bottom,
+                    #3a9e5c 0 8.33%,
+                    #359454 8.33% 16.66%
+                );
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35);
+            overflow: hidden;
+        }
+
+        /* 하프라인 + 센터서클 */
+        .sb-pitch::before {
+            content: '';
+            position: absolute;
+            left: 0; right: 0; top: 50%;
+            height: 2px;
+            background: rgba(255,255,255,0.35);
+            pointer-events: none;   /* 장식이 선수 칩 클릭을 가로채지 않게 */
+        }
+        .sb-pitch::after {
+            content: '';
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 26%; aspect-ratio: 1;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(255,255,255,0.35);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .sb-box {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 56%;
+            height: 15%;
+            border: 2px solid rgba(255,255,255,0.35);
+            pointer-events: none;
+        }
+        .sb-box-bottom { bottom: 0; border-bottom: none; border-radius: 4px 4px 0 0; }
+        .sb-box-top { top: 0; border-top: none; border-radius: 0 0 4px 4px; }
+
+        /* --- 슬롯 --- */
+        .sb-slot {
+            position: absolute;
+            z-index: 1;
+            transform: translate(-50%, -50%);
+            width: 15%;
+            min-width: 40px;
+            max-width: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sb-chip {
+            width: 100%;
+            background: rgba(255,255,255,0.96);
+            border-radius: 10px;
+            padding: 5px 3px 4px;
+            text-align: center;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 2px solid transparent;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .sb-chip-name {
+            display: block;
+            font-size: 0.78em;
+            font-weight: 700;
+            color: #222;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sb-chip-sub {
+            display: block;
+            font-size: 0.62em;
+            font-weight: 700;
+            color: #667eea;
+            margin-top: 1px;
+        }
+
+        .sb-chip.sb-picked {
+            border-color: #FF6B35;
+            box-shadow: 0 0 0 3px rgba(255,107,53,0.35), 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .sb-chip.sb-dragging { opacity: 0.35; }
+
+        .sb-chip:focus-visible {
+            outline: 3px solid #FF6B35;
+            outline-offset: 2px;
+        }
+
+        .sb-ghost {
+            position: fixed;
+            z-index: 2000;
+            width: 64px;
+            transform: translate(-50%, -50%) scale(1.1);
+            pointer-events: none;
+            opacity: 0.95;
+        }
+
+        .sb-drop-on {
+            outline: 3px solid #FF6B35;
+            outline-offset: 2px;
+            border-radius: 10px;
+        }
+        .sb-slot.sb-drop-on { outline-offset: 0; }
+        .sb-pitch.sb-drop-on { outline-offset: -3px; border-radius: 14px; }
+
+        /* --- 후보 / 미배치 --- */
+        .sb-block-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            font-size: 0.95em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .sb-block-title span { font-size: 0.82em; font-weight: 600; color: #888; }
+
+        .sb-tray {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-content: flex-start;
+            background: #f5f6fa;
+            border: 2px dashed #d6daea;
+            border-radius: 10px;
+            padding: 8px;
+            min-height: 62px;
+        }
+
+        .sb-tray-pool { max-height: 148px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        .sb-tray-empty {
+            font-size: 0.85em;
+            color: #999;
+            padding: 8px 4px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .sb-tray .sb-chip {
+            width: auto;
+            min-width: 62px;
+            padding: 6px 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            border: 2px solid #e4e7f2;
+            /* 세로로 쓸면 목록이 스크롤되고, 옆으로 끌면 선수를 꺼낼 수 있다 */
+            touch-action: pan-y;
+        }
+        .sb-tray .sb-chip.sb-picked { border-color: #FF6B35; }
+
+        .sb-posbar {
+            background: #f0f2fb;
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+
+        .sb-posbar .sb-block-title { margin-bottom: 6px; color: #444; }
+        .sb-posbar .sb-block-title span { color: #667eea; font-weight: 700; font-size: 0.9em; }
+
+        .sb-posrow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            min-width: 0;
+        }
+
+        .sb-posbtn {
+            min-width: 44px;
+            min-height: 34px;
+            padding: 5px 8px;
+            border: 1px solid #d3d8ea;
+            border-radius: 7px;
+            background: white;
+            color: #555;
+            font-size: 0.78em;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .sb-posbtn:hover { border-color: #667eea; color: #667eea; }
+        .sb-posbtn-auto { min-width: 50px; }
+        .sb-posbtn-on {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+            color: white;
+        }
+
+        .sb-foot {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .sb-summary {
+            margin-right: auto;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            #soccerBoardModal .modal-content {
+                padding: 12px;
+                width: 100%;
+                max-height: 100vh;
+                max-height: 100dvh;
+                border-radius: 0;
+                gap: 10px;
+            }
+            .sb-head h3 { font-size: 1.1em; }
+            .sb-toolbar { width: 100%; }
+            .sb-toolbar select { flex: 1; min-width: 0; }
+            .sb-hint { font-size: 0.8em; padding: 7px 10px; }
+            .sb-body { gap: 10px; }
+            /* 경기장을 조금 낮춰 교체/미배치 목록까지 한 화면에 들어오게 */
+            .sb-pitch { aspect-ratio: 68 / 78; }
+            .sb-slot { min-width: 36px; }
+            .sb-chip-name { font-size: 0.7em; }
+            .sb-chip { padding: 4px 2px 3px; }
+            .sb-tray { min-height: 52px; padding: 6px; }
+            .sb-tray-pool { max-height: 104px; }
+            .sb-foot .sb-btn { flex: 1 1 auto; min-width: 92px; }
+            .sb-summary { width: 100%; margin-bottom: 2px; }
+        }
     </style>
 </head>
 <body>
@@ -3258,6 +3602,7 @@
                 </label>
                 <button class="btn btn-primary" id="futsalBtn" onclick="generateFutsalTeams()">풋살팀 구성</button>
                 <button class="btn btn-primary" id="soccerBtn" onclick="generateSoccerTeams()">축구팀 구성</button>
+                <button class="btn btn-success" onclick="openSoccerBoard()">축구 전술판</button>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 44px;">
                     <input type="checkbox" id="hideTierCheckbox" onchange="toggleTierVisibility()" style="width: 22px; height: 22px; cursor: pointer;">
                     <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
@@ -3269,6 +3614,51 @@
                 <button class="btn btn-secondary" onclick="copyTeamsToClipboard()">클립보드 복사</button>
                 <button class="btn btn-secondary" onclick="showTeamHistory()">이전 팀 보기</button>
                 <button class="btn btn-primary" onclick="openFutsalFMSetup()">시뮬레이션</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 축구 전술판 (배치는 이 기기에만 저장) -->
+    <div id="soccerBoardModal" class="modal" role="dialog" aria-modal="true" aria-label="축구 전술판">
+        <div class="modal-content">
+            <div class="sb-head">
+                <h3>⚽ 축구 전술판</h3>
+                <div class="sb-toolbar">
+                    <select id="sbFormation" onchange="sbChangeFormation(this.value)" aria-label="포메이션 선택"></select>
+                    <select id="sbTeamPick" onchange="sbApplyTeam(this.value)" aria-label="팀 불러오기">
+                        <option value="">팀 불러오기</option>
+                    </select>
+                </div>
+            </div>
+            <div class="sb-hint">경기장 아무 곳에나 <b>끌어다 놓으면</b> 그 자리에 섭니다. 선수를 <b>누르면 포지션</b>을 바꿀 수 있어요. 배치는 이 기기에만 저장됩니다.</div>
+            <div class="sb-body">
+                <div class="sb-main">
+                    <div class="sb-pitch-wrap">
+                        <div class="sb-pitch" id="sbPitch" data-sb-target="pitch" onclick="sbPitchClick(event)"></div>
+                    </div>
+                </div>
+                <div class="sb-side">
+                    <div class="sb-posbar" id="sbPosBar" hidden>
+                        <div class="sb-block-title">포지션 <span id="sbPosName"></span></div>
+                        <div class="sb-posrow" id="sbPosRow"></div>
+                    </div>
+                    <div class="sb-block">
+                        <div class="sb-block-title">교체 선수 <span id="sbBenchCount">0명</span></div>
+                        <div class="sb-tray" id="sbBench" data-sb-target="bench"></div>
+                    </div>
+                    <div class="sb-block sb-block-grow">
+                        <div class="sb-block-title">미배치 선수 <span id="sbPoolCount">0명</span></div>
+                        <div class="sb-tray sb-tray-pool" id="sbPool" data-sb-target="pool"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="sb-foot">
+                <span id="sbCount" class="sb-summary"></span>
+                <button class="sb-btn sb-btn-ghost" onclick="sbShareImage()">이미지 공유</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbCopyText()">텍스트 복사</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbAlignToFormation()">위치 정렬</button>
+                <button class="sb-btn sb-btn-ghost" onclick="sbReset()">초기화</button>
+                <button class="sb-btn sb-btn-primary" onclick="closeSoccerBoard()">닫기</button>
             </div>
         </div>
     </div>
@@ -3440,6 +3830,66 @@
             } catch (e) {
                 console.warn('팀 히스토리 저장 실패:', e);
             }
+        }
+
+        function teamPairKey(a, b) {
+            return a < b ? a + '||' + b : b + '||' + a;
+        }
+
+        // 최근 팀 히스토리에서 "같은 팀이었던 페어" 가중치 맵 (최근 경기일수록 가중치 큼)
+        function getRecentTeamPairWeights() {
+            const weights = new Map();
+            try {
+                const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
+                history.forEach((entry, idx) => {
+                    const weight = history.length - idx; // history[0]이 최신
+                    (entry.teams || []).forEach(team => {
+                        for (let i = 0; i < team.length; i++) {
+                            for (let j = i + 1; j < team.length; j++) {
+                                const key = teamPairKey(team[i].name, team[j].name);
+                                weights.set(key, (weights.get(key) || 0) + weight);
+                            }
+                        }
+                    });
+                });
+            } catch (e) {
+                console.warn('팀 히스토리 로드 실패:', e);
+            }
+            return weights;
+        }
+
+        // 밸런스 점수가 완전히 동점인 후보들 중, 최근 경기와 팀 동료가 가장 덜 겹치는 조합 선택.
+        // 동점 집합 안에서만 고르므로 밸런스 점수는 그대로 유지된다.
+        function pickLeastRepeatedTeams(candidates, fallback) {
+            if (!candidates || candidates.length <= 1) return fallback;
+
+            const weights = getRecentTeamPairWeights();
+            if (weights.size === 0) {
+                return candidates[Math.floor(Math.random() * candidates.length)];
+            }
+
+            let picked = fallback;
+            let bestScore = Infinity;
+            let tieCount = 0;
+            for (const teams of candidates) {
+                let score = 0;
+                for (const team of teams) {
+                    for (let i = 0; i < team.length; i++) {
+                        for (let j = i + 1; j < team.length; j++) {
+                            score += weights.get(teamPairKey(team[i].name, team[j].name)) || 0;
+                        }
+                    }
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    picked = teams;
+                    tieCount = 1;
+                } else if (score === bestScore) {
+                    tieCount++;
+                    if (Math.random() < 1 / tieCount) picked = teams; // 동점이면 균등 무작위
+                }
+            }
+            return picked;
         }
 
         // 모달 ESC/배경 클릭 닫기 + 포커스 트랩
@@ -3637,7 +4087,7 @@
 
         // 티어 가중치 (높을수록 강함, 비선형 간격)
         const tierWeights = {
-            '황제': 10,
+            '황제': 11,
             'S': 10,
             'A+': 8,
             'A': 6.5,
@@ -3648,7 +4098,15 @@
             'D': 1
         };
 
-        // 투표 집계 전용 점수: 황제를 S 바로 위로 분리 (밸런스 점수 tierWeights는 황제=S=10 유지)
+        // 팀 생성 시 허용하는 밸런스 손해 폭(팀 평균 실력차 기준).
+        // 0이면 매번 같은 팀만 나오고, 크면 다양해지는 대신 밸런스가 나빠진다.
+        // 실측상 0.10 부근에서 다양성이 포화되고 그 이상은 밸런스만 손해였다.
+        const TEAM_BALANCE_TOLERANCE = 0.1;
+
+        // 서로 다른 팀 조합을 이만큼 확보하지 못하면 허용폭을 한 단계 넓힌다 (최대 3단계).
+        const MIN_TEAM_CANDIDATES = 8;
+
+        // 투표 집계 전용 점수 (현재 값은 tierWeights와 동일 — 투표 점수만 따로 조정할 여지를 둔 것)
         const tierVoteScores = { ...tierWeights, '황제': 11 };
 
         // 티어 화면 표기: 황제는 왕관 아이콘으로 표시 (내부 저장값은 '황제' 유지)
@@ -3694,39 +4152,72 @@
             { name: '허진명', tier: 'B', win: 0, draw: 0, loss: 0 }
         ];
 
-        // 투표 평균으로 티어 계산
-        function calculateTierFromVotes(votes) {
-            if (!votes || votes.length === 0) return 'B';
+        // 투표 배열 요약: 트림 평균 / 유효 표 수 / 투표 산포
+        function summarizeVotes(votes) {
+            if (!votes || votes.length === 0) return null;
 
             // "모름" 투표는 제외하고 계산
-            const validVotes = votes.filter(vote => vote.tier !== '모름');
-
-            // 유효한 투표가 없으면 기본값 B 반환
-            if (validVotes.length === 0) return 'B';
-
-            // 가중치 배열로 변환
-            let weights = validVotes.map(vote => tierVoteScores[vote.tier] || 4);
+            const scores = votes
+                .filter(vote => vote.tier !== '모름')
+                .map(vote => tierVoteScores[vote.tier] || 4);
+            if (scores.length === 0) return null;
 
             // 5명 이상 투표 시 최고/최저 1표씩 제거 (trimmed mean)
-            if (weights.length >= 5) {
-                weights.sort((a, b) => a - b);
-                weights = weights.slice(1, -1);
-            }
+            const sorted = [...scores].sort((a, b) => a - b);
+            const trimmed = sorted.length >= 5 ? sorted.slice(1, -1) : sorted;
+            const mean = trimmed.reduce((sum, w) => sum + w, 0) / trimmed.length;
 
-            const avgWeight = weights.reduce((sum, w) => sum + w, 0) / weights.length;
+            // 투표 산포(표준편차) — 표가 적을 때 얼마나 믿을 수 있는지 판단용
+            const rawMean = scores.reduce((sum, w) => sum + w, 0) / scores.length;
+            const variance = scores.reduce((sum, w) => sum + (w - rawMean) * (w - rawMean), 0) / scores.length;
 
-            // 가장 가까운 가중치의 티어로 매칭
-            const tiers = Object.entries(tierVoteScores);
+            return { mean: mean, count: trimmed.length, voteCount: scores.length, sd: Math.sqrt(variance) };
+        }
+
+        // 점수값 → 가장 가까운 티어
+        function tierFromScore(value) {
             let closestTier = 'B';
             let closestDist = Infinity;
-            for (const [tier, weight] of tiers) {
-                const dist = Math.abs(avgWeight - weight);
+            for (const [tier, weight] of Object.entries(tierVoteScores)) {
+                const dist = Math.abs(value - weight);
                 if (dist < closestDist) {
                     closestDist = dist;
                     closestTier = tier;
                 }
             }
             return closestTier;
+        }
+
+
+        // 팀 밸런스용 연속 레이팅 (경험적 베이즈 보정)
+        // 티어로 반올림하면 같은 티어 안의 실력차가 통째로 사라지므로 연속값을 그대로 쓴다.
+        // 표가 적은 선수는 추정 오차가 커서 전체 평균 쪽으로 당겨진다 (표가 충분하면 거의 그대로).
+        function calculateRatings(summaries) {
+            const list = Object.values(summaries);
+            const result = {};
+            if (list.length === 0) return result;
+
+            const globalMean = list.reduce((sum, x) => sum + x.mean, 0) / list.length;
+            const knownSds = list.filter(x => x.voteCount >= 3).map(x => x.sd);
+            const globalSd = knownSds.length
+                ? knownSds.reduce((a, b) => a + b, 0) / knownSds.length
+                : 1;
+
+            // 표집분산 = (투표 산포)^2 / 표 수
+            const sampleVar = x => {
+                const sd = x.voteCount >= 3 ? x.sd : globalSd;
+                return (sd * sd) / x.count;
+            };
+            // 선수 간 실력 분산 τ² = 관측 분산 - 평균 표집분산
+            const between = list.reduce((sum, x) => sum + Math.pow(x.mean - globalMean, 2), 0) / list.length;
+            const avgSampleVar = list.reduce((sum, x) => sum + sampleVar(x), 0) / list.length;
+            const tau2 = Math.max(0, between - avgSampleVar);
+
+            for (const [name, x] of Object.entries(summaries)) {
+                const weight = tau2 > 0 ? tau2 / (tau2 + sampleVar(x)) : 0;
+                result[name] = globalMean + weight * (x.mean - globalMean);
+            }
+            return result;
         }
 
         // 디바이스 ID 생성 (클라이언트 측)
@@ -3925,6 +4416,7 @@
                             id: doc.id,
                             name: data.name,
                             tier: data.tier,
+                            rating: typeof data.rating === 'number' ? data.rating : undefined,
                             win: data.win !== undefined ? data.win : 0,
                             draw: data.draw !== undefined ? data.draw : 0,
                             loss: data.loss !== undefined ? data.loss : 0
@@ -4015,6 +4507,7 @@
                             id: change.doc.id,
                             name: data.name,
                             tier: data.tier,
+                            rating: typeof data.rating === 'number' ? data.rating : undefined,
                             win: data.win !== undefined ? data.win : 0,
                             draw: data.draw !== undefined ? data.draw : 0,
                             loss: data.loss !== undefined ? data.loss : 0
@@ -4083,21 +4576,31 @@
                     votesByPlayer[vote.playerName].push(vote);
                 });
 
-                // 각 선수의 티어를 투표 평균으로 업데이트
+                // 선수별 투표 요약 → 티어(표시용) + 연속 레이팅(밸런스용)
+                const summaries = {};
+                for (const player of players) {
+                    const summary = summarizeVotes(votesByPlayer[player.name] || []);
+                    if (summary) summaries[player.name] = summary;
+                }
+                const ratings = calculateRatings(summaries);
+
                 const batch = canWrite ? db.batch() : null;
                 let hasUpdates = false;
                 for (const player of players) {
-                    const playerVotes = votesByPlayer[player.name] || [];
-                    if (playerVotes.length > 0) {
-                        const calculatedTier = calculateTierFromVotes(playerVotes);
-                        if (player.tier !== calculatedTier) {
-                            player.tier = calculatedTier;
-                            if (canWrite && player.id) {
-                                const docRef = db.collection('players').doc(player.id);
-                                batch.update(docRef, { tier: calculatedTier });
-                                hasUpdates = true;
-                            }
-                        }
+                    const summary = summaries[player.name];
+                    if (!summary) continue;
+
+                    const calculatedTier = tierFromScore(summary.mean);
+                    const calculatedRating = Math.round(ratings[player.name] * 1000) / 1000;
+                    const changed = player.tier !== calculatedTier || player.rating !== calculatedRating;
+
+                    player.tier = calculatedTier;
+                    player.rating = calculatedRating;
+
+                    if (changed && canWrite && player.id) {
+                        const docRef = db.collection('players').doc(player.id);
+                        batch.update(docRef, { tier: calculatedTier, rating: calculatedRating });
+                        hasUpdates = true;
                     }
                 }
 
@@ -5022,6 +5525,11 @@
         // 풋살팀 구성 생성
         // 선수 가중치 (티어 점수 기반)
         function getEffectiveWeight(player) {
+            // 투표 평균(연속값)이 있으면 그대로 사용 — 같은 티어 안의 실력차까지 반영된다.
+            // 티어로 반올림된 값은 레이팅이 아직 없을 때만 쓰는 대체값.
+            if (typeof player.rating === 'number' && isFinite(player.rating)) {
+                return player.rating;
+            }
             return tierWeights[player.tier] || 4;
         }
 
@@ -5037,20 +5545,25 @@
                 let bestTeams = null;
                 let bestDiff = Infinity;
                 let noImproveCount = 0;
+                let candidateTeams = []; // 후보 보관 — 밸런스가 사실상 같은 대안 중에서 고르기 위해
 
                 for (let attempt = 0; attempt < 100; attempt++) {
                     const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
                     const teams = createBalancedTeams(teamSizes, reShuffledList);
                     if (teams) {
                         const diff = calculateTeamDifference(teams);
-                        if (diff < bestDiff) {
+                        if (candidateTeams.length < 40) candidateTeams.push(teams);
+                        // 예전에 있던 `diff < 0.01` 조기 종료는 뺐다. 연속 레이팅을 쓰면 점수가
+                        // 워낙 작아져서 첫 시도에 바로 걸리고, 그러면 후보가 1개뿐이라 매번 같은 팀이 나온다.
+                        if (diff < bestDiff - 1e-9) {
                             bestDiff = diff;
                             bestTeams = teams;
                             noImproveCount = 0;
-                            if (diff < 0.01) break;
                         } else {
                             noImproveCount++;
-                            if (noImproveCount >= 20) break;
+                            // 연속 레이팅에서는 최적화 1회 비용이 커서 20회는 과하다.
+                            // 실측상 8회로 줄여도 밸런스 손실은 거의 없고 생성 시간은 절반 이하가 된다.
+                            if (noImproveCount >= 8) break;
                         }
                     }
                 }
@@ -5062,6 +5575,69 @@
                     showToast('팀 구성을 실패했습니다. 선수 수를 확인해주세요.', 'error');
                     return;
                 }
+
+                // 밸런스가 사실상 같은 후보들 중, 최근 경기와 팀 동료가 가장 덜 겹치는 조합 선택.
+                // 연속 레이팅에서는 최적해가 유일해지기 쉬워 "완전 동점"만 모으면 후보가 안 생긴다.
+                // 그래서 팀 평균 실력차가 최적해보다 TEAM_BALANCE_TOLERANCE 이상 나빠지지 않고,
+                // 쏠림 방지 점수도 나빠지지 않는 후보까지 허용한다.
+                const teamAvgSpread = tm => {
+                    const avgs = tm.map(t => t.reduce((s, p) => s + getEffectiveWeight(p), 0) / t.length);
+                    return Math.max(...avgs) - Math.min(...avgs);
+                };
+                const bestSpread = teamAvgSpread(bestTeams);
+                const bestStacking = calculateTierDistributionScore(bestTeams);
+                // 후보를 모을 때 허용폭을 단계적으로 넓힌다.
+                // 인원이 많으면 첫 단계(TEAM_BALANCE_TOLERANCE)에서 이미 후보가 충분해 밸런스를 그대로 유지하고,
+                // 10~14명처럼 가능한 조합 자체가 적을 때만 허용폭이 넓어져 "맨날 같은 팀"을 피한다.
+                const teamsKey = tm => tm.map(t => t.map(p => p.name).sort().join(',')).sort().join('|');
+                let balancedCandidates = [];
+                for (let step = 1; step <= 3; step++) {
+                    const spreadLimit = bestSpread + TEAM_BALANCE_TOLERANCE * step;
+                    const isAcceptable = t =>
+                        teamAvgSpread(t) <= spreadLimit &&
+                        calculateTierDistributionScore(t) <= bestStacking + 1e-9;
+
+                    const seen = new Set();
+                    balancedCandidates = [];
+                    const addCandidate = t => {
+                        const key = teamsKey(t);
+                        if (!seen.has(key)) { seen.add(key); balancedCandidates.push(t); }
+                    };
+                    candidateTeams.forEach(t => { if (isAcceptable(t)) addCandidate(t); });
+
+                    // 힐클라이밍은 매번 같은 최적해로 수렴해서 후보가 사실상 1개인 경우가 많다.
+                    // 그래서 최적해를 직접 흔들어(무작위 1~3회 스왑) 허용 범위 안의 다른 조합을 더 찾는다.
+                    for (let trial = 0; trial < 400 && balancedCandidates.length < 40; trial++) {
+                        const variant = bestTeams.map(team => [...team]);
+                        const swapCount = 1 + Math.floor(Math.random() * 3);
+                        for (let s = 0; s < swapCount; s++) {
+                            const i = Math.floor(Math.random() * variant.length);
+                            let j = Math.floor(Math.random() * variant.length);
+                            if (i === j) j = (j + 1) % variant.length;
+                            const pi = Math.floor(Math.random() * variant[i].length);
+                            const pj = Math.floor(Math.random() * variant[j].length);
+                            const tmp = variant[i][pi];
+                            variant[i][pi] = variant[j][pj];
+                            variant[j][pj] = tmp;
+                        }
+                        if (isAcceptable(variant)) addCandidate(variant);
+                    }
+
+                    if (balancedCandidates.length >= MIN_TEAM_CANDIDATES) break;
+                }
+
+                bestTeams = pickLeastRepeatedTeams(balancedCandidates, bestTeams);
+
+                // 팀 순서 셔플 (Fisher-Yates)
+                // 스네이크 드래프트는 첫 픽이 항상 teams[0] 이라 최상위 티어(황제 등)가 늘 1팀에 고정됨.
+                // sort(() => Math.random() - 0.5) 는 팀 수가 적을 때 편향이 커서 쓰지 않음.
+                const teamOrder = bestTeams.map((_, i) => i);
+                for (let i = teamOrder.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [teamOrder[i], teamOrder[j]] = [teamOrder[j], teamOrder[i]];
+                }
+                bestTeams = teamOrder.map(i => bestTeams[i]);
+                teamSizes = teamOrder.map(i => teamSizes[i]);
 
                 // 팀 간 평균 차이 계산
                 const avgs = bestTeams.map(t => {
@@ -5380,7 +5956,12 @@
                 // 팀 간 분배의 분산 계산
                 const avg = tierCounts.reduce((a, b) => a + b, 0) / tierCounts.length;
                 const variance = tierCounts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / tierCounts.length;
-                score += variance * 3; // 티어 분배 불균형 페널티 (5에서 3으로 더 감소)
+                // 인원수 균등 분배는 쏠리면 안 되는 티어(S/A+/C/D)에만 적용.
+                // 일반 티어까지 인원수를 맞추면, B↔B+ 처럼 인접 티어를 바꿔 평균이 더 맞아지는
+                // 스왑을 이 페널티가 이겨버려서 최적화가 그대로 멈춰버림
+                if (criticalTiers.includes(tier)) {
+                    score += variance * 3; // 티어 분배 불균형 페널티
+                }
                 
                 // S, A+, D 티어는 한 팀에 몰리면 큰 페널티 (하지만 인원당 평균 밸런스가 최우선)
                 if (criticalTiers.includes(tier)) {
@@ -5467,6 +6048,882 @@
         let draggedPlayer = null;
         let draggedFromTeamIndex = null;
 
+
+        // ====== 축구 전술판 ======
+        // 배치는 서버가 아니라 이 기기의 localStorage 에만 저장된다.
+        // 그래야 같은 사이트를 봐도 각자 자기 전술판을 따로 짜볼 수 있다.
+        const SOCCER_BOARD_KEY = 'jeotjaFcSoccerBoard';
+        const SOCCER_MAX_ON_PITCH = 11;
+
+        // 선수에게 붙일 수 있는 포지션
+        const SOCCER_POSITIONS = ['GK', 'LB', 'CB', 'RB', 'LWB', 'RWB', 'CDM', 'LM', 'CM', 'RM', 'CAM', 'LW', 'RW', 'ST', 'CF'];
+
+        // 포메이션 = 11명의 포지션 + 경기장 위치(%). 빈 자리를 두지 않고 선수를 바로 여기에 세운다.
+        const SOCCER_FORMATIONS = {
+            '4-4-2': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LB', x: 15, y: 71 }, { pos: 'CB', x: 37, y: 75 }, { pos: 'CB', x: 63, y: 75 }, { pos: 'RB', x: 85, y: 71 },
+                { pos: 'LM', x: 15, y: 45 }, { pos: 'CM', x: 37, y: 49 }, { pos: 'CM', x: 63, y: 49 }, { pos: 'RM', x: 85, y: 45 },
+                { pos: 'ST', x: 38, y: 18 }, { pos: 'ST', x: 62, y: 18 }
+            ],
+            '4-3-3': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LB', x: 15, y: 71 }, { pos: 'CB', x: 37, y: 75 }, { pos: 'CB', x: 63, y: 75 }, { pos: 'RB', x: 85, y: 71 },
+                { pos: 'CDM', x: 50, y: 55 }, { pos: 'CM', x: 30, y: 45 }, { pos: 'CM', x: 70, y: 45 },
+                { pos: 'LW', x: 16, y: 22 }, { pos: 'ST', x: 50, y: 15 }, { pos: 'RW', x: 84, y: 22 }
+            ],
+            '4-2-3-1': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LB', x: 15, y: 71 }, { pos: 'CB', x: 37, y: 75 }, { pos: 'CB', x: 63, y: 75 }, { pos: 'RB', x: 85, y: 71 },
+                { pos: 'CDM', x: 36, y: 57 }, { pos: 'CDM', x: 64, y: 57 },
+                { pos: 'LM', x: 16, y: 36 }, { pos: 'CAM', x: 50, y: 33 }, { pos: 'RM', x: 84, y: 36 },
+                { pos: 'ST', x: 50, y: 14 }
+            ],
+            '4-5-1': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LB', x: 15, y: 71 }, { pos: 'CB', x: 37, y: 75 }, { pos: 'CB', x: 63, y: 75 }, { pos: 'RB', x: 85, y: 71 },
+                { pos: 'LM', x: 13, y: 45 }, { pos: 'CM', x: 32, y: 48 }, { pos: 'CM', x: 50, y: 52 }, { pos: 'CM', x: 68, y: 48 }, { pos: 'RM', x: 87, y: 45 },
+                { pos: 'ST', x: 50, y: 16 }
+            ],
+            '3-5-2': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'CB', x: 26, y: 75 }, { pos: 'CB', x: 50, y: 77 }, { pos: 'CB', x: 74, y: 75 },
+                { pos: 'LWB', x: 12, y: 52 }, { pos: 'CM', x: 34, y: 50 }, { pos: 'CDM', x: 50, y: 57 }, { pos: 'CM', x: 66, y: 50 }, { pos: 'RWB', x: 88, y: 52 },
+                { pos: 'ST', x: 38, y: 18 }, { pos: 'ST', x: 62, y: 18 }
+            ],
+            '3-4-3': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'CB', x: 26, y: 75 }, { pos: 'CB', x: 50, y: 77 }, { pos: 'CB', x: 74, y: 75 },
+                { pos: 'LM', x: 14, y: 50 }, { pos: 'CM', x: 38, y: 52 }, { pos: 'CM', x: 62, y: 52 }, { pos: 'RM', x: 86, y: 50 },
+                { pos: 'LW', x: 18, y: 22 }, { pos: 'ST', x: 50, y: 15 }, { pos: 'RW', x: 82, y: 22 }
+            ],
+            '5-3-2': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LWB', x: 11, y: 64 }, { pos: 'CB', x: 30, y: 76 }, { pos: 'CB', x: 50, y: 78 }, { pos: 'CB', x: 70, y: 76 }, { pos: 'RWB', x: 89, y: 64 },
+                { pos: 'CM', x: 30, y: 47 }, { pos: 'CDM', x: 50, y: 52 }, { pos: 'CM', x: 70, y: 47 },
+                { pos: 'ST', x: 38, y: 18 }, { pos: 'ST', x: 62, y: 18 }
+            ],
+            '5-4-1': [
+                { pos: 'GK', x: 50, y: 91 },
+                { pos: 'LWB', x: 11, y: 64 }, { pos: 'CB', x: 30, y: 76 }, { pos: 'CB', x: 50, y: 78 }, { pos: 'CB', x: 70, y: 76 }, { pos: 'RWB', x: 89, y: 64 },
+                { pos: 'LM', x: 15, y: 45 }, { pos: 'CM', x: 38, y: 49 }, { pos: 'CM', x: 62, y: 49 }, { pos: 'RM', x: 85, y: 45 },
+                { pos: 'ST', x: 50, y: 16 }
+            ]
+        };
+
+        let soccerBoard = null;   // { formation, onPitch: [{name,x,y,pos}], bench: [name] }
+        let sbPicked = null;      // 눌러서 고른 대상 { kind:'pitch', index } | { kind:'tray', name, zone }
+        let sbDragEndedAt = 0;
+
+        // 칩이 경기장 밖으로 삐져나가지 않게 좌표를 가둔다
+        function sbClampX(v) { return Math.min(91, Math.max(9, Number(v) || 0)); }
+        function sbClampY(v) { return Math.min(94, Math.max(6, Number(v) || 0)); }
+
+        // 놓은 위치로 포지션을 짐작한다 (마음에 안 들면 포지션 바에서 바꾸면 된다)
+        function sbGuessPosition(x, y) {
+            if (y >= 85) return 'GK';
+            if (y >= 62) return x < 25 ? 'LB' : x > 75 ? 'RB' : 'CB';
+            if (y >= 40) return x < 22 ? 'LM' : x > 78 ? 'RM' : 'CM';
+            if (y >= 28) return x < 22 ? 'LW' : x > 78 ? 'RW' : 'CAM';
+            return x < 22 ? 'LW' : x > 78 ? 'RW' : 'ST';
+        }
+
+        function sbDefaultBoard() {
+            return { formation: '4-4-2', onPitch: [], bench: [] };
+        }
+
+        function loadSoccerBoard() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(SOCCER_BOARD_KEY) || 'null');
+                if (raw && SOCCER_FORMATIONS[raw.formation] && Array.isArray(raw.onPitch)) {
+                    const known = new Set(players.map(p => p.name));
+                    const seen = new Set();
+                    const onPitch = [];
+                    raw.onPitch.forEach(entry => {
+                        // 명단에서 빠진 이름은 버리고, 한 선수가 두 자리를 차지하지 않게 한다
+                        if (!entry || !known.has(entry.name) || seen.has(entry.name)) return;
+                        if (onPitch.length >= SOCCER_MAX_ON_PITCH) return;
+                        seen.add(entry.name);
+                        onPitch.push({
+                            name: entry.name,
+                            x: sbClampX(entry.x),
+                            y: sbClampY(entry.y),
+                            pos: SOCCER_POSITIONS.includes(entry.pos) ? entry.pos : sbGuessPosition(sbClampX(entry.x), sbClampY(entry.y)),
+                            posManual: !!entry.posManual
+                        });
+                    });
+                    const bench = [];
+                    (Array.isArray(raw.bench) ? raw.bench : []).forEach(n => {
+                        if (!known.has(n) || seen.has(n)) return;
+                        seen.add(n);
+                        bench.push(n);
+                    });
+                    return { formation: raw.formation, onPitch: onPitch, bench: bench };
+                }
+            } catch (e) {
+                console.warn('전술판 불러오기 실패:', e);
+            }
+            return sbDefaultBoard();
+        }
+
+        function saveSoccerBoard() {
+            if (!soccerBoard) return;
+            try {
+                localStorage.setItem(SOCCER_BOARD_KEY, JSON.stringify({
+                    formation: soccerBoard.formation,
+                    onPitch: soccerBoard.onPitch.map(p => ({
+                        name: p.name,
+                        x: Math.round(p.x * 100) / 100,
+                        y: Math.round(p.y * 100) / 100,
+                        pos: p.pos,
+                        posManual: !!p.posManual
+                    })),
+                    bench: soccerBoard.bench
+                }));
+            } catch (e) {
+                console.warn('전술판 저장 실패:', e);
+            }
+        }
+
+        function openSoccerBoard() {
+            if (!players.length) {
+                showToast('선수 명단을 불러오는 중입니다.', 'warning');
+                return;
+            }
+            soccerBoard = loadSoccerBoard();
+            sbPicked = null;
+
+            const select = document.getElementById('sbFormation');
+            select.innerHTML = Object.keys(SOCCER_FORMATIONS)
+                .map(name => `<option value="${name}"${name === soccerBoard.formation ? ' selected' : ''}>${name}</option>`)
+                .join('');
+
+            // 팀을 구성한 뒤라면 그 결과를 바로 불러올 수 있게 목록을 채운다
+            const teamPick = document.getElementById('sbTeamPick');
+            if (currentTeamsData && currentTeamsData.length) {
+                teamPick.innerHTML = '<option value="">팀 불러오기</option>' + currentTeamsData
+                    .map((t, i) => `<option value="${i}">팀 ${i + 1} (${t.length}명)</option>`).join('');
+                teamPick.style.display = '';
+            } else {
+                teamPick.style.display = 'none';
+            }
+
+            const modal = document.getElementById('soccerBoardModal');
+            if (!modal.dataset.sbReady) {
+                // 드래그로 끝난 동작이 배경 클릭으로 오인돼 창이 닫히는 것 방지
+                modal.addEventListener('click', e => {
+                    if (e.target === modal && Date.now() - sbDragEndedAt < 400) e.stopPropagation();
+                }, true);
+                modal.dataset.sbReady = '1';
+            }
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            renderSoccerBoard();
+        }
+
+        function closeSoccerBoard() {
+            document.getElementById('soccerBoardModal').classList.remove('active');
+            if (!isAnyModalActive()) document.body.style.overflow = '';
+        }
+
+        function sbPlayerByName(name) {
+            return players.find(p => p.name === name);
+        }
+
+        // 아직 경기장에도 후보에도 없는 선수 (실력 순)
+        function sbUnassigned() {
+            const used = new Set(soccerBoard.onPitch.map(p => p.name));
+            soccerBoard.bench.forEach(n => used.add(n));
+            return players
+                .filter(p => !used.has(p.name))
+                .sort((a, b) => getEffectiveWeight(b) - getEffectiveWeight(a));
+        }
+
+        function sbChipHtml(name, sub, picked) {
+            const player = sbPlayerByName(name);
+            const tier = player ? tierLabel(player.tier) : '';
+            const label = sub ? (showTier && tier ? `${sub} · ${tier}` : sub) : (showTier ? tier : '');
+            const aria = [name, sub, tier].filter(Boolean).join(' ');
+            return `<span class="sb-chip${picked ? ' sb-picked' : ''}" role="button" tabindex="0"
+                          aria-pressed="${picked ? 'true' : 'false'}" aria-label="${escapeHtml(aria)}">
+                        <span class="sb-chip-name">${escapeHtml(name)}</span>
+                        ${label ? `<span class="sb-chip-sub">${escapeHtml(label)}</span>` : ''}
+                    </span>`;
+        }
+
+        function sbIsPicked(kind, key) {
+            if (!sbPicked) return false;
+            if (kind === 'pitch') return sbPicked.kind === 'pitch' && sbPicked.index === key;
+            return sbPicked.kind === 'tray' && sbPicked.name === key;
+        }
+
+        function renderSoccerBoard() {
+            if (!soccerBoard) return;
+
+            // 경기장 — 선수를 놓은 자리에만 칩이 있다 (빈 자리 표시 없음)
+            const pitch = document.getElementById('sbPitch');
+            pitch.innerHTML = '<div class="sb-box sb-box-bottom"></div><div class="sb-box sb-box-top"></div>' +
+                soccerBoard.onPitch.map((p, i) =>
+                    `<div class="sb-slot" data-sb-target="player" data-sb-index="${i}"
+                          style="left:${p.x}%;top:${p.y}%">${sbChipHtml(p.name, p.pos, sbIsPicked('pitch', i))}</div>`
+                ).join('');
+
+            // 포지션 바 — 경기장 위 선수를 고르면 나타난다
+            const posBar = document.getElementById('sbPosBar');
+            const wasHidden = posBar.hidden;
+            if (sbPicked && sbPicked.kind === 'pitch' && soccerBoard.onPitch[sbPicked.index]) {
+                const target = soccerBoard.onPitch[sbPicked.index];
+                document.getElementById('sbPosName').textContent = target.name;
+                document.getElementById('sbPosRow').innerHTML =
+                    `<button type="button" class="sb-posbtn sb-posbtn-auto${target.posManual ? '' : ' sb-posbtn-on'}"
+                             onclick="sbSetPosition('AUTO')">자동</button>` +
+                    SOCCER_POSITIONS
+                        .map(pos => `<button type="button" class="sb-posbtn${(target.posManual && pos === target.pos) ? ' sb-posbtn-on' : ''}"
+                                        onclick="sbSetPosition('${pos}')">${pos}</button>`).join('');
+                posBar.hidden = false;
+                // 방금 열렸다면 버튼이 화면 밖에 있지 않게 끌어온다
+                if (wasHidden) posBar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else {
+                posBar.hidden = true;
+            }
+
+            // 후보
+            const bench = document.getElementById('sbBench');
+            bench.innerHTML = soccerBoard.bench.length
+                ? soccerBoard.bench.map(n => sbChipHtml(n, null, sbIsPicked('tray', n))).join('')
+                : '<span class="sb-tray-empty">여기로 옮기면 교체 선수가 됩니다</span>';
+
+            // 미배치
+            const pool = document.getElementById('sbPool');
+            const rest = sbUnassigned();
+            pool.innerHTML = rest.length
+                ? rest.map(p => sbChipHtml(p.name, null, sbIsPicked('tray', p.name))).join('')
+                : '<span class="sb-tray-empty">모든 선수가 배치되었습니다</span>';
+
+            document.getElementById('sbCount').textContent = `선발 ${soccerBoard.onPitch.length}/${SOCCER_MAX_ON_PITCH}`;
+            document.getElementById('sbBenchCount').textContent = `${soccerBoard.bench.length}명`;
+            document.getElementById('sbPoolCount').textContent = `${rest.length}명`;
+
+            sbBindChips();
+        }
+
+        function sbBindChips() {
+            const modal = document.getElementById('soccerBoardModal');
+
+            modal.querySelectorAll('#sbPitch .sb-slot').forEach(el => {
+                const source = { kind: 'pitch', index: parseInt(el.dataset.sbIndex, 10) };
+                const chip = el.querySelector('.sb-chip');
+                sbBindPointer(chip, source);
+                sbBindKeys(chip, source);
+            });
+
+            ['sbBench', 'sbPool'].forEach(id => {
+                modal.querySelectorAll(`#${id} .sb-chip`).forEach(chip => {
+                    const source = { kind: 'tray', name: chip.querySelector('.sb-chip-name').textContent, zone: id };
+                    sbBindPointer(chip, source);
+                    sbBindKeys(chip, source);
+                });
+            });
+        }
+
+        // 키보드로도 같은 동작 (Enter / Space)
+        function sbBindKeys(el, source) {
+            el.addEventListener('keydown', e => {
+                if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+                e.preventDefault();
+                sbTap(source);
+            });
+        }
+
+        let sbActivePointer = null;
+
+        function sbBindPointer(el, source) {
+            el.addEventListener('pointerdown', e => {
+                if (e.button > 0) return;
+                if (sbActivePointer !== null) return;   // 두 손가락 동시 드래그 방지
+                sbActivePointer = e.pointerId;
+                e.preventDefault();
+                const startX = e.clientX, startY = e.clientY;
+                let moved = false;
+                let ghost = null;
+
+                const onMove = ev => {
+                    if (!moved) {
+                        if (Math.abs(ev.clientX - startX) < 8 && Math.abs(ev.clientY - startY) < 8) return;
+                        moved = true;
+                        ghost = el.cloneNode(true);
+                        ghost.classList.add('sb-ghost');
+                        ghost.classList.remove('sb-picked');
+                        document.body.appendChild(ghost);
+                        el.classList.add('sb-dragging');
+                    }
+                    ghost.style.left = ev.clientX + 'px';
+                    ghost.style.top = ev.clientY + 'px';
+                    sbHighlight(sbTargetAt(ev.clientX, ev.clientY));
+                };
+
+                const onUp = ev => {
+                    sbActivePointer = null;
+                    el.releasePointerCapture && el.hasPointerCapture(e.pointerId) && el.releasePointerCapture(e.pointerId);
+                    el.removeEventListener('pointermove', onMove);
+                    el.removeEventListener('pointerup', onUp);
+                    el.removeEventListener('pointercancel', onUp);
+                    el.classList.remove('sb-dragging');
+                    if (ghost) ghost.remove();
+                    sbHighlight(null);
+                    if (!moved) { sbTap(source); return; }
+                    sbDragEndedAt = Date.now();
+                    const target = sbTargetAt(ev.clientX, ev.clientY);
+                    if (target) sbMove(source, target);
+                    else renderSoccerBoard();
+                };
+
+                el.setPointerCapture(e.pointerId);
+                el.addEventListener('pointermove', onMove);
+                el.addEventListener('pointerup', onUp);
+                el.addEventListener('pointercancel', onUp);
+            });
+        }
+
+        function sbTargetAt(clientX, clientY) {
+            const el = document.elementFromPoint(clientX, clientY);
+            if (!el) return null;
+            const hit = el.closest('[data-sb-target]');
+            if (!hit) return null;
+            const kind = hit.dataset.sbTarget;
+            if (kind === 'player') return { kind: 'player', index: parseInt(hit.dataset.sbIndex, 10), el: hit };
+            if (kind === 'pitch') {
+                const point = sbPitchPoint(clientX, clientY);
+                return { kind: 'grass', el: hit, x: point.x, y: point.y };
+            }
+            return { kind: kind, el: hit };   // 'bench' | 'pool'
+        }
+
+        // 화면 좌표 → 경기장 안 백분율 좌표
+        function sbPitchPoint(clientX, clientY) {
+            const rect = document.getElementById('sbPitch').getBoundingClientRect();
+            return {
+                x: sbClampX((clientX - rect.left) / rect.width * 100),
+                y: sbClampY((clientY - rect.top) / rect.height * 100)
+            };
+        }
+
+        let sbHighlighted = null;
+        function sbHighlight(target) {
+            if (sbHighlighted) sbHighlighted.classList.remove('sb-drop-on');
+            sbHighlighted = target ? target.el : null;
+            if (sbHighlighted) sbHighlighted.classList.add('sb-drop-on');
+        }
+
+        function sbNameOf(ref) {
+            if (!ref) return null;
+            if (ref.kind === 'pitch') {
+                const entry = soccerBoard.onPitch[ref.index];
+                return entry ? entry.name : null;
+            }
+            return ref.name;
+        }
+
+        // 선수를 경기장/후보에서 떼어낸다 (아무 데도 없으면 미배치 상태)
+        function sbDetach(name) {
+            soccerBoard.onPitch = soccerBoard.onPitch.filter(p => p.name !== name);
+            soccerBoard.bench = soccerBoard.bench.filter(n => n !== name);
+        }
+
+        // 선수를 고른 상태에서 경기장 빈 곳을 누르면 그 자리로
+        function sbPitchClick(event) {
+            if (!sbPicked) return;
+            if (event.target.closest('.sb-slot')) return;   // 선수 칩은 칩이 처리
+            if (Date.now() - sbDragEndedAt < 400) return;   // 드래그 직후 클릭은 무시
+            const point = sbPitchPoint(event.clientX, event.clientY);
+            sbMove(sbPicked, { kind: 'grass', x: point.x, y: point.y });
+        }
+
+        function sbTap(ref) {
+            const same = sbPicked && ((ref.kind === 'pitch' && sbPicked.kind === 'pitch' && sbPicked.index === ref.index)
+                                   || (ref.kind === 'tray' && sbPicked.kind === 'tray' && sbPicked.name === ref.name));
+            if (same) {
+                sbPicked = null;
+                renderSoccerBoard();
+                return;
+            }
+
+            if (sbPicked) {
+                // 같은 목록 안에서 다른 선수를 누르면 선택만 옮긴다
+                if (sbPicked.kind === 'tray' && ref.kind === 'tray' && sbPicked.zone === ref.zone) {
+                    sbPicked = ref;
+                    renderSoccerBoard();
+                    return;
+                }
+                const target = ref.kind === 'pitch'
+                    ? { kind: 'player', index: ref.index }
+                    : { kind: ref.zone === 'sbBench' ? 'bench' : 'pool' };
+                sbMove(sbPicked, target);
+                return;
+            }
+
+            sbPicked = ref;
+            renderSoccerBoard();
+        }
+
+        function sbMove(source, target) {
+            const name = sbNameOf(source);
+            if (!name) { sbPicked = null; renderSoccerBoard(); return; }
+
+            if (target.kind === 'grass') {
+                const entry = source.kind === 'pitch' ? soccerBoard.onPitch[source.index] : null;
+                if (entry) {
+                    entry.x = sbClampX(target.x);
+                    entry.y = sbClampY(target.y);
+                    // 옮긴 자리에 맞춰 포지션도 따라간다.
+                    // 단, 직접 골라둔 선수는 건드리지 않는다 (안 그러면 지정한 게 무의미해진다)
+                    if (!entry.posManual) entry.pos = sbGuessPosition(entry.x, entry.y);
+                } else {
+                    if (soccerBoard.onPitch.length >= SOCCER_MAX_ON_PITCH) {
+                        showToast('이미 11명입니다. 한 명을 빼고 넣어주세요.', 'warning');
+                        sbPicked = null;
+                        renderSoccerBoard();
+                        return;
+                    }
+                    const x = sbClampX(target.x), y = sbClampY(target.y);
+                    sbDetach(name);
+                    soccerBoard.onPitch.push({ name: name, x: x, y: y, pos: sbGuessPosition(x, y) });
+                }
+            } else if (target.kind === 'player') {
+                const spot = soccerBoard.onPitch[target.index];
+                if (!spot || spot.name === name) { sbPicked = null; renderSoccerBoard(); return; }
+                if (source.kind === 'pitch') {
+                    // 둘 다 경기장 위 → 서로 자리를 맞바꾼다 (포지션도 함께)
+                    const mine = soccerBoard.onPitch[source.index];
+                    const swapped = spot.name;
+                    spot.name = mine.name;
+                    mine.name = swapped;
+                } else {
+                    // 밖에서 들어온 선수가 그 자리를 차지하고, 있던 선수는 원래 자리로 나간다
+                    const replaced = spot.name;
+                    const toBench = source.zone === 'sbBench';
+                    sbDetach(name);
+                    spot.name = name;
+                    if (toBench) soccerBoard.bench.push(replaced);
+                }
+            } else if (target.kind === 'bench') {
+                sbDetach(name);
+                soccerBoard.bench.push(name);
+            } else {
+                sbDetach(name);
+            }
+
+            sbPicked = null;
+            saveSoccerBoard();
+            renderSoccerBoard();
+        }
+
+        function sbSetPosition(pos) {
+            if (!sbPicked || sbPicked.kind !== 'pitch') return;
+            const entry = soccerBoard.onPitch[sbPicked.index];
+            if (!entry) return;
+            if (pos === 'AUTO') {
+                // 다시 위치를 따라가게
+                entry.posManual = false;
+                entry.pos = sbGuessPosition(entry.x, entry.y);
+            } else {
+                if (!SOCCER_POSITIONS.includes(pos)) return;
+                entry.pos = pos;
+                entry.posManual = true;
+            }
+            saveSoccerBoard();
+            renderSoccerBoard();
+        }
+
+        // 포지션이 속한 큰 역할 (수비/미드/공격)
+        const SB_ROLE_GROUP = {
+            GK: 'GK',
+            LB: 'DF', CB: 'DF', RB: 'DF', LWB: 'DF', RWB: 'DF',
+            CDM: 'MF', LM: 'MF', CM: 'MF', RM: 'MF', CAM: 'MF',
+            LW: 'FW', RW: 'FW', ST: 'FW', CF: 'FW'
+        };
+        const SB_GROUP_ORDER = { GK: 0, DF: 1, MF: 2, FW: 3 };
+        // 왼쪽 -1 / 가운데 0 / 오른쪽 1
+        const SB_SIDE = {
+            GK: 0, LB: -1, LWB: -1, LM: -1, LW: -1,
+            CB: 0, CDM: 0, CM: 0, CAM: 0, ST: 0, CF: 0,
+            RB: 1, RWB: 1, RM: 1, RW: 1
+        };
+
+        // 이 포지션의 선수를 이 자리에 세우는 게 얼마나 어색한지 (작을수록 잘 맞음).
+        // 현재 좌표가 아니라 포지션으로만 따진다 — 좌표로 따지면 포메이션을 오갈 때마다 배치가 표류한다.
+        function sbRoleCost(playerPos, spotPos) {
+            if (playerPos === spotPos) return 0;
+            const pg = SB_ROLE_GROUP[playerPos], sg = SB_ROLE_GROUP[spotPos];
+            if ((pg === 'GK') !== (sg === 'GK')) return 1000;   // 골키퍼는 골문 밖으로 안 나간다
+            const sideGap = Math.abs(SB_SIDE[playerPos] - SB_SIDE[spotPos]) * 8;
+            if (pg === sg) return 10 + sideGap;                 // 같은 역할군이면 좌우만 맞춰준다
+            // 자리가 모자라 다른 역할군으로 밀려날 때도 좌우는 지킨다 (RM 이면 오른쪽 윙으로)
+            return 100 + Math.abs(SB_GROUP_ORDER[pg] - SB_GROUP_ORDER[sg]) * 20 + sideGap;
+        }
+
+        // 선수 n명을 자리 m개에 "전체 비용이 최소가 되게" 배정 (헝가리안 알고리즘, n <= m).
+        // 눈앞에서 싼 것부터 고르면 마지막에 남은 선수가 반대편으로 밀려나는 일이 생긴다.
+        function sbAssign(cost) {
+            const n = cost.length, m = cost[0].length;
+            const u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0);
+            const p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0);
+            for (let i = 1; i <= n; i++) {
+                p[0] = i;
+                let j0 = 0;
+                const minv = new Array(m + 1).fill(Infinity);
+                const used = new Array(m + 1).fill(false);
+                do {
+                    used[j0] = true;
+                    const i0 = p[j0];
+                    let delta = Infinity, j1 = 0;
+                    for (let j = 1; j <= m; j++) {
+                        if (used[j]) continue;
+                        const cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+                        if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+                        if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+                    }
+                    for (let j = 0; j <= m; j++) {
+                        if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+                        else minv[j] -= delta;
+                    }
+                    j0 = j1;
+                } while (p[j0] !== 0);
+                do {
+                    const j1 = way[j0];
+                    p[j0] = p[j1];
+                    j0 = j1;
+                } while (j0);
+            }
+            const result = new Array(n).fill(-1);
+            for (let j = 1; j <= m; j++) if (p[j]) result[p[j] - 1] = j - 1;
+            return result;
+        }
+
+        // 현재 뛰고 있는 선수들을 고른 포메이션 모양으로 세운다.
+        // 누가 어느 자리로 갈지는 지금 포지션과 서 있는 자리를 보고 전체가 가장 자연스럽게 되도록 배정한다.
+        function sbApplyShape(formation) {
+            const shape = SOCCER_FORMATIONS[formation];
+            if (!shape || !soccerBoard.onPitch.length) return;
+
+            const cost = soccerBoard.onPitch.map((entry, ei) =>
+                shape.map((spot, si) => {
+                    const dx = entry.x - spot.x, dy = entry.y - spot.y;
+                    // 포지션 궁합이 먼저(x1000), 궁합이 같으면 지금 서 있는 자리에서 가까운 쪽으로
+                    return sbRoleCost(entry.pos, spot.pos) * 1000
+                         + Math.sqrt(dx * dx + dy * dy)
+                         + ei * 0.001 + si * 0.0001;
+                })
+            );
+
+            const assigned = sbAssign(cost);
+            soccerBoard.onPitch.forEach((entry, i) => {
+                const spot = shape[assigned[i]];
+                if (!spot) return;
+                entry.x = spot.x;
+                entry.y = spot.y;
+                // '자동'인 선수는 새로 선 자리의 포지션을 따라간다 (직접 고정한 선수는 그대로)
+                if (!entry.posManual) entry.pos = spot.pos;
+            });
+        }
+
+        function sbChangeFormation(name) {
+            if (!SOCCER_FORMATIONS[name]) return;
+            soccerBoard.formation = name;
+            sbApplyShape(name);
+            const select = document.getElementById('sbFormation');
+            if (select && select.value !== name) select.value = name;
+            sbPicked = null;
+            saveSoccerBoard();
+            renderSoccerBoard();
+        }
+
+        function sbAlignToFormation() {
+            sbApplyShape(soccerBoard.formation);
+            sbPicked = null;
+            saveSoccerBoard();
+            renderSoccerBoard();
+            showToast(`${soccerBoard.formation} 모양으로 정렬했습니다.`, 'success');
+        }
+
+        // 팀 구성 결과에서 한 팀을 그대로 불러오기
+        function sbApplyTeam(value) {
+            const index = parseInt(value, 10);
+            const select = document.getElementById('sbTeamPick');
+            select.value = '';
+            if (isNaN(index) || !currentTeamsData || !currentTeamsData[index]) return;
+
+            const roster = currentTeamsData[index].slice()
+                .sort((a, b) => getEffectiveWeight(b) - getEffectiveWeight(a))
+                .map(p => p.name);
+            const shape = SOCCER_FORMATIONS[soccerBoard.formation];
+
+            // 골문은 가장 낮은 실력의 선수, 필드는 앞선부터 실력 순
+            const ordered = [];
+            if (roster.length) ordered.push(roster.pop());
+            while (ordered.length < SOCCER_MAX_ON_PITCH && roster.length) ordered.push(roster.shift());
+
+            soccerBoard.onPitch = ordered.map((name, i) => ({
+                name: name,
+                x: shape[i].x,
+                y: shape[i].y,
+                pos: shape[i].pos,
+                posManual: false
+            }));
+            soccerBoard.bench = roster;
+
+            sbPicked = null;
+            saveSoccerBoard();
+            renderSoccerBoard();
+            showToast(`팀 ${index + 1}을(를) 불러왔습니다.`, 'success');
+        }
+
+        async function sbReset() {
+            const ok = await showConfirm('전술판을 비울까요? 이 기기에 저장된 배치가 사라집니다.');
+            if (!ok) return;
+            soccerBoard.onPitch = [];
+            soccerBoard.bench = [];
+            sbPicked = null;
+            saveSoccerBoard();
+            renderSoccerBoard();
+            showToast('전술판을 초기화했습니다.', 'success');
+        }
+
+        // ====== 전술판 공유 ======
+
+        // 라인(GK/DF/MF/FW) 별로 묶어 왼쪽부터 정렬
+        function sbLineup() {
+            const lines = { GK: [], DF: [], MF: [], FW: [] };
+            soccerBoard.onPitch.forEach(entry => {
+                lines[SB_ROLE_GROUP[entry.pos] || 'MF'].push(entry);
+            });
+            Object.values(lines).forEach(arr => arr.sort((a, b) => a.x - b.x));
+            return lines;
+        }
+
+        function sbCopyText() {
+            if (!soccerBoard.onPitch.length) {
+                showToast('경기장에 선수가 없습니다.', 'warning');
+                return;
+            }
+            const lines = sbLineup();
+            let text = `⚽ 젓자FC 전술판 · ${soccerBoard.formation}\n\n`;
+            ['FW', 'MF', 'DF', 'GK'].forEach(group => {
+                if (!lines[group].length) return;
+                text += `${group}  ` + lines[group]
+                    .map(e => `${e.name}(${e.pos})`).join(' ') + '\n';
+            });
+            if (soccerBoard.bench.length) {
+                text += `\n교체  ${soccerBoard.bench.join(' ')}`;
+            }
+            sbCopyToClipboard(text.trim());
+        }
+
+        function sbCopyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text)
+                    .then(() => showToast('전술판을 클립보드에 복사했습니다.', 'success'))
+                    .catch(() => showToast('복사에 실패했습니다.', 'error'));
+                return;
+            }
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('전술판을 클립보드에 복사했습니다.', 'success');
+            } catch (e) {
+                showToast('복사에 실패했습니다.', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function sbRoundRect(ctx, x, y, w, h, r) {
+            const radius = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + w, y, x + w, y + h, radius);
+            ctx.arcTo(x + w, y + h, x, y + h, radius);
+            ctx.arcTo(x, y + h, x, y, radius);
+            ctx.arcTo(x, y, x + w, y, radius);
+            ctx.closePath();
+        }
+
+        // 전술판을 그대로 그림으로 그린다 (외부 라이브러리 없이 canvas 로)
+        function sbRenderImage() {
+            const scale = 2;
+            const W = 720;
+            const PAD = 18;
+            const HEAD = 62;
+            const pitchW = W - PAD * 2;
+            const pitchH = Math.round(pitchW * 78 / 68);   // 공유용은 조금 납작하게
+            const benchH = soccerBoard.bench.length ? 76 : 0;
+            const H = HEAD + pitchH + benchH + PAD;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = W * scale;
+            canvas.height = H * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+            const font = "'Pretendard Variable', Pretendard, -apple-system, 'Segoe UI', sans-serif";
+
+            // 배경
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, W, H);
+
+            // 제목
+            ctx.fillStyle = '#222222';
+            ctx.font = `800 24px ${font}`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.fillText('⚽ 젓자FC 전술판', PAD, HEAD / 2 + 2);
+            ctx.fillStyle = '#667eea';
+            ctx.font = `700 20px ${font}`;
+            ctx.textAlign = 'right';
+            ctx.fillText(soccerBoard.formation, W - PAD, HEAD / 2 + 2);
+
+            // 경기장
+            const px = PAD, py = HEAD;
+            ctx.save();
+            sbRoundRect(ctx, px, py, pitchW, pitchH, 14);
+            ctx.clip();
+            for (let i = 0; i < 12; i++) {
+                ctx.fillStyle = i % 2 === 0 ? '#3a9e5c' : '#359454';
+                ctx.fillRect(px, py + (pitchH / 12) * i, pitchW, pitchH / 12 + 1);
+            }
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 2;
+            // 하프라인
+            ctx.beginPath();
+            ctx.moveTo(px, py + pitchH / 2);
+            ctx.lineTo(px + pitchW, py + pitchH / 2);
+            ctx.stroke();
+            // 센터서클
+            ctx.beginPath();
+            ctx.arc(px + pitchW / 2, py + pitchH / 2, pitchW * 0.13, 0, Math.PI * 2);
+            ctx.stroke();
+            // 페널티박스
+            const boxW = pitchW * 0.56, boxH = pitchH * 0.15;
+            ctx.strokeRect(px + (pitchW - boxW) / 2, py + pitchH - boxH, boxW, boxH);
+            ctx.strokeRect(px + (pitchW - boxW) / 2, py, boxW, boxH);
+            ctx.restore();
+            sbRoundRect(ctx, px, py, pitchW, pitchH, 14);
+            ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 선수 칩
+            const chipW = 92, chipH = 46;
+            soccerBoard.onPitch.forEach(entry => {
+                const cx = px + pitchW * entry.x / 100;
+                const cy = py + pitchH * entry.y / 100;
+                const x = cx - chipW / 2, y = cy - chipH / 2;
+
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.32)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetY = 2;
+                ctx.fillStyle = 'rgba(255,255,255,0.97)';
+                sbRoundRect(ctx, x, y, chipW, chipH, 10);
+                ctx.fill();
+                ctx.restore();
+
+                const player = sbPlayerByName(entry.name);
+                const tier = player ? tierLabel(player.tier) : '';
+                const sub = showTier && tier ? `${entry.pos} · ${tier}` : entry.pos;
+
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#222222';
+                ctx.font = `700 17px ${font}`;
+                ctx.fillText(entry.name, cx, y + 17);
+                ctx.fillStyle = '#667eea';
+                ctx.font = `700 13px ${font}`;
+                ctx.fillText(sub, cx, y + 34);
+            });
+
+            // 교체 선수
+            if (soccerBoard.bench.length) {
+                const by = py + pitchH + 16;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444444';
+                ctx.font = `700 17px ${font}`;
+                ctx.fillText('교체', PAD, by + 16);
+                ctx.fillStyle = '#555555';
+                ctx.font = `600 16px ${font}`;
+                const names = soccerBoard.bench.join('  ');
+                ctx.fillText(names, PAD + 46, by + 16);
+            }
+
+            return canvas;
+        }
+
+        function sbDownloadImage(blob, fileName) {
+            if (!blob) { showToast('이미지를 만들지 못했습니다.', 'error'); return; }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast('전술판 이미지를 저장했습니다.', 'success');
+        }
+
+        // 일부러 async 로 만들지 않는다.
+        // await 를 한 번이라도 걸면 "방금 사용자가 눌렀다"는 자격이 풀려서 클립보드 복사가 거부된다.
+        function sbShareImage() {
+            if (!soccerBoard.onPitch.length) {
+                showToast('경기장에 선수가 없습니다.', 'warning');
+                return;
+            }
+
+            let canvas;
+            try {
+                canvas = sbRenderImage();
+            } catch (e) {
+                console.warn('전술판 이미지 생성 실패:', e);
+                showToast('이미지를 만들지 못했습니다.', 'error');
+                return;
+            }
+
+            const fileName = `젓자FC-전술판-${soccerBoard.formation}.png`;
+            const blobPromise = new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            // 손가락으로 쓰는 기기인지 (PC 에서 OS 공유창을 띄우면 오히려 잘 실패한다)
+            const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+            // PC: 클립보드로 바로 복사. 이미지가 만들어지길 기다리는 동안에도
+            // 자격이 유지되도록 Blob 대신 Promise 를 그대로 넘긴다.
+            if (!isTouch && navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+                navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
+                    .then(() => showToast('전술판 이미지를 클립보드에 복사했습니다. 붙여넣기 하세요.', 'success'))
+                    .catch(err => {
+                        console.warn('이미지 클립보드 복사 실패:', err);
+                        blobPromise.then(blob => sbDownloadImage(blob, fileName));
+                    });
+                return;
+            }
+
+            // 휴대폰: 공유 시트로
+            blobPromise.then(async blob => {
+                if (!blob) { showToast('이미지를 만들지 못했습니다.', 'error'); return; }
+                try {
+                    const file = new File([blob], fileName, { type: 'image/png' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: '젓자FC 전술판' });
+                        return;
+                    }
+                } catch (e) {
+                    if (e && e.name === 'AbortError') return;   // 사용자가 공유를 취소함
+                    console.warn('공유 실패:', e);
+                }
+                sbDownloadImage(blob, fileName);
+            });
+        }
+
         // 팀 렌더링
         function renderTeams(teams, teamSizes) {
             currentTeamsData = teams;
@@ -5528,7 +6985,7 @@
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
                     <div class="balance-indicator ${balanceClass}">차이: ${avgDiff.toFixed(2)} (${balanceText})</div>
                     <div class="team-stats">
-                        <div>티어 합: ${tierSum}</div>
+                        <div>티어 합: ${tierSum.toFixed(1)}</div>
                         <div>인원당 평균: ${tierAverage}</div>
                     </div>
                     <div class="tier-dist-bar">${distBar}</div>
@@ -5799,7 +7256,7 @@
             `;
             const list = document.getElementById('fmSetupTeamList');
             currentTeamsData.forEach((team, i) => {
-                const avg = (team.reduce((s, p) => s + (tierWeights[p.tier] || 4), 0) / team.length).toFixed(1);
+                const avg = (team.reduce((s, p) => s + getEffectiveWeight(p), 0) / team.length).toFixed(1);
                 const btn = document.createElement('button');
                 btn.className = 'fm-setup-team-btn';
                 btn.innerHTML = `<strong>팀 ${i + 1}</strong> (${team.map(p => escapeHtml(p.name)).join(', ')}) <span style="color:#aaa;font-size:0.85em;">평균 ${avg}</span>`;
@@ -5917,14 +7374,14 @@
             const maxStarters = isFutsal ? 6 : 11;
             const modeLabel = isFutsal ? '풋살' : '축구';
 
-            function sortIndicesByTier(team) {
+            function sortIndicesByStrength(team) {
                 const indices = team.map((_, i) => i);
-                indices.sort((a, b) => (tierWeights[team[b].tier] || 0) - (tierWeights[team[a].tier] || 0));
+                indices.sort((a, b) => getEffectiveWeight(team[b]) - getEffectiveWeight(team[a]));
                 return indices;
             }
 
-            const sortedA = sortIndicesByTier(teamA);
-            const sortedB = sortIndicesByTier(teamB);
+            const sortedA = sortIndicesByStrength(teamA);
+            const sortedB = sortIndicesByStrength(teamB);
 
             fmPositionState = {
                 a: {
@@ -6091,7 +7548,7 @@
         function calculateTeamStrength(team) {
             const starters = team.filter(p => !p.isSub);
             if (!starters.length) return 1;
-            const total = starters.reduce((s, p) => s + (tierWeights[p.tier] || 4), 0);
+            const total = starters.reduce((s, p) => s + getEffectiveWeight(p), 0);
             return total / starters.length;
         }
 
@@ -6222,7 +7679,7 @@
         function selectWeightedPlayer(players, context) {
             if (!players.length) return { name: '알 수 없음', tier: 'C', position: 'MF' };
             const weights = players.map(p => {
-                let w = tierWeights[p.tier] || 3;
+                let w = getEffectiveWeight(p);
                 if (context === 'foul') w = 12 - w;
                 const posW = FM_POS_WEIGHTS[context] ? (FM_POS_WEIGHTS[context][p.position] || 1) : 1;
                 w *= posW;
@@ -6345,7 +7802,7 @@
             if (!playersB.length) playersB = st.teamB;
 
             function pkSuccess(player) {
-                const w = tierWeights[player.tier] || 3;
+                const w = getEffectiveWeight(player);
                 const rate = 0.6 + (w / 10) * 0.3;
                 return Math.random() < rate;
             }
