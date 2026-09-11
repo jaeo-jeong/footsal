@@ -247,33 +247,72 @@
         return chosen;
     }
 
+    // A goalkeeper may require an extra teammate. This is a roster-size rule,
+    // separate from user locks that pin a particular numbered team.
+    function largerTeamPlans(roster, sizes, locks, playerId) {
+        const ordinary = [{ sizes: sizes.slice(), locks: { ...locks } }];
+        if (playerId == null) return ordinary;
+        const player = roster.find(p => identity(p) === playerId);
+        if (!player) throw new Error('인원이 많은 팀에 배정할 선수가 선택 명단에 없습니다.');
+        const largest = Math.max(...sizes);
+        if (Math.min(...sizes) === largest) return ordinary;
+        const largeTeams = sizes.map((size, i) => size === largest ? i : -1).filter(i => i >= 0);
+        const fixedCounts = sizes.map((_, i) => Object.values(locks).filter(team => team === i).length);
+        let plans;
+        if (Object.hasOwn(locks, playerId)) {
+            const fixedTeam = locks[playerId];
+            if (sizes[fixedTeam] === largest) return ordinary;
+            // Move the spare roster seat, never a locked player, to the keeper's team.
+            plans = largeTeams.filter(i => fixedCounts[i] <= sizes[fixedTeam]).map(i => {
+                const capacities = sizes.slice();
+                [capacities[fixedTeam], capacities[i]] = [capacities[i], capacities[fixedTeam]];
+                return { sizes: capacities, locks: { ...locks } };
+            });
+        } else {
+            plans = largeTeams.filter(i => fixedCounts[i] < sizes[i]).map(i => ({
+                sizes: sizes.slice(), locks: { ...locks, [playerId]: i }
+            }));
+        }
+        if (!plans.length) throw new Error(player.name + ' 선수를 인원이 많은 팀에 배정할 수 없습니다. 인원이 많은 팀의 선수 잠금을 일부 해제해주세요.');
+        return plans;
+    }
+
     async function generate(roster, sizes, options = {}) {
         const locks = options.locks || {};
         validate(roster, sizes, locks);
         const random = options.random || Math.random;
+        const plans = shuffle(largerTeamPlans(roster, sizes, locks, options.largerTeamPlayerId), random);
+        const largerTeamPlayerId = Math.max(...sizes) !== Math.min(...sizes) ? options.largerTeamPlayerId : undefined;
         const yieldTask = options.yieldTask || (() => Promise.resolve());
         const pool = new Map();
         let bestTeams, bestScore;
         function add(teams) {
             const score = metrics(teams);
-            if (bestScore && score.tierScore !== bestScore.tierScore) return;
+            if (bestScore && score.tierScore > bestScore.tierScore) return;
+            // Placement alternatives may have different optimal tier quotas.
+            // Discard worse-tier candidates as soon as a better allocation is found.
+            if (bestScore && score.tierScore < bestScore.tierScore) { pool.clear(); bestScore = null; }
             if (!bestScore || better(score, bestScore)) { bestScore = score; bestTeams = copyTeams(teams); }
             if (pool.size < 200) pool.set(teamKey(teams), { teams: copyTeams(teams), score });
         }
-        for (let attempt = 0; attempt < 12; attempt++) {
-            add(optimize(draft(roster, sizes, random, locks), locks));
+        for (let attempt = 0; attempt < Math.max(12, plans.length * 4); attempt++) {
+            const plan = plans[attempt % plans.length];
+            add(optimize(draft(roster, plan.sizes, random, plan.locks), plan.locks));
             await yieldTask();
         }
+        const bases = [...pool.values()].map(candidate => candidate.teams);
         // Perturb within the same hard tier quotas, including same-tier exchanges.
         for (let trial = 0; trial < 600; trial++) {
-            const variant = copyTeams(bestTeams);
+            const variant = copyTeams(trial % 4 === 0 ? bestTeams : bases[Math.floor(random() * bases.length)]);
+            const candidateLocks = { ...locks };
+            if (largerTeamPlayerId != null) candidateLocks[largerTeamPlayerId] = variant.findIndex(team => team.some(p => identity(p) === largerTeamPlayerId));
             const swaps = 1 + Math.floor(random() * 4);
             for (let s = 0; s < swaps; s++) {
                 const a = Math.floor(random() * sizes.length);
                 let b = Math.floor(random() * (sizes.length - 1));
                 if (b >= a) b++;
-                const pa = Math.floor(random() * sizes[a]), pb = Math.floor(random() * sizes[b]);
-                if (Object.hasOwn(locks, identity(variant[a][pa])) || Object.hasOwn(locks, identity(variant[b][pb]))) continue;
+                const pa = Math.floor(random() * variant[a].length), pb = Math.floor(random() * variant[b].length);
+                if (Object.hasOwn(candidateLocks, identity(variant[a][pa])) || Object.hasOwn(candidateLocks, identity(variant[b][pb]))) continue;
                 [variant[a][pa], variant[b][pb]] = [variant[b][pb], variant[a][pa]];
             }
             const score = metrics(variant);
@@ -291,7 +330,7 @@
         const chosen = selectCandidate(candidates, { ...options, random });
         // Locked players pin team numbers as well as teammates.
         const teams = Object.keys(locks).length ? chosen : shuffle(chosen, random);
-        return { teams, teamSizes: teams.map(t => t.length), metrics: metrics(teams), bestSpread: bestScore.spread, tolerance, candidateCount: candidates.length, repeated: teamKey(teams) === options.lastKey };
+        return { teams, teamSizes: teams.map(t => t.length), metrics: metrics(teams), bestSpread: bestScore.spread, tolerance, candidateCount: candidates.length, repeated: teamKey(teams) === options.lastKey, largerTeamPlayerId };
     }
 
     const api = { TIER_WEIGHTS, TIERS, identity, weight, shuffle, teamKey, pairKey, validate, metrics, tierViolations, draft, optimize, selectCandidate, generate };

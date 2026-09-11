@@ -280,3 +280,29 @@ test('changing on-field count during generation discards the old result',async()
     assert.equal(c.teamPreviewHistory.length,0);
     assert.equal(lockCount(c),0);
 });
+
+test('futsal and soccer automatically pass Moon Chanwoo by ID and explain the larger-team placement',async()=>{
+    for(const mode of ['futsal','soccer']) {
+        const {c,calls,elements}=setup();
+        c.players[1].name='문찬우';
+        c.setSelectedPlayers(c.players.slice(0,13).map(p=>p.name));
+        await c[mode==='futsal'?'generateFutsalTeams':'generateSoccerTeams']();
+        assert.equal(calls[0].largerTeamPlayerId,'p1');
+        assert.equal(c.currentTeamsData.find(team=>team.some(p=>p.id==='p1')).length,7);
+        assert.equal(lockCount(c),0); // Automatic placement must not create a visible, persistent user lock.
+        assert.match(elements.get('teamGenerationSummary').textContent,/문찬우\(GK\).*인원이 많은 팀/);
+    }
+});
+
+test('deselecting the keeper or returning to equal sizes removes the automatic size rule',async()=>{
+    const {c,calls,elements}=setup();
+    c.players[1].name='문찬우';
+    c.setSelectedPlayers(c.players.slice(0,12).map(p=>p.name));
+    await c.generateFutsalTeams();
+    assert.doesNotMatch(elements.get('teamGenerationSummary').textContent,/문찬우/);
+    c.setSelectedPlayers(c.players.filter(p=>p.id!=='p1').slice(0,13).map(p=>p.name));
+    await c.generateFutsalTeams();
+    assert.equal(calls.at(-1).largerTeamPlayerId,undefined);
+    assert(!c.currentTeamsData.flat().some(p=>p.id==='p1'));
+    assert.doesNotMatch(elements.get('teamGenerationSummary').textContent,/문찬우/);
+});

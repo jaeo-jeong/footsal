@@ -3690,18 +3690,17 @@
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
                 <label for="onFieldCountSelect">팀별 출전 인원</label>
                 <select id="onFieldCountSelect" onchange="resetPlayerLocks('출전 인원이 바뀌어 선수 잠금을 모두 해제했습니다.')" style="min-height:44px;padding:6px;border-radius:8px">
-                    <option value="auto">자동 (풋살 최대 6명 · 축구 최대 11명)</option>
+                    <option value="auto">자동</option>
                     <option value="5">5명</option>
                     <option value="6">6명</option>
                     <option value="7">7명</option>
                     <option value="11">11명</option>
                 </select>
-                <span style="font-size:0.85em;color:#666">팀 명단에는 교체 선수가 포함됩니다. 티어 분산을 우선해 편성합니다.</span>
             </div>
-            <div id="teamGenerationSummary" role="status" style="margin-bottom:12px;color:#555"></div>
-            <div id="lockSummary" role="status" style="margin-bottom:12px;color:#555"></div>
+            <div id="teamGenerationSummary" hidden></div>
+            <div id="lockSummary" hidden></div>
             <div id="playerSwapControls" class="player-swap-controls" hidden>
-                <span id="playerSwapSummary" role="status"></span>
+                <span id="playerSwapSummary" hidden></span>
                 <button type="button" id="cancelPlayerSwapBtn" class="btn btn-secondary player-swap-cancel" onclick="clearPlayerSwapSelection()" hidden>교환 선택 취소</button>
             </div>
             <div id="teamHistorySection" style="display: none;"></div>
@@ -5543,6 +5542,7 @@
                 showToast('모든 팀에 출전 인원 이상의 선수가 필요합니다.', 'warning'); return;
             }
             const roster = selectedPlayersList.map(p => ({ ...p }));
+            const largerTeamPlayer = roster.find(p => p.name.trim() === '문찬우');
             const signature = list => JSON.stringify(list.map(p => [p.id || p.name, p.tier, getEffectiveWeight(p)]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
             const initialSignature = signature(roster);
             const initialConfigurationVersion = teamConfigurationVersion;
@@ -5557,6 +5557,7 @@
                 const options = {
                     onFieldCount,
                     locks: { ...playerTeamLocks },
+                    largerTeamPlayerId: largerTeamPlayer ? TeamBuilder.identity(largerTeamPlayer) : undefined,
                     history: readTeamHistory(CONFIRMED_TEAM_HISTORY_KEY).filter(e => e.mode === mode && e.onFieldCount === onFieldCount).map(resolveHistory),
                     previews: teamPreviewHistory.map(resolveHistory),
                     lastKey: currentTeamsData ? TeamBuilder.teamKey(currentTeamsData) : ''
@@ -5572,7 +5573,8 @@
                 teamPreviewHistory = teamPreviewHistory.slice(0, 5);
                 document.getElementById('teamActions').style.display = 'flex';
                 document.getElementById('teamGenerationSummary').textContent = '티어 분산 우선 · 팀별 ' + onFieldCount + '명 출전 · 나머지는 교체 · 평균 차이 ' + result.metrics.spread.toFixed(2) +
-                    (result.metrics.tierScore > 0 ? ' · 고정 선수를 유지해 티어를 완전히 고르게 나눌 수 없습니다.' : '') +
+                    (result.largerTeamPlayerId ? ' · 문찬우(GK)는 인원이 많은 팀에 배정했습니다.' : '') +
+                    (result.metrics.tierScore > 0 ? ' · 현재 배정 조건에서는 티어를 완전히 고르게 나눌 수 없습니다.' : '') +
                     (result.repeated ? ' · 현재 조건에서 다른 후보를 찾지 못했습니다.' : '');
                 showToast('팀 편성이 완료되었습니다. 최종 팀을 확정해주세요.');
             } catch (error) {
@@ -5694,7 +5696,7 @@
                 ? currentTeamsData?.[pendingPlayerSwap.teamIndex]?.find(p => TeamBuilder.identity(p) === pendingPlayerSwap.playerId)
                 : null;
             if (!selectedPlayer || Object.hasOwn(playerTeamLocks, pendingPlayerSwap.playerId)) pendingPlayerSwap = null;
-            document.getElementById('playerSwapControls').hidden = !isAdmin || !currentTeamsData || currentTeamsData.length < 2;
+            document.getElementById('playerSwapControls').hidden = !isAdmin || !pendingPlayerSwap;
             document.getElementById('playerSwapSummary').textContent = teamGenerationRunning
                 ? '팀 편성이 끝나면 선수를 맞교환할 수 있습니다.'
                 : pendingPlayerSwap
