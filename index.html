@@ -309,6 +309,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 6px;
             transition: all 0.2s;
         }
 
@@ -330,6 +331,7 @@
             display: flex;
             flex-direction: column;
             flex: 1;
+            min-width: 0;
         }
 
         .player-tier {
@@ -900,6 +902,26 @@
         .balance-good { background: rgba(255,255,255,0.25); color: #c8ffc8; }
         .balance-ok { background: rgba(255,255,255,0.2); color: #fff3cd; }
         .balance-bad { background: rgba(255,255,255,0.2); color: #ffb3b3; }
+        .player-lock {
+            flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 6px;
+            border: 1px solid rgba(255,255,255,.5); border-radius: 8px;
+            background: rgba(255,255,255,.14); cursor: pointer; font-size: 1.1em;
+        }
+        .player-lock[aria-pressed="true"] { background: #ffe08a; border-color: #ffe08a; }
+        .player-lock:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+        .player-swap {
+            width: 100%; min-height: 44px; padding: 6px; border: 1px solid transparent;
+            border-radius: 6px; background: transparent; color: inherit; font: inherit;
+            text-align: left; overflow-wrap: anywhere; cursor: pointer;
+        }
+        .player-swap:hover { background: rgba(255,255,255,.15); }
+        .player-swap[aria-disabled="true"] { cursor: default; }
+        .player-swap[aria-pressed="true"] { background: #ffe08a; color: #333; }
+        .player-swap:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+        .team-player.swap-selected { outline: 2px solid #ffe08a; outline-offset: 2px; }
+        .player-swap-controls { margin-bottom: 12px; color: #555; }
+        .player-swap-controls:not([hidden]) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .player-swap-cancel { min-height: 44px; }
         .tier-dist-bar {
             display: flex;
             height: 8px;
@@ -3650,7 +3672,7 @@
                 <button class="btn btn-secondary" onclick="deselectAllPlayers()">전체 해제</button>
                 <label style="display: flex; align-items: center; gap: 6px; min-height: 44px;">
                     <span style="font-size: 0.95em; color: #333;">팀 수</span>
-                    <select id="teamCountSelect" style="min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.95em; cursor: pointer;">
+                    <select id="teamCountSelect" onchange="resetPlayerLocks('팀 수가 바뀌어 선수 잠금을 모두 해제했습니다.')" style="min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.95em; cursor: pointer;">
                         <option value="auto" selected>자동</option>
                         <option value="2">2팀</option>
                         <option value="3">3팀</option>
@@ -3665,9 +3687,27 @@
                     <span style="font-size: 0.95em; color: #333;">티어 숨기기</span>
                 </label>
             </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                <label for="onFieldCountSelect">팀별 출전 인원</label>
+                <select id="onFieldCountSelect" onchange="resetPlayerLocks('출전 인원이 바뀌어 선수 잠금을 모두 해제했습니다.')" style="min-height:44px;padding:6px;border-radius:8px">
+                    <option value="auto">자동 (풋살 최대 6명 · 축구 최대 11명)</option>
+                    <option value="5">5명</option>
+                    <option value="6">6명</option>
+                    <option value="7">7명</option>
+                    <option value="11">11명</option>
+                </select>
+                <span style="font-size:0.85em;color:#666">팀 명단에는 교체 선수가 포함됩니다. 티어 분산을 우선해 편성합니다.</span>
+            </div>
+            <div id="teamGenerationSummary" role="status" style="margin-bottom:12px;color:#555"></div>
+            <div id="lockSummary" role="status" style="margin-bottom:12px;color:#555"></div>
+            <div id="playerSwapControls" class="player-swap-controls" hidden>
+                <span id="playerSwapSummary" role="status"></span>
+                <button type="button" id="cancelPlayerSwapBtn" class="btn btn-secondary player-swap-cancel" onclick="clearPlayerSwapSelection()" hidden>교환 선택 취소</button>
+            </div>
             <div id="teamHistorySection" style="display: none;"></div>
             <div class="teams-container" id="teamsContainer"></div>
             <div id="teamActions" class="team-actions" style="display: none;">
+                <button class="btn btn-success" id="confirmTeamsBtn" onclick="confirmCurrentTeams()">팀 확정</button>
                 <button class="btn btn-secondary" onclick="copyTeamsToClipboard()">클립보드 복사</button>
                 <button class="btn btn-secondary" onclick="showTeamHistory()">이전 팀 보기</button>
                 <button class="btn btn-primary" onclick="openFutsalFMSetup()">시뮬레이션</button>
@@ -3764,6 +3804,7 @@
 
     <!-- Firebase 설정 파일 -->
     <script src="firebase-config.js"></script>
+    <script src="team-builder.js"></script>
 
     <script>
         // ===== 유틸리티 함수 =====
@@ -3871,82 +3912,53 @@
             if (totalEl) totalEl.textContent = players.length;
         }
 
-        // 팀 히스토리
+        // 재추첨은 세션 기록, 확정한 경기는 별도 저장한다.
         const TEAM_HISTORY_KEY = 'jeotjaFcTeamHistory';
-        function saveTeamHistory(teams, teamSizes) {
+        const CONFIRMED_TEAM_HISTORY_KEY = 'jeotjaFcConfirmedTeamsV2';
+        let teamPreviewHistory = [];
+        let visibleTeamHistory = [];
+
+        function readTeamHistory(key) {
             try {
-                const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
-                const entry = {
-                    date: new Date().toLocaleString('ko-KR'),
-                    teams: teams.map(team => team.map(p => ({ name: p.name, tier: p.tier }))),
-                    teamSizes: teamSizes
-                };
-                history.unshift(entry);
-                if (history.length > 5) history.pop();
-                localStorage.setItem(TEAM_HISTORY_KEY, JSON.stringify(history));
-            } catch (e) {
-                console.warn('팀 히스토리 저장 실패:', e);
+                const entries = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!Array.isArray(entries)) return [];
+                return entries.filter(entry => entry && Array.isArray(entry.teams) && entry.teams.length >= 2 &&
+                    entry.teams.every(team => Array.isArray(team) && team.length > 0 && team.every(p => p && typeof p.name === 'string'))).slice(0, 20);
+            } catch (error) { console.warn('팀 이력 읽기 실패:', error); return []; }
+        }
+
+        function makeTeamHistoryEntry(teams, meta) {
+            return {
+                version: 2, date: new Date().toLocaleString('ko-KR'), timestamp: Date.now(),
+                mode: meta.mode, onFieldCount: meta.onFieldCount,
+                teams: teams.map(team => team.map(p => ({ id: p.id || p.name, name: p.name, tier: p.tier, rating: getEffectiveWeight(p) }))),
+                teamSizes: teams.map(team => team.length)
+            };
+        }
+
+        function markTeamsUnconfirmed() {
+            if (currentTeamMeta) currentTeamMeta.confirmed = false;
+            const button = document.getElementById('confirmTeamsBtn');
+            button.disabled = !currentTeamsData;
+            button.textContent = '팀 확정';
+        }
+
+        function confirmCurrentTeams() {
+            if (!currentTeamsData || !currentTeamMeta || currentTeamMeta.confirmed) return;
+            if (currentTeamsData.some(team => team.length < currentTeamMeta.onFieldCount)) {
+                showToast('출전 인원보다 선수가 적은 팀이 있습니다.', 'warning');
+                return;
             }
-        }
-
-        function teamPairKey(a, b) {
-            return a < b ? a + '||' + b : b + '||' + a;
-        }
-
-        // 최근 팀 히스토리에서 "같은 팀이었던 페어" 가중치 맵 (최근 경기일수록 가중치 큼)
-        function getRecentTeamPairWeights() {
-            const weights = new Map();
             try {
-                const history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
-                history.forEach((entry, idx) => {
-                    const weight = history.length - idx; // history[0]이 최신
-                    (entry.teams || []).forEach(team => {
-                        for (let i = 0; i < team.length; i++) {
-                            for (let j = i + 1; j < team.length; j++) {
-                                const key = teamPairKey(team[i].name, team[j].name);
-                                weights.set(key, (weights.get(key) || 0) + weight);
-                            }
-                        }
-                    });
-                });
-            } catch (e) {
-                console.warn('팀 히스토리 로드 실패:', e);
-            }
-            return weights;
-        }
-
-        // 밸런스 점수가 완전히 동점인 후보들 중, 최근 경기와 팀 동료가 가장 덜 겹치는 조합 선택.
-        // 동점 집합 안에서만 고르므로 밸런스 점수는 그대로 유지된다.
-        function pickLeastRepeatedTeams(candidates, fallback) {
-            if (!candidates || candidates.length <= 1) return fallback;
-
-            const weights = getRecentTeamPairWeights();
-            if (weights.size === 0) {
-                return candidates[Math.floor(Math.random() * candidates.length)];
-            }
-
-            let picked = fallback;
-            let bestScore = Infinity;
-            let tieCount = 0;
-            for (const teams of candidates) {
-                let score = 0;
-                for (const team of teams) {
-                    for (let i = 0; i < team.length; i++) {
-                        for (let j = i + 1; j < team.length; j++) {
-                            score += weights.get(teamPairKey(team[i].name, team[j].name)) || 0;
-                        }
-                    }
-                }
-                if (score < bestScore) {
-                    bestScore = score;
-                    picked = teams;
-                    tieCount = 1;
-                } else if (score === bestScore) {
-                    tieCount++;
-                    if (Math.random() < 1 / tieCount) picked = teams; // 동점이면 균등 무작위
-                }
-            }
-            return picked;
+                const entry = makeTeamHistoryEntry(currentTeamsData, currentTeamMeta);
+                const history = readTeamHistory(CONFIRMED_TEAM_HISTORY_KEY);
+                localStorage.setItem(CONFIRMED_TEAM_HISTORY_KEY, JSON.stringify([entry, ...history].slice(0, 20)));
+                currentTeamMeta.confirmed = true;
+                const button = document.getElementById('confirmTeamsBtn');
+                button.disabled = true;
+                button.textContent = '확정 완료';
+                showToast('최종 팀을 이 기기의 경기 기록에 저장했습니다.');
+            } catch (error) { showToast('경기 기록을 저장하지 못했습니다.', 'error'); }
         }
 
         // 모달 ESC/배경 클릭 닫기 + 포커스 트랩
@@ -4143,25 +4155,7 @@
         let adminCode = '';
 
         // 티어 가중치 (높을수록 강함, 비선형 간격)
-        const tierWeights = {
-            '황제': 11,
-            'S': 10,
-            'A+': 8,
-            'A': 6.5,
-            'A-': 5.5,
-            'B+': 5,
-            'B': 4,
-            'C': 2.5,
-            'D': 1
-        };
-
-        // 팀 생성 시 허용하는 밸런스 손해 폭(팀 평균 실력차 기준).
-        // 0이면 매번 같은 팀만 나오고, 크면 다양해지는 대신 밸런스가 나빠진다.
-        // 실측상 0.10 부근에서 다양성이 포화되고 그 이상은 밸런스만 손해였다.
-        const TEAM_BALANCE_TOLERANCE = 0.1;
-
-        // 서로 다른 팀 조합을 이만큼 확보하지 못하면 허용폭을 한 단계 넓힌다 (최대 3단계).
-        const MIN_TEAM_CANDIDATES = 8;
+        const tierWeights = TeamBuilder.TIER_WEIGHTS;
 
         // 투표 집계 전용 점수 (현재 값은 tierWeights와 동일 — 투표 점수만 따로 조정할 여지를 둔 것)
         const tierVoteScores = { ...tierWeights, '황제': 11 };
@@ -4328,6 +4322,12 @@
         // 현재 표시된 팀 정보 저장 (티어 숨기기 토글용)
         let currentTeamsData = null;
         let currentTeamSizes = null;
+        let currentTeamMeta = null;
+        let playerTeamLocks = Object.create(null);
+        let pendingPlayerSwap = null;
+        let teamConfigurationVersion = 0;
+        let teamGenerationRunning = false;
+        let playerRatingRevision = 0;
         
         // 페이지 로드 시 초기화
         function init() {
@@ -4439,6 +4439,10 @@
             if (players.length > 0) {
                 renderPlayers();
             }
+            if (currentTeamsData && currentTeamSizes) {
+                pendingPlayerSwap = null;
+                renderTeams(currentTeamsData, currentTeamSizes);
+            }
         }
         
         // Firebase에서 선수 목록 로드
@@ -4461,24 +4465,13 @@
                     if (isAdmin) {
                         await initializeDefaultPlayers();
                         const newSnapshot = await playersRef.get();
-                        players = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        players = newSnapshot.docs.map(doc => normalizePlayer(doc.id, doc.data()));
                     } else {
                         // 게스트 모드: 기본 선수 데이터를 읽기 전용으로 표시
                         players = defaultPlayers.map((p, idx) => ({ ...p, id: 'temp_' + idx }));
                     }
                 } else {
-                    players = snapshot.docs.map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            name: data.name,
-                            tier: data.tier,
-                            rating: typeof data.rating === 'number' ? data.rating : undefined,
-                            win: data.win !== undefined ? data.win : 0,
-                            draw: data.draw !== undefined ? data.draw : 0,
-                            loss: data.loss !== undefined ? data.loss : 0
-                        };
-                    });
+                    players = snapshot.docs.map(doc => normalizePlayer(doc.id, doc.data()));
                 }
 
                 // 투표 데이터로 티어 업데이트
@@ -4526,72 +4519,48 @@
         }
         
         
-        // 실시간 리스너 설정 (다른 사용자의 변경사항 실시간 반영)
-        // 실시간 리스너 (중복 방지)
         let playersListener = null;
-        let isInitialLoad = true; // 초기 로드 여부
-        
-        function setupRealtimeListener() {
-            if (!db) return;
-            
-            // 기존 리스너가 있으면 제거 (중복 방지)
-            if (playersListener) {
-                playersListener();
-                playersListener = null;
-            }
-            
-            // 초기 로드 플래그 리셋
-            isInitialLoad = true;
-            
-            // 새 리스너 설정
-            playersListener = db.collection('players').onSnapshot((snapshot) => {
-                // 초기 로드 시에는 변경사항 처리하지 않음 (이미 loadPlayersFromFirebase에서 로드됨)
-                if (isInitialLoad) {
-                    isInitialLoad = false;
-                    // 초기 로드 후에는 변경사항만 처리
-                    return;
-                }
-                
-                // 변경사항이 있을 때만 업데이트
-                let hasChanges = false;
-                
-                snapshot.docChanges().forEach((change) => {
-                    // 초기 로드가 아닌 경우에만 처리
-                    if (change.type === 'added' || change.type === 'modified') {
-                        hasChanges = true;
-                        const data = change.doc.data();
-                        const playerData = {
-                            id: change.doc.id,
-                            name: data.name,
-                            tier: data.tier,
-                            rating: typeof data.rating === 'number' ? data.rating : undefined,
-                            win: data.win !== undefined ? data.win : 0,
-                            draw: data.draw !== undefined ? data.draw : 0,
-                            loss: data.loss !== undefined ? data.loss : 0
-                        };
-                        const index = players.findIndex(p => p.id === change.doc.id);
-                        if (index >= 0) {
-                            players[index] = playerData;
-                        } else {
-                            players.push(playerData);
-                        }
-                    } else if (change.type === 'removed') {
-                        hasChanges = true;
-                        players = players.filter(p => p.id !== change.doc.id);
-                    }
-                });
-                
-                if (hasChanges) {
-                    updateTiersFromVotes(isAdmin).then(() => {
-                        sortPlayersByName();
-                        debouncedRenderPlayers();
-                    });
-                }
-            }, (error) => {
-                console.error('실시간 리스너 오류:', error);
-            });
+        let votesListener = null;
+        let latestVotes = null;
+        let ratingRefreshSequence = 0;
+
+        function normalizePlayer(id, data) {
+            return {
+                ...data, id, name: data.name, tier: data.tier || 'B',
+                baseTier: data.baseTier || (Number.isFinite(data.rating) ? 'B' : (data.tier || 'B')),
+                manualTier: Object.hasOwn(tierWeights, data.manualTier) ? data.manualTier : null,
+                rating: Number.isFinite(data.rating) ? data.rating : undefined,
+                win: data.win || 0, draw: data.draw || 0, loss: data.loss || 0
+            };
         }
-        
+
+        function setupRealtimeListener() {
+            if (playersListener) playersListener();
+            if (votesListener) votesListener();
+            playersListener = votesListener = null;
+            latestVotes = null;
+            ratingRefreshSequence++;
+            if (!db) return;
+            const onError = error => {
+                console.error('선수 평가 동기화 실패:', error);
+                showToast('최신 선수 평가를 받지 못했습니다. 연결 상태를 확인해주세요.', 'warning');
+            };
+            playersListener = db.collection('players').onSnapshot(snapshot => {
+                const previousIds = getSelectedPlayerIds();
+                players = snapshot.docs.map(doc => normalizePlayer(doc.id, doc.data()));
+                const names = new Set(players.map(p => p.name));
+                const selectionChanged = setSelectedPlayers([...selectedPlayers].filter(name => names.has(name)));
+                if (!selectionChanged && previousIds !== getSelectedPlayerIds()) {
+                    resetPlayerLocks('선택한 선수 정보가 바뀌어 선수 잠금을 모두 해제했습니다.');
+                }
+                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(onError);
+            }, onError);
+            votesListener = db.collection('votes').onSnapshot(snapshot => {
+                latestVotes = snapshot.docs.map(doc => doc.data());
+                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(onError);
+            }, onError);
+        }
+
         // Firebase에 선수 목록 저장
         async function savePlayersToFirebase() {
             if (!isAdmin) return;
@@ -4617,55 +4586,39 @@
         }
         
         // 투표 데이터로 티어 업데이트
-        async function updateTiersFromVotes(canWrite = true) {
-            if (!db) return;
-
+        async function updateTiersFromVotes(canWrite = false, suppliedVotes = null) {
+            if (!db && !suppliedVotes) return;
+            const sequence = ++ratingRefreshSequence;
             try {
-                const votesSnapshot = await db.collection('votes').get();
-                const votes = votesSnapshot.docs.map(doc => doc.data());
-
-                // 선수별로 투표 그룹화
-                const votesByPlayer = {};
+                const votes = suppliedVotes || (await db.collection('votes').get()).docs.map(doc => doc.data());
+                if (sequence !== ratingRefreshSequence) return;
+                latestVotes = votes;
+                const grouped = new Map();
                 votes.forEach(vote => {
-                    if (!votesByPlayer[vote.playerName]) {
-                        votesByPlayer[vote.playerName] = [];
-                    }
-                    votesByPlayer[vote.playerName].push(vote);
+                    if (!grouped.has(vote.playerName)) grouped.set(vote.playerName, []);
+                    grouped.get(vote.playerName).push(vote);
                 });
-
-                // 선수별 투표 요약 → 티어(표시용) + 연속 레이팅(밸런스용)
-                const summaries = {};
+                const summaries = Object.create(null);
                 for (const player of players) {
-                    const summary = summarizeVotes(votesByPlayer[player.name] || []);
+                    const summary = summarizeVotes(grouped.get(player.name) || []);
                     if (summary) summaries[player.name] = summary;
                 }
                 const ratings = calculateRatings(summaries);
-
-                const batch = canWrite ? db.batch() : null;
-                let hasUpdates = false;
+                let changed = false;
                 for (const player of players) {
                     const summary = summaries[player.name];
-                    if (!summary) continue;
-
-                    const calculatedTier = tierFromScore(summary.mean);
-                    const calculatedRating = Math.round(ratings[player.name] * 1000) / 1000;
-                    const changed = player.tier !== calculatedTier || player.rating !== calculatedRating;
-
-                    player.tier = calculatedTier;
-                    player.rating = calculatedRating;
-
-                    if (changed && canWrite && player.id) {
-                        const docRef = db.collection('players').doc(player.id);
-                        batch.update(docRef, { tier: calculatedTier, rating: calculatedRating });
-                        hasUpdates = true;
-                    }
+                    const manual = Object.hasOwn(tierWeights, player.manualTier);
+                    const tier = manual ? player.manualTier : summary ? tierFromScore(summary.mean) : (player.baseTier || 'B');
+                    const rating = manual ? tierWeights[tier] : summary ? Math.round(ratings[player.name] * 1000) / 1000 : tierWeights[tier];
+                    changed ||= player.tier !== tier || player.rating !== rating;
+                    Object.assign(player, { tier, rating, voteCount: summary ? summary.voteCount : 0 });
                 }
-
-                if (hasUpdates && batch) {
-                    await batch.commit();
-                }
+                // Votes and explicit manual overrides are the shared source of truth.
+                // Derived ratings stay local, avoiding competing admin snapshot writes.
+                if (changed) playerRatingRevision++;
             } catch (error) {
                 console.error('티어 업데이트 실패:', error);
+                showToast('최신 투표 평가를 불러오지 못했습니다.', 'warning');
             }
         }
 
@@ -4754,15 +4707,16 @@
                         <div class="field-group">
                             <label>티어</label>
                             <select onchange="updatePlayerById('${playerId}', 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
-                                <option value="황제" ${player.tier === '황제' ? 'selected' : ''}>👑</option>
-                                <option value="S" ${player.tier === 'S' ? 'selected' : ''}>S</option>
-                                <option value="A+" ${player.tier === 'A+' ? 'selected' : ''}>A+</option>
-                                <option value="A" ${player.tier === 'A' ? 'selected' : ''}>A</option>
-                                <option value="A-" ${player.tier === 'A-' ? 'selected' : ''}>A-</option>
-                                <option value="B+" ${player.tier === 'B+' ? 'selected' : ''}>B+</option>
-                                <option value="B" ${player.tier === 'B' ? 'selected' : ''}>B</option>
-                                <option value="C" ${player.tier === 'C' ? 'selected' : ''}>C</option>
-                                <option value="D" ${player.tier === 'D' ? 'selected' : ''}>D</option>
+                                <option value="auto" ${!player.manualTier ? 'selected' : ''}>투표 자동 (${tierLabel(player.tier)})</option>
+                                <option value="황제" ${player.manualTier === '황제' ? 'selected' : ''}>👑</option>
+                                <option value="S" ${player.manualTier === 'S' ? 'selected' : ''}>S</option>
+                                <option value="A+" ${player.manualTier === 'A+' ? 'selected' : ''}>A+</option>
+                                <option value="A" ${player.manualTier === 'A' ? 'selected' : ''}>A</option>
+                                <option value="A-" ${player.manualTier === 'A-' ? 'selected' : ''}>A-</option>
+                                <option value="B+" ${player.manualTier === 'B+' ? 'selected' : ''}>B+</option>
+                                <option value="B" ${player.manualTier === 'B' ? 'selected' : ''}>B</option>
+                                <option value="C" ${player.manualTier === 'C' ? 'selected' : ''}>C</option>
+                                <option value="D" ${player.manualTier === 'D' ? 'selected' : ''}>D</option>
                             </select>
                         </div>
                         ${deleteButtonHtml}
@@ -4775,13 +4729,28 @@
             updateSelectionCounter();
         }
 
+        function getSelectedPlayerIds() {
+            return JSON.stringify(players.filter(p => selectedPlayers.has(p.name)).map(TeamBuilder.identity).sort());
+        }
+
+        // 선택을 바꾸는 모든 경로에서 잠금의 수명을 동일하게 관리한다.
+        function setSelectedPlayers(names) {
+            const next = new Set(names);
+            if (next.size === selectedPlayers.size && [...next].every(name => selectedPlayers.has(name))) return false;
+            selectedPlayers = next;
+            resetPlayerLocks('선수 선택이 바뀌어 선수 잠금을 모두 해제했습니다.');
+            return true;
+        }
+
         // 선수 선택 토글
         function togglePlayerSelection(playerName, isChecked) {
+            const next = new Set(selectedPlayers);
             if (isChecked) {
-                selectedPlayers.add(playerName);
+                next.add(playerName);
             } else {
-                selectedPlayers.delete(playerName);
+                next.delete(playerName);
             }
+            setSelectedPlayers(next);
             updateSelectionCounter();
         }
 
@@ -4792,9 +4761,7 @@
                 const matchTier = tierFilter === 'all' || p.tier === tierFilter;
                 return matchName && matchTier;
             });
-            filtered.forEach(player => {
-                selectedPlayers.add(player.name);
-            });
+            setSelectedPlayers([...selectedPlayers, ...filtered.map(player => player.name)]);
             renderPlayers();
             updateSelectionCounter();
         }
@@ -4806,9 +4773,8 @@
                 const matchTier = tierFilter === 'all' || p.tier === tierFilter;
                 return matchName && matchTier;
             });
-            filtered.forEach(player => {
-                selectedPlayers.delete(player.name);
-            });
+            const removed = new Set(filtered.map(player => player.name));
+            setSelectedPlayers([...selectedPlayers].filter(name => !removed.has(name)));
             renderPlayers();
             updateSelectionCounter();
         }
@@ -4874,54 +4840,37 @@
 
         // 팀 히스토리 보기
         function showTeamHistory() {
-            let history;
-            try {
-                history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
-            } catch (e) {
-                console.warn('팀 히스토리 로드 실패:', e);
-                history = [];
-            }
             const section = document.getElementById('teamHistorySection');
-            if (history.length === 0) {
-                showToast('이전 팀 기록이 없습니다.', 'warning');
-                return;
-            }
-            if (section.style.display === 'block') {
-                section.style.display = 'none';
-                return;
-            }
+            if (section.style.display === 'block') { section.style.display = 'none'; return; }
+            visibleTeamHistory = [
+                ...teamPreviewHistory.map(entry => ({ ...entry, label: '재추첨 후보' })),
+                ...readTeamHistory(CONFIRMED_TEAM_HISTORY_KEY).map(entry => ({ ...entry, label: '확정 경기' })),
+                ...readTeamHistory(TEAM_HISTORY_KEY).map(entry => ({ ...entry, label: '이전 생성 기록' }))
+            ];
+            if (!visibleTeamHistory.length) { showToast('이전 팀 기록이 없습니다.', 'warning'); return; }
             section.style.display = 'block';
-            section.innerHTML = '<div class="team-history-section"><h3 style="margin-bottom:12px;">이전 팀 기록 (최근 5개)</h3>' +
-                history.map((entry, idx) => {
-                    const summary = entry.teams.map((t, ti) => `팀${ti+1}(${t.length}명)`).join(' / ');
-                    return `<div class="history-item" onclick="restoreTeamHistory(${idx})">
-                        <div style="font-size:0.85em;color:#999;">${entry.date}</div>
-                        <div style="font-weight:600;">${summary}</div>
-                    </div>`;
-                }).join('') + '</div>';
+            section.innerHTML = '<div class="team-history-section"><h3>이 기기의 팀 기록</h3>' + visibleTeamHistory.map((entry, index) =>
+                '<div class="history-item" onclick="restoreTeamHistory(' + index + ')"><div>' + escapeHtml(entry.label) + ' · ' + escapeHtml(entry.date || '') +
+                '</div><div>' + entry.teams.map((team, i) => '팀 ' + (i + 1) + ' (' + team.length + '명)').join(' / ') + '</div></div>'
+            ).join('') + '</div>';
         }
 
-        function restoreTeamHistory(idx) {
-            let history;
-            try {
-                history = JSON.parse(localStorage.getItem(TEAM_HISTORY_KEY) || '[]');
-            } catch (e) {
-                console.warn('팀 히스토리 로드 실패:', e);
-                history = [];
-            }
-            if (!history[idx]) return;
-            const entry = history[idx];
-            // 현재 players에서 이름으로 매칭
-            const teams = entry.teams.map(team =>
-                team.map(p => {
-                    const found = players.find(pl => pl.name === p.name);
-                    return found || p;
-                })
-            );
-            renderTeams(teams, [...entry.teamSizes]);
+        function restoreTeamHistory(index) {
+            if (teamGenerationRunning) return;
+            const entry = visibleTeamHistory[index];
+            if (!entry) return;
+            // 당시 레이팅을 보존한다. 이름으로 현재 선수를 덮어쓰지 않는다.
+            const teams = entry.teams.map(team => team.map(p => ({ ...p })));
+            playerTeamLocks = Object.create(null);
+            pendingPlayerSwap = null;
+            teamConfigurationVersion++;
+            currentTeamMeta = { mode: entry.mode || 'futsal', onFieldCount: entry.onFieldCount || Math.min(6, ...teams.map(t => t.length)), confirmed: false };
+            renderTeams(teams, teams.map(t => t.length));
+            markTeamsUnconfirmed();
             document.getElementById('teamActions').style.display = 'flex';
             document.getElementById('teamHistorySection').style.display = 'none';
-            showToast('이전 팀이 복원되었습니다.', 'success');
+            document.getElementById('teamGenerationSummary').textContent = '이전 명단을 복원하고 선수 잠금을 초기화했습니다. 실제 사용할 팀을 확정해주세요.';
+            showToast('이전 팀이 복원되었습니다.');
         }
 
         // 초기값으로 되돌리기
@@ -4977,7 +4926,7 @@
                     await initializeDefaultPlayers();
                     
                     // 선택된 선수 목록 초기화
-                    selectedPlayers.clear();
+                    setSelectedPlayers([]);
                     
                     // 선수 목록 다시 로드
                     await loadPlayersFromFirebase();
@@ -5403,6 +5352,8 @@
                 const docRef = await db.collection('players').add({
                     name,
                     tier,
+                    baseTier: tier,
+                    manualTier: null,
                     win: 0,
                     draw: 0,
                     loss: 0
@@ -5410,7 +5361,7 @@
                 // 로컬 배열에도 즉시 추가 (리스너 실패 시 대비)
                 // 단, 실시간 리스너가 await 도중 이미 추가했을 수 있으므로 id 중복 방지
                 if (!players.some(p => p.id === docRef.id)) {
-                    players.push({ id: docRef.id, name, tier, win: 0, draw: 0, loss: 0 });
+                    players.push({ id: docRef.id, name, tier, baseTier: tier, manualTier: null, win: 0, draw: 0, loss: 0 });
                 }
                 sortPlayersByName();
                 renderPlayers();
@@ -5427,35 +5378,24 @@
 
         // 선수 정보 업데이트 (ID로)
         async function updatePlayerById(playerId, field, value) {
-            if (!isAdmin) {
-                showToast('관리자만 선수 정보를 수정할 수 있습니다.', 'error');
-                return;
-            }
-
-            if (!db || typeof db === 'undefined') {
-                showToast('Firebase가 초기화되지 않았습니다.', 'error');
-                return;
-            }
-
-            if (!playerId) {
-                showToast('선수 정보를 찾을 수 없습니다.', 'error');
-                return;
-            }
-
+            if (!isAdmin || !db) { showToast('관리자 연결 상태를 확인해주세요.', 'error'); return; }
             const player = players.find(p => p.id === playerId);
-            if (!player) {
-                showToast('선수 정보를 찾을 수 없습니다.', 'error');
-                return;
-            }
-            
+            if (!player || field !== 'tier' || (value !== 'auto' && !Object.hasOwn(tierWeights, value))) return;
+            const baseTier = player.baseTier || 'B';
+            const changes = value === 'auto'
+                ? { manualTier: null, baseTier }
+                : { manualTier: value, baseTier, tier: value, rating: tierWeights[value] };
             try {
-                // Firebase 업데이트
-                await db.collection('players').doc(playerId).update({ [field]: value });
-                player[field] = value;
-                renderTierTable(); // 티어표 업데이트
+                await db.collection('players').doc(playerId).update(changes);
+                const current = players.find(p => p.id === playerId);
+                if (current) Object.assign(current, changes);
+                await updateTiersFromVotes(false, latestVotes);
+                renderPlayers();
+                showToast(value === 'auto' ? '투표 자동 평가로 변경했습니다.' : '관리자 지정 티어를 적용했습니다.');
             } catch (error) {
                 console.error('선수 정보 업데이트 실패:', error);
-                showToast('업데이트에 실패했습니다: ' + error.message, 'error');
+                showToast('업데이트에 실패했습니다.', 'error');
+                renderPlayers();
             }
         }
 
@@ -5487,7 +5427,7 @@
             if (confirmed) {
                 try {
                     // 선택 목록에서도 제거
-                    selectedPlayers.delete(playerName);
+                    setSelectedPlayers([...selectedPlayers].filter(name => name !== playerName));
 
                     await db.collection('players').doc(playerId).delete();
 
@@ -5582,137 +5522,87 @@
         // 풋살팀 구성 생성
         // 선수 가중치 (티어 점수 기반)
         function getEffectiveWeight(player) {
-            // 투표 평균(연속값)이 있으면 그대로 사용 — 같은 티어 안의 실력차까지 반영된다.
-            // 티어로 반올림된 값은 레이팅이 아직 없을 때만 쓰는 대체값.
-            if (typeof player.rating === 'number' && isFinite(player.rating)) {
-                return player.rating;
-            }
-            return tierWeights[player.tier] || 4;
+            return TeamBuilder.weight(player);
         }
 
         // 공통 팀 생성 로직 (로딩 스피너 포함)
-        function runTeamGeneration(selectedPlayersList, teamSizes, btnId) {
-            const btn = document.getElementById(btnId);
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="btn-spinner"></span>생성 중...';
-
-            setTimeout(() => {
-                const shuffledList = [...selectedPlayersList].sort(() => Math.random() - 0.5);
-                let bestTeams = null;
-                let bestDiff = Infinity;
-                let noImproveCount = 0;
-                let candidateTeams = []; // 후보 보관 — 밸런스가 사실상 같은 대안 중에서 고르기 위해
-
-                for (let attempt = 0; attempt < 100; attempt++) {
-                    const reShuffledList = [...shuffledList].sort(() => Math.random() - 0.5);
-                    const teams = createBalancedTeams(teamSizes, reShuffledList);
-                    if (teams) {
-                        const diff = calculateTeamDifference(teams);
-                        if (candidateTeams.length < 40) candidateTeams.push(teams);
-                        // 예전에 있던 `diff < 0.01` 조기 종료는 뺐다. 연속 레이팅을 쓰면 점수가
-                        // 워낙 작아져서 첫 시도에 바로 걸리고, 그러면 후보가 1개뿐이라 매번 같은 팀이 나온다.
-                        if (diff < bestDiff - 1e-9) {
-                            bestDiff = diff;
-                            bestTeams = teams;
-                            noImproveCount = 0;
-                        } else {
-                            noImproveCount++;
-                            // 연속 레이팅에서는 최적화 1회 비용이 커서 20회는 과하다.
-                            // 실측상 8회로 줄여도 밸런스 손실은 거의 없고 생성 시간은 절반 이하가 된다.
-                            if (noImproveCount >= 8) break;
-                        }
-                    }
-                }
-
-                btn.disabled = false;
-                btn.textContent = originalText;
-
-                if (!bestTeams) {
-                    showToast('팀 구성을 실패했습니다. 선수 수를 확인해주세요.', 'error');
-                    return;
-                }
-
-                // 밸런스가 사실상 같은 후보들 중, 최근 경기와 팀 동료가 가장 덜 겹치는 조합 선택.
-                // 연속 레이팅에서는 최적해가 유일해지기 쉬워 "완전 동점"만 모으면 후보가 안 생긴다.
-                // 그래서 팀 평균 실력차가 최적해보다 TEAM_BALANCE_TOLERANCE 이상 나빠지지 않고,
-                // 쏠림 방지 점수도 나빠지지 않는 후보까지 허용한다.
-                const teamAvgSpread = tm => {
-                    const avgs = tm.map(t => t.reduce((s, p) => s + getEffectiveWeight(p), 0) / t.length);
-                    return Math.max(...avgs) - Math.min(...avgs);
+        async function runTeamGeneration(selectedPlayersList, teamSizes, btnId, mode = 'futsal') {
+            if (teamGenerationRunning) return;
+            const selectedIds = new Set(selectedPlayersList.map(TeamBuilder.identity));
+            if (Object.keys(playerTeamLocks).some(id => !selectedIds.has(id))) {
+                resetPlayerLocks('선수 선택이 바뀌어 선수 잠금을 모두 해제했습니다.');
+            }
+            // Keep existing team capacities/labels when the roster size is unchanged.
+            if (Object.keys(playerTeamLocks).length && currentTeamSizes &&
+                JSON.stringify(teamSizes.slice().sort((a,b) => a-b)) === JSON.stringify(currentTeamSizes.slice().sort((a,b) => a-b))) {
+                teamSizes = currentTeamSizes.slice();
+            }
+            const value = document.getElementById('onFieldCountSelect').value;
+            const onFieldCount = value === 'auto' ? Math.min(mode === 'soccer' ? 11 : 6, ...teamSizes) : Number(value);
+            if (!Number.isInteger(onFieldCount) || onFieldCount < 1 || teamSizes.some(size => size < onFieldCount)) {
+                showToast('모든 팀에 출전 인원 이상의 선수가 필요합니다.', 'warning'); return;
+            }
+            const roster = selectedPlayersList.map(p => ({ ...p }));
+            const signature = list => JSON.stringify(list.map(p => [p.id || p.name, p.tier, getEffectiveWeight(p)]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
+            const initialSignature = signature(roster);
+            const initialConfigurationVersion = teamConfigurationVersion;
+            const buttons = ['futsalBtn', 'soccerBtn'].map(id => document.getElementById(id));
+            const previousText = buttons.map(button => button.textContent);
+            teamGenerationRunning = true;
+            clearPlayerSwapSelection();
+            buttons.forEach(button => button.disabled = true);
+            document.getElementById(btnId).innerHTML = '<span class="btn-spinner"></span>생성 중...';
+            try {
+                const resolveHistory = entry => ({ ...entry, teams: entry.teams.map(team => team.map(p => ({ ...p, id: p.id || players.find(x => x.name === p.name)?.id || p.name }))) });
+                const options = {
+                    onFieldCount,
+                    locks: { ...playerTeamLocks },
+                    history: readTeamHistory(CONFIRMED_TEAM_HISTORY_KEY).filter(e => e.mode === mode && e.onFieldCount === onFieldCount).map(resolveHistory),
+                    previews: teamPreviewHistory.map(resolveHistory),
+                    lastKey: currentTeamsData ? TeamBuilder.teamKey(currentTeamsData) : ''
                 };
-                const bestSpread = teamAvgSpread(bestTeams);
-                const bestStacking = calculateTierDistributionScore(bestTeams);
-                // 후보를 모을 때 허용폭을 단계적으로 넓힌다.
-                // 인원이 많으면 첫 단계(TEAM_BALANCE_TOLERANCE)에서 이미 후보가 충분해 밸런스를 그대로 유지하고,
-                // 10~14명처럼 가능한 조합 자체가 적을 때만 허용폭이 넓어져 "맨날 같은 팀"을 피한다.
-                const teamsKey = tm => tm.map(t => t.map(p => p.name).sort().join(',')).sort().join('|');
-                let balancedCandidates = [];
-                for (let step = 1; step <= 3; step++) {
-                    const spreadLimit = bestSpread + TEAM_BALANCE_TOLERANCE * step;
-                    const isAcceptable = t =>
-                        teamAvgSpread(t) <= spreadLimit &&
-                        calculateTierDistributionScore(t) <= bestStacking + 1e-9;
-
-                    const seen = new Set();
-                    balancedCandidates = [];
-                    const addCandidate = t => {
-                        const key = teamsKey(t);
-                        if (!seen.has(key)) { seen.add(key); balancedCandidates.push(t); }
-                    };
-                    candidateTeams.forEach(t => { if (isAcceptable(t)) addCandidate(t); });
-
-                    // 힐클라이밍은 매번 같은 최적해로 수렴해서 후보가 사실상 1개인 경우가 많다.
-                    // 그래서 최적해를 직접 흔들어(무작위 1~3회 스왑) 허용 범위 안의 다른 조합을 더 찾는다.
-                    for (let trial = 0; trial < 400 && balancedCandidates.length < 40; trial++) {
-                        const variant = bestTeams.map(team => [...team]);
-                        const swapCount = 1 + Math.floor(Math.random() * 3);
-                        for (let s = 0; s < swapCount; s++) {
-                            const i = Math.floor(Math.random() * variant.length);
-                            let j = Math.floor(Math.random() * variant.length);
-                            if (i === j) j = (j + 1) % variant.length;
-                            const pi = Math.floor(Math.random() * variant[i].length);
-                            const pj = Math.floor(Math.random() * variant[j].length);
-                            const tmp = variant[i][pi];
-                            variant[i][pi] = variant[j][pj];
-                            variant[j][pj] = tmp;
-                        }
-                        if (isAcceptable(variant)) addCandidate(variant);
-                    }
-
-                    if (balancedCandidates.length >= MIN_TEAM_CANDIDATES) break;
+                const result = await generateTeamsOffThread(roster, teamSizes, options);
+                if (teamConfigurationVersion !== initialConfigurationVersion || signature(players.filter(p => selectedPlayers.has(p.name))) !== initialSignature) {
+                    showToast('선택 선수나 편성 조건·평가가 변경되었습니다. 다시 편성해주세요.', 'warning'); return;
                 }
-
-                bestTeams = pickLeastRepeatedTeams(balancedCandidates, bestTeams);
-
-                // 팀 순서 셔플 (Fisher-Yates)
-                // 스네이크 드래프트는 첫 픽이 항상 teams[0] 이라 최상위 티어(황제 등)가 늘 1팀에 고정됨.
-                // sort(() => Math.random() - 0.5) 는 팀 수가 적을 때 편향이 커서 쓰지 않음.
-                const teamOrder = bestTeams.map((_, i) => i);
-                for (let i = teamOrder.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [teamOrder[i], teamOrder[j]] = [teamOrder[j], teamOrder[i]];
-                }
-                bestTeams = teamOrder.map(i => bestTeams[i]);
-                teamSizes = teamOrder.map(i => teamSizes[i]);
-
-                // 팀 간 평균 차이 계산
-                const avgs = bestTeams.map(t => {
-                    const s = t.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
-                    return t.length > 0 ? s / t.length : 0;
-                });
-                const maxAvg = Math.max(...avgs);
-                const minAvg = Math.min(...avgs);
-                const avgDiff = (maxAvg - minAvg).toFixed(2);
-
-                renderTeams(bestTeams, teamSizes);
-                saveTeamHistory(bestTeams, teamSizes);
+                currentTeamMeta = { mode, onFieldCount, confirmed: false };
+                renderTeams(result.teams, result.teamSizes);
+                markTeamsUnconfirmed();
+                teamPreviewHistory.unshift(makeTeamHistoryEntry(result.teams, currentTeamMeta));
+                teamPreviewHistory = teamPreviewHistory.slice(0, 5);
                 document.getElementById('teamActions').style.display = 'flex';
-                showToast(`팀 생성 완료! 평균 차이: ${avgDiff}`, 'success');
-            }, 0);
+                document.getElementById('teamGenerationSummary').textContent = '티어 분산 우선 · 팀별 ' + onFieldCount + '명 출전 · 나머지는 교체 · 평균 차이 ' + result.metrics.spread.toFixed(2) +
+                    (result.metrics.tierScore > 0 ? ' · 고정 선수를 유지해 티어를 완전히 고르게 나눌 수 없습니다.' : '') +
+                    (result.repeated ? ' · 현재 조건에서 다른 후보를 찾지 못했습니다.' : '');
+                showToast('팀 편성이 완료되었습니다. 최종 팀을 확정해주세요.');
+            } catch (error) {
+                console.error('팀 편성 실패:', error);
+                showToast(error.message || '팀 편성에 실패했습니다.', 'error');
+            } finally {
+                teamGenerationRunning = false;
+                updatePlayerSwapSelection();
+                buttons.forEach((button, i) => { button.disabled = false; button.textContent = previousText[i]; });
+            }
+        }
+
+        async function generateTeamsOffThread(roster, sizes, options) {
+            if (typeof Worker !== 'undefined' && location.protocol !== 'file:') {
+                try {
+                    return await new Promise((resolve, reject) => {
+                        const worker = new Worker('team-builder.js');
+                        const timeout = setTimeout(() => { worker.terminate(); reject(new Error('편성 작업 시간 초과')); }, 10000);
+                        const finish = () => { clearTimeout(timeout); worker.terminate(); };
+                        worker.onmessage = event => { finish(); event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.result); };
+                        worker.onerror = event => { event.preventDefault(); finish(); reject(new Error('Worker 실행 실패')); };
+                        worker.postMessage({ roster, sizes, options });
+                    });
+                } catch (error) { console.warn('기본 편성 방식으로 재시도:', error.message); }
+            }
+            return TeamBuilder.generate(roster, sizes, { ...options, yieldTask: () => new Promise(resolve => setTimeout(resolve, 0)) });
         }
 
         function generateFutsalTeams() {
+            if (!prepareTeamGeneration('futsal')) return;
             const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
             const totalPlayers = selectedPlayersList.length;
 
@@ -5738,17 +5628,18 @@
                 }
             } else {
                 const numTeams = parseInt(teamCountValue, 10);
-                if (totalPlayers < numTeams) {
-                    showToast(`${totalPlayers}명으로는 ${numTeams}팀을 만들 수 없습니다.`, 'warning');
+                if (![2, 3, 4].includes(numTeams) || totalPlayers < numTeams * 5) {
+                    showToast('풋살은 팀별 최소 5명이 필요합니다.', 'warning');
                     return;
                 }
                 teamSizes = computeEvenTeamSizes(totalPlayers, numTeams);
             }
 
-            runTeamGeneration(selectedPlayersList, teamSizes, 'futsalBtn');
+            return runTeamGeneration(selectedPlayersList, teamSizes, 'futsalBtn');
         }
 
         function generateSoccerTeams() {
+            if (!prepareTeamGeneration('soccer')) return;
             const selectedPlayersList = players.filter(p => selectedPlayers.has(p.name));
             const totalPlayers = selectedPlayersList.length;
 
@@ -5757,303 +5648,7 @@
                 return;
             }
             const teamSizes = getSoccerTeamSizes(totalPlayers);
-            runTeamGeneration(selectedPlayersList, teamSizes, 'soccerBtn');
-        }
-
-        // 밸런스 있는 팀 생성 (Snake Draft)
-        function createBalancedTeams(teamSizes, playerList) {
-            const numTeams = teamSizes.length;
-            const teams = Array(numTeams).fill(null).map(() => []);
-
-            // 선수를 티어순 정렬, 같은 티어 내 랜덤
-            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            const sorted = [...playerList].sort((a, b) => {
-                const tierDiff = tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
-                if (tierDiff !== 0) return tierDiff;
-                return Math.random() - 0.5;
-            });
-
-            // Snake draft 순서 생성 (0→1→2→2→1→0→...)
-            const draftOrder = [];
-            const fillCount = Array(numTeams).fill(0);
-            let forward = true;
-            let assigned = 0;
-            const totalNeeded = teamSizes.reduce((a, b) => a + b, 0);
-            while (assigned < totalNeeded) {
-                const seq = forward
-                    ? Array.from({length: numTeams}, (_, i) => i)
-                    : Array.from({length: numTeams}, (_, i) => numTeams - 1 - i);
-                for (const idx of seq) {
-                    if (assigned >= totalNeeded) break;
-                    if (fillCount[idx] < teamSizes[idx]) {
-                        draftOrder.push(idx);
-                        fillCount[idx]++;
-                        assigned++;
-                    }
-                }
-                forward = !forward;
-            }
-
-            // Snake draft로 선수 배정
-            let playerIdx = 0;
-            for (const teamIdx of draftOrder) {
-                if (playerIdx >= sorted.length) break;
-                teams[teamIdx].push(sorted[playerIdx]);
-                playerIdx++;
-            }
-
-            // 팀 크기 확인
-            for (let i = 0; i < numTeams; i++) {
-                if (teams[i].length !== teamSizes[i]) {
-                    return null;
-                }
-            }
-
-            // 티어 밸런스 최적화
-            optimizeTierBalance(teams);
-
-            return teams;
-        }
-
-        // 티어별 분배 개선 (인원당 평균도 고려)
-        function improveTierDistribution(teams) {
-            const criticalTiers = ['S', 'A+', 'C', 'D'];
-            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            
-            function getTeamTierAverage(team) {
-                if (team.length === 0) return 0;
-                const sum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
-                return sum / team.length;
-            }
-            
-            function getAverageVariance(teams) {
-                const averages = teams.map(team => getTeamTierAverage(team));
-                const avg = averages.reduce((a, b) => a + b, 0) / averages.length;
-                return averages.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / averages.length;
-            }
-            
-            for (let iteration = 0; iteration < 200; iteration++) {
-                let improved = false;
-                const currentAvgVariance = getAverageVariance(teams);
-                
-                // 각 티어별로 확인
-                for (const tier of tierOrder) {
-                    if (improved) break;
-                    const tierCounts = teams.map(team =>
-                        team.filter(p => p.tier === tier).length
-                    );
-                    const maxCount = Math.max(...tierCounts);
-                    const minCount = Math.min(...tierCounts);
-
-                    // 분배가 불균형하면 개선 시도
-                    if (maxCount - minCount > 1 || (criticalTiers.includes(tier) && maxCount >= 2)) {
-                        // 가장 많은 팀과 가장 적은 팀 찾기
-                        const maxTeamIdx = tierCounts.indexOf(maxCount);
-                        const minTeamIdx = tierCounts.indexOf(minCount);
-
-                        // 해당 티어 선수를 찾아서 교체 시도
-                        const maxTeam = teams[maxTeamIdx];
-                        const minTeam = teams[minTeamIdx];
-
-                        // 같은 티어가 아닌 선수와 교체
-                        for (let i = 0; i < maxTeam.length; i++) {
-                            if (maxTeam[i].tier === tier) {
-                                for (let j = 0; j < minTeam.length; j++) {
-                                    if (minTeam[j].tier !== tier) {
-                                        // 교체 시도
-                                        const temp = maxTeam[i];
-                                        maxTeam[i] = minTeam[j];
-                                        minTeam[j] = temp;
-
-                                        // 인원당 평균 밸런스 개선 확인
-                                        const newAvgVariance = getAverageVariance(teams);
-
-                                        // 티어 분배 개선 확인
-                                        const newTierCounts = teams.map(team =>
-                                            team.filter(p => p.tier === tier).length
-                                        );
-                                        const newMaxCount = Math.max(...newTierCounts);
-                                        const newMinCount = Math.min(...newTierCounts);
-
-                                        // 인원당 평균 밸런스가 개선되거나, 티어 분배가 개선되고 인원당 평균이 나빠지지 않으면 수용
-                                        const tierDistributionImproved = (newMaxCount - newMinCount < maxCount - minCount);
-                                        const avgBalanceImproved = (newAvgVariance < currentAvgVariance);
-
-                                        // 인원당 평균 밸런스 개선을 더 우선시 (인원당 평균이 개선되면 무조건 수용)
-                                        // 또는 티어 분배가 개선되고 인원당 평균이 거의 나빠지지 않으면 수용 (5% 이내)
-                                        if (avgBalanceImproved || (tierDistributionImproved && newAvgVariance <= currentAvgVariance * 1.05)) {
-                                            improved = true;
-                                            break;
-                                        } else {
-                                            // 되돌리기
-                                            minTeam[j] = maxTeam[i];
-                                            maxTeam[i] = temp;
-                                        }
-                                    }
-                                }
-                                if (improved) break;
-                            }
-                        }
-                    }
-                }
-                
-                if (!improved) break;
-            }
-        }
-
-        // 티어 밸런스 최적화 (Best-Improvement + 3-Way 로테이션)
-        function optimizeTierBalance(teams) {
-            // 먼저 티어별 분배 개선 (S, A+, D가 한 팀에 몰리지 않도록)
-            improveTierDistribution(teams);
-
-            // Best-improvement 스왑 + 3-way 로테이션
-            for (let iteration = 0; iteration < 200; iteration++) {
-                const currentScore = calculateTeamDifference(teams);
-                let bestScore = currentScore;
-                let bestMove = null;
-
-                // 2-way 스왑: 모든 팀 쌍의 모든 선수 조합 탐색
-                for (let i = 0; i < teams.length; i++) {
-                    for (let j = i + 1; j < teams.length; j++) {
-                        for (let pi = 0; pi < teams[i].length; pi++) {
-                            for (let pj = 0; pj < teams[j].length; pj++) {
-                                if (teams[i][pi].tier === teams[j][pj].tier) continue;
-                                // 스왑 적용
-                                const tmp = teams[i][pi];
-                                teams[i][pi] = teams[j][pj];
-                                teams[j][pj] = tmp;
-                                const score = calculateTeamDifference(teams);
-                                if (score < bestScore) {
-                                    bestScore = score;
-                                    bestMove = { type: '2way', i, j, pi, pj };
-                                }
-                                // 되돌리기
-                                teams[j][pj] = teams[i][pi];
-                                teams[i][pi] = tmp;
-                            }
-                        }
-                    }
-                }
-
-                // 3-way 로테이션: 3팀 이상일 때 A→B, B→C, C→A 및 역방향
-                if (teams.length >= 3) {
-                    for (let a = 0; a < teams.length; a++) {
-                        for (let b = a + 1; b < teams.length; b++) {
-                            for (let c = b + 1; c < teams.length; c++) {
-                                for (let pa = 0; pa < teams[a].length; pa++) {
-                                    for (let pb = 0; pb < teams[b].length; pb++) {
-                                        for (let pc = 0; pc < teams[c].length; pc++) {
-                                            // 정방향: A→B, B→C, C→A
-                                            const sa = teams[a][pa], sb = teams[b][pb], sc = teams[c][pc];
-                                            if (sa.tier === sb.tier && sb.tier === sc.tier) continue;
-                                            teams[a][pa] = sc;
-                                            teams[b][pb] = sa;
-                                            teams[c][pc] = sb;
-                                            let score = calculateTeamDifference(teams);
-                                            if (score < bestScore) {
-                                                bestScore = score;
-                                                bestMove = { type: '3way', a, b, c, pa, pb, pc, dir: 'fwd' };
-                                            }
-                                            // 역방향: A→C, C→B, B→A
-                                            teams[a][pa] = sb;
-                                            teams[b][pb] = sc;
-                                            teams[c][pc] = sa;
-                                            score = calculateTeamDifference(teams);
-                                            if (score < bestScore) {
-                                                bestScore = score;
-                                                bestMove = { type: '3way', a, b, c, pa, pb, pc, dir: 'rev' };
-                                            }
-                                            // 되돌리기
-                                            teams[a][pa] = sa;
-                                            teams[b][pb] = sb;
-                                            teams[c][pc] = sc;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 최선의 이동 적용
-                if (!bestMove) break;
-                if (bestMove.type === '2way') {
-                    const { i, j, pi, pj } = bestMove;
-                    const tmp = teams[i][pi];
-                    teams[i][pi] = teams[j][pj];
-                    teams[j][pj] = tmp;
-                } else {
-                    const { a, b, c, pa, pb, pc, dir } = bestMove;
-                    const sa = teams[a][pa], sb = teams[b][pb], sc = teams[c][pc];
-                    if (dir === 'fwd') {
-                        teams[a][pa] = sc;
-                        teams[b][pb] = sa;
-                        teams[c][pc] = sb;
-                    } else {
-                        teams[a][pa] = sb;
-                        teams[b][pb] = sc;
-                        teams[c][pc] = sa;
-                    }
-                }
-            }
-        }
-
-        // 티어별 분배 점수 계산 (낮을수록 좋음, 인원당 평균 밸런스 최우선)
-        function calculateTierDistributionScore(teams) {
-            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            const criticalTiers = ['S', 'A+', 'C', 'D']; // 한 팀에 몰리면 안 되는 티어
-            let score = 0;
-            
-            // 각 티어별로 팀 간 분배 확인
-            tierOrder.forEach(tier => {
-                const tierCounts = teams.map(team => 
-                    team.filter(p => p.tier === tier).length
-                );
-                
-                // 팀 간 분배의 분산 계산
-                const avg = tierCounts.reduce((a, b) => a + b, 0) / tierCounts.length;
-                const variance = tierCounts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / tierCounts.length;
-                // 인원수 균등 분배는 쏠리면 안 되는 티어(S/A+/C/D)에만 적용.
-                // 일반 티어까지 인원수를 맞추면, B↔B+ 처럼 인접 티어를 바꿔 평균이 더 맞아지는
-                // 스왑을 이 페널티가 이겨버려서 최적화가 그대로 멈춰버림
-                if (criticalTiers.includes(tier)) {
-                    score += variance * 3; // 티어 분배 불균형 페널티
-                }
-                
-                // S, A+, D 티어는 한 팀에 몰리면 큰 페널티 (하지만 인원당 평균 밸런스가 최우선)
-                if (criticalTiers.includes(tier)) {
-                    const maxCount = Math.max(...tierCounts);
-                    const minCount = Math.min(...tierCounts);
-                    if (maxCount - minCount > 1) {
-                        score += (maxCount - minCount - 1) * 30; // 큰 페널티 (50에서 30으로 더 감소)
-                    }
-                    // 한 팀에 2명 이상 몰리면 추가 페널티
-                    if (maxCount >= 2) {
-                        score += (maxCount - 1) * 15; // 추가 페널티 (25에서 15로 더 감소)
-                    }
-                }
-            });
-            
-            return score;
-        }
-
-        // 팀 간 티어 차이 계산 (인원당 평균 기준)
-        function calculateTeamDifference(teams) {
-            // 인원당 평균 티어를 계산
-            const averages = teams.map(team => {
-                const sum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
-                return team.length > 0 ? sum / team.length : 0;
-            });
-            
-            // 평균의 분산 계산 (인원당 평균 밸런스가 최우선)
-            const avg = averages.reduce((a, b) => a + b, 0) / averages.length;
-            const variance = averages.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / averages.length;
-            
-            // 티어 분배 점수 추가 (가중치를 낮춰서 인원당 평균을 더 우선시)
-            const tierDistributionScore = calculateTierDistributionScore(teams);
-            
-            // 인원당 평균 분산에 높은 가중치, 티어 분배 점수에 낮은 가중치 적용
-            return variance * 10 + tierDistributionScore * 0.1;
+            return runTeamGeneration(selectedPlayersList, teamSizes, 'soccerBtn', 'soccer');
         }
 
         // 티어 표시/숨기기 토글
@@ -6065,7 +5660,110 @@
             }
         }
         
-        // 선수 이동 함수
+        // 잠금은 현재 편성 조건에만 유효하며 저장소에 보관하지 않는다.
+        function resetPlayerLocks(message = '편성 조건이 바뀌어 선수 잠금을 모두 해제했습니다.') {
+            const hadLocks = Object.keys(playerTeamLocks).length > 0;
+            playerTeamLocks = Object.create(null);
+            clearPlayerSwapSelection();
+            // 계산 중 조건이 바뀌었다 되돌아와도 이전 잠금을 사용한 결과를 적용하지 않는다.
+            teamConfigurationVersion++;
+            if (hadLocks && currentTeamsData && currentTeamSizes) renderTeams(currentTeamsData, currentTeamSizes);
+            if (hadLocks) showToast(message);
+        }
+
+        function prepareTeamGeneration(mode) {
+            if (teamGenerationRunning) return false;
+            clearPlayerSwapSelection();
+            if (currentTeamMeta && currentTeamMeta.mode !== mode) {
+                resetPlayerLocks('풋살·축구 경기 방식이 바뀌어 선수 잠금을 모두 해제했습니다.');
+            }
+            return true;
+        }
+
+        function togglePlayerLock(playerId, teamIndex) {
+            if (teamGenerationRunning || !currentTeamsData || !currentTeamsData[teamIndex]?.some(p => TeamBuilder.identity(p) === playerId)) return;
+            if (Object.hasOwn(playerTeamLocks, playerId)) delete playerTeamLocks[playerId];
+            else playerTeamLocks[playerId] = teamIndex;
+            pendingPlayerSwap = null;
+            renderTeams(currentTeamsData, currentTeamSizes);
+        }
+
+        // 이름을 하나씩 선택해 서로 다른 팀의 두 선수를 한 번에 맞교환한다.
+        function updatePlayerSwapSelection() {
+            const selectedPlayer = isAdmin && !teamGenerationRunning && pendingPlayerSwap
+                ? currentTeamsData?.[pendingPlayerSwap.teamIndex]?.find(p => TeamBuilder.identity(p) === pendingPlayerSwap.playerId)
+                : null;
+            if (!selectedPlayer || Object.hasOwn(playerTeamLocks, pendingPlayerSwap.playerId)) pendingPlayerSwap = null;
+            document.getElementById('playerSwapControls').hidden = !isAdmin || !currentTeamsData || currentTeamsData.length < 2;
+            document.getElementById('playerSwapSummary').textContent = teamGenerationRunning
+                ? '팀 편성이 끝나면 선수를 맞교환할 수 있습니다.'
+                : pendingPlayerSwap
+                    ? '팀 ' + (pendingPlayerSwap.teamIndex + 1) + ' ' + selectedPlayer.name + ' 선택 · 다른 팀의 선수 이름을 누르면 맞교환합니다.'
+                    : '↔ 서로 다른 팀의 선수 이름을 한 명씩 누르면 인원을 유지하며 맞교환합니다.';
+            document.getElementById('cancelPlayerSwapBtn').hidden = !pendingPlayerSwap;
+            document.querySelectorAll('#teamsContainer .player-swap').forEach(button => {
+                const row = button.closest('.team-player');
+                const selected = !!pendingPlayerSwap && row.dataset.playerId === pendingPlayerSwap.playerId && Number(row.dataset.teamIndex) === pendingPlayerSwap.teamIndex;
+                button.setAttribute('aria-pressed', String(selected));
+                button.setAttribute('aria-disabled', String(teamGenerationRunning || Object.hasOwn(playerTeamLocks, row.dataset.playerId)));
+                row.classList.toggle('swap-selected', selected);
+            });
+        }
+
+        function clearPlayerSwapSelection() {
+            pendingPlayerSwap = null;
+            updatePlayerSwapSelection();
+        }
+
+        function selectPlayerForSwap(playerId, teamIndex) {
+            if (!isAdmin) { showToast('관리자만 선수를 맞교환할 수 있습니다.', 'error'); return; }
+            if (teamGenerationRunning || !currentTeamsData || !currentTeamSizes) return;
+            updatePlayerSwapSelection();
+            if (!currentTeamsData[teamIndex]?.some(p => TeamBuilder.identity(p) === playerId)) return;
+            if (Object.hasOwn(playerTeamLocks, playerId)) {
+                showToast('고정된 선수는 자물쇠를 해제한 뒤 교환해주세요.', 'warning'); return;
+            }
+            if (pendingPlayerSwap && pendingPlayerSwap.teamIndex !== teamIndex) {
+                swapTeamPlayers(pendingPlayerSwap.playerId, pendingPlayerSwap.teamIndex, playerId, teamIndex);
+                return;
+            }
+            pendingPlayerSwap = pendingPlayerSwap?.playerId === playerId ? null : { playerId, teamIndex };
+            updatePlayerSwapSelection();
+        }
+
+        function swapTeamPlayers(firstPlayerId, firstTeamIndex, secondPlayerId, secondTeamIndex) {
+            if (!isAdmin) { showToast('관리자만 선수를 맞교환할 수 있습니다.', 'error'); return false; }
+            if (teamGenerationRunning || !currentTeamsData || !currentTeamSizes || firstTeamIndex === secondTeamIndex || firstPlayerId === secondPlayerId) return false;
+            const firstTeam = currentTeamsData[firstTeamIndex], secondTeam = currentTeamsData[secondTeamIndex];
+            const firstIndex = firstTeam?.findIndex(p => TeamBuilder.identity(p) === firstPlayerId) ?? -1;
+            const secondIndex = secondTeam?.findIndex(p => TeamBuilder.identity(p) === secondPlayerId) ?? -1;
+            if (firstIndex < 0 || secondIndex < 0) { clearPlayerSwapSelection(); return false; }
+            if (Object.hasOwn(playerTeamLocks, firstPlayerId) || Object.hasOwn(playerTeamLocks, secondPlayerId)) {
+                showToast('고정된 선수는 자물쇠를 해제한 뒤 교환해주세요.', 'warning'); return false;
+            }
+            const firstPlayer = firstTeam[firstIndex], secondPlayer = secondTeam[secondIndex];
+            // 두 자리를 바로 교체하므로 출전·교체 인원과 다른 선수의 잠금은 유지된다.
+            firstTeam[firstIndex] = secondPlayer;
+            secondTeam[secondIndex] = firstPlayer;
+            finishManualTeamEdit();
+            showToast(firstPlayer.name + ' ↔ ' + secondPlayer.name + ' 맞교환 완료');
+            const target = [...document.querySelectorAll('#teamsContainer .player-swap')]
+                .find(button => button.closest('.team-player').dataset.playerId === secondPlayerId);
+            target?.focus({ preventScroll: true });
+            return true;
+        }
+
+        function finishManualTeamEdit() {
+            pendingPlayerSwap = null;
+            // 수동 조정한 명단은 다시 확정해야 경기 이력에 반영된다.
+            markTeamsUnconfirmed();
+            renderTeams(currentTeamsData, currentTeamSizes);
+            const needsPlayers = currentTeamMeta && currentTeamsData.some(team => team.length < currentTeamMeta.onFieldCount);
+            document.getElementById('teamGenerationSummary').textContent = needsPlayers
+                ? '선수 이동을 마친 뒤 팀별 출전 인원을 맞춰 확정해주세요.'
+                : TeamBuilder.tierViolations(currentTeamsData) > 0 ? '수동 조정으로 티어가 몰린 팀이 있습니다. 확인 후 팀을 확정해주세요.' : '수동 조정한 팀을 확정해주세요.';
+        }
+
         function movePlayerToTeam(playerName, fromTeamIndex, toTeamIndex) {
             if (!isAdmin) {
                 showToast('관리자만 선수를 이동할 수 있습니다.', 'error');
@@ -6077,7 +5775,8 @@
                 return;
             }
 
-            if (fromTeamIndex === toTeamIndex) return;
+            if (teamGenerationRunning || fromTeamIndex === toTeamIndex || !currentTeamsData[fromTeamIndex] || !currentTeamsData[toTeamIndex]) return;
+            // 선수 교환 도중의 인원 부족은 허용하고, 최종 확정 시 출전 인원을 확인한다.
 
             const fromTeam = currentTeamsData[fromTeamIndex];
             const playerIndex = fromTeam.findIndex(p => p.name === playerName);
@@ -6088,6 +5787,9 @@
             }
             
             const player = fromTeam[playerIndex];
+            if (Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player))) {
+                showToast('고정된 선수는 자물쇠를 해제한 뒤 이동해주세요.', 'warning'); return;
+            }
             
             // 선수 이동
             fromTeam.splice(playerIndex, 1);
@@ -6097,8 +5799,7 @@
             currentTeamSizes[fromTeamIndex]--;
             currentTeamSizes[toTeamIndex]++;
             
-            // 팀 정보 다시 렌더링
-            renderTeams(currentTeamsData, currentTeamSizes);
+            finishManualTeamEdit();
         }
 
         // 드래그 앤 드롭 관련 전역 변수
@@ -7030,6 +6731,10 @@
         function renderTeams(teams, teamSizes) {
             currentTeamsData = teams;
             currentTeamSizes = teamSizes;
+            const lockCount = Object.keys(playerTeamLocks).length;
+            document.getElementById('lockSummary').textContent = lockCount
+                ? '🔒 ' + lockCount + '명 고정 · 다시 편성해도 현재 팀에 남습니다. 자물쇠를 다시 누르면 해제됩니다.'
+                : '선수 옆 자물쇠를 누르면 현재 팀에 고정할 수 있습니다.';
 
             const container = document.getElementById('teamsContainer');
             container.innerHTML = '';
@@ -7063,9 +6768,8 @@
 
                 // 밸런스 표시
                 let balanceClass = 'balance-good';
-                let balanceText = '균형';
-                if (avgDiff >= 1.0) { balanceClass = 'balance-bad'; balanceText = '불균형'; }
-                else if (avgDiff >= 0.5) { balanceClass = 'balance-ok'; balanceText = '보통'; }
+                let balanceText = '티어 균등';
+                if (TeamBuilder.tierViolations(teams) > 0) { balanceClass = 'balance-ok'; balanceText = '티어 쏠림 있음'; }
 
                 // 티어 분포 바
                 const tierCounts = {};
@@ -7085,6 +6789,7 @@
 
                 teamDiv.innerHTML = `
                     <div class="team-title">팀 ${index + 1} (${teamSizes[index]}명)</div>
+                    ${currentTeamMeta ? `<div>출전 ${currentTeamMeta.onFieldCount}명 · 교체 ${Math.max(0, team.length - currentTeamMeta.onFieldCount)}명</div>` : ''}
                     <div class="balance-indicator ${balanceClass}">차이: ${avgDiff.toFixed(2)} (${balanceText})</div>
                     <div class="team-stats">
                         <div>티어 합: ${tierSum.toFixed(1)}</div>
@@ -7093,14 +6798,22 @@
                     <div class="tier-dist-bar">${distBar}</div>
                     <ul class="team-players" data-team-index="${index}">
                         ${sortedTeam.map(player => `
-                            <li class="team-player ${isAdmin ? 'draggable' : ''}"
-                                draggable="${isAdmin && !isMobile ? 'true' : 'false'}"
+                            <li class="team-player ${isAdmin && !Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player)) ? 'draggable' : ''}"
+                                draggable="${isAdmin && !isMobile && !Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player)) ? 'true' : 'false'}"
+                                data-player-id="${escapeHtml(TeamBuilder.identity(player))}"
                                 data-player-name="${escapeHtml(player.name)}"
                                 data-team-index="${index}">
                                 <div class="player-info">
-                                    <div>${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus').replace('-', 'minus')}">${tierLabel(player.tier)}</span>` : ''}</div>
+                                    ${isAdmin && numTeams > 1 ? `<button type="button" class="player-swap" aria-pressed="false"
+                                        aria-label="${escapeHtml(player.name)} 맞교환 선수 선택"
+                                        onclick="event.stopPropagation(); selectPlayerForSwap('${escapeForJsString(TeamBuilder.identity(player))}', ${index})">` : '<div>'}
+                                        ${isAdmin && numTeams > 1 ? '<span aria-hidden="true">↔ </span>' : ''}${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus').replace('-', 'minus')}">${tierLabel(player.tier)}</span>` : ''}
+                                    ${isAdmin && numTeams > 1 ? '</button>' : '</div>'}
                                 </div>
-                                ${isAdmin && isMobile && numTeams > 1 ? `<select class="mobile-move-select" onchange="if(this.value !== '') { movePlayerToTeam('${escapeForJsString(player.name)}', ${index}, parseInt(this.value)); this.selectedIndex=0; }" onclick="event.stopPropagation()">
+                                <button type="button" class="player-lock" aria-pressed="${Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player))}"
+                                    aria-label="${escapeHtml(player.name)} ${Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player)) ? '잠금 해제' : '이 팀에 고정'}"
+                                    onclick="event.stopPropagation(); togglePlayerLock('${escapeForJsString(TeamBuilder.identity(player))}', ${index})">${Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player)) ? '🔒' : '🔓'}</button>
+                                ${isAdmin && isMobile && numTeams > 1 ? `<select class="mobile-move-select" ${Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player)) ? 'disabled' : ''} onchange="if(this.value !== '') { movePlayerToTeam('${escapeForJsString(player.name)}', ${index}, parseInt(this.value)); this.selectedIndex=0; }" onclick="event.stopPropagation()">
                                     <option value="">이동</option>
                                     ${moveOptions}
                                 </select>` : ''}
@@ -7114,6 +6827,7 @@
                     setupDragAndDrop(teamDiv, index);
                 }
             });
+            updatePlayerSwapSelection();
         }
 
         // 드래그 앤 드롭 이벤트 설정
@@ -7123,6 +6837,7 @@
             // 선수 항목에 드래그 이벤트
             playersList.querySelectorAll('.team-player.draggable').forEach(playerEl => {
                 playerEl.addEventListener('dragstart', function(e) {
+                    clearPlayerSwapSelection();
                     draggedPlayer = this.getAttribute('data-player-name');
                     draggedFromTeamIndex = parseInt(this.getAttribute('data-team-index'));
                     this.classList.add('dragging');
@@ -7472,8 +7187,8 @@
             fmSelectedTeams = { teamA, teamB, nameA, nameB };
 
             const maxSize = Math.max(teamA.length, teamB.length);
-            const isFutsal = maxSize <= 7;
-            const maxStarters = isFutsal ? 6 : 11;
+            const isFutsal = currentTeamMeta ? currentTeamMeta.mode === 'futsal' : maxSize <= 7;
+            const maxStarters = currentTeamMeta ? currentTeamMeta.onFieldCount : (isFutsal ? 6 : 11);
             const modeLabel = isFutsal ? '풋살' : '축구';
 
             function sortIndicesByStrength(team) {
