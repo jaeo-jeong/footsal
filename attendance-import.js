@@ -127,40 +127,110 @@
         }
         return lines.length?lines:String(data.text||'').split(/\r?\n/u).filter(text=>text.trim()).map(text=>({text,confidence:Number(data.confidence)||0}));
     }
+    function ocrFailure(raw,action,started,corePath){
+        const detail=String(raw?.message||raw||'Worker execution failed').slice(0,900);
+        const asset=detail.match(/worker\.min\.js|tesseract-core(?:-relaxedsimd|-simd)?-lstm\.wasm(?:\.js)?|(?:kor|eng)\.traineddata(?:\.gz)?/u)?.[0]
+            ||(action==='load'?!started?'worker.min.js':corePath?.endsWith('.js')?corePath.split('/').pop():'':'');
+        const message=action==='recognize'?'사진을 처리하던 중 인식 엔진이 멈췄어요. 이름 부분만 작게 캡처해 다시 시도해주세요.'
+            :action==='loadLanguage'||action==='initialize'?'사진 인식 데이터를 준비하지 못했어요. 오류 상세에서 파일 상태를 확인해주세요.'
+            :'사진 인식 엔진을 시작하지 못했어요. 오류 상세에서 파일 상태를 확인해주세요.';
+        return Object.assign(Error(message),{action,started,asset,detail});
+    }
     // Pinned Tesseract.js 7 worker protocol. Owning the Worker lets cancel/timeout stop even initialization.
     class OcrClient {
-        constructor({Worker=root.Worker,base,onProgress=()=>{},timeout=90000}={}){
+        constructor({Worker=root.Worker,base,onProgress=()=>{},timeout=90000,fetch:fetcher=root.document&&root.fetch?root.fetch.bind(root):null}={}){
             if(!Worker)throw Error('이 브라우저에서는 사진 인식을 사용할 수 없어요. 최신 브라우저에서 열어주세요.');
-            this.worker=new Worker(new URL('worker.min.js',base).href);this.jobs=new Map();this.next=0;this.closed=false;this.base=base;this.timeout=timeout;
-            this.worker.onmessage=event=>{
-                const message=event.data,job=this.jobs.get(message?.jobId);if(this.closed||!job)return;
-                if(message.status==='progress'){onProgress(message.data||{});return;}
+            this.Worker=Worker;this.fetcher=fetcher;this.onProgress=onProgress;this.jobs=new Map();this.next=0;this.closed=false;this.base=base;this.timeout=timeout;
+            this.worker=null;this.failure=null;this.action='load';this.corePath=base;this.openWorker();
+        }
+        openWorker(){
+            if(this.closed)throw this.failure;
+            this.started=false;this.failure=null;
+            let worker;
+            try{worker=new this.Worker(new URL('worker.min.js?v=7.0.0',this.base).href);}
+            catch(error){throw ocrFailure(error,'load',false,this.corePath);}
+            this.worker=worker;
+            worker.onmessage=event=>{
+                const message=event.data,job=this.jobs.get(message?.jobId);if(this.closed||this.worker!==worker||!job)return;
+                this.started=true;
+                if(message.status==='progress'){this.onProgress(message.data||{});return;}
                 clearTimeout(job.timer);this.jobs.delete(message.jobId);
                 if(message.status==='resolve')job.resolve(message.data);
-                else job.reject(Error('사진 인식 중 문제가 생겼어요. 사진을 다시 확인해주세요.'));
+                else job.reject(ocrFailure(message.data,job.action,true,this.corePath));
             };
-            this.worker.onerror=event=>{event.preventDefault?.();this.stop(Error('사진 인식 파일을 불러오지 못했어요. 연결을 확인하고 다시 시도해주세요.'));};
+            worker.onerror=event=>{
+                event.preventDefault?.();if(this.closed||this.worker!==worker)return;
+                this.disposeWorker(ocrFailure(event.message||event.filename,this.action,this.started,this.corePath));
+            };
+        }
+        disposeWorker(error){
+            this.failure=error;
+            if(this.worker){this.worker.onmessage=this.worker.onerror=null;this.worker.terminate();this.worker=null;}
+            for(const job of this.jobs.values()){clearTimeout(job.timer);job.reject(error);}this.jobs.clear();
         }
         request(action,payload,transfer=[]){
-            if(this.closed)return Promise.reject(Error('사진 인식이 취소됐습니다.'));
+            if(this.closed||!this.worker)return Promise.reject(this.failure||Error('사진 인식이 취소됐습니다.'));
+            this.action=action;
             const jobId='attendance-'+(++this.next);
             return new Promise((resolve,reject)=>{
                 const timer=setTimeout(()=>this.stop(Error('사진 인식 시간이 길어지고 있어요. 캡처를 작게 나누어 다시 시도해주세요.')),this.timeout);
-                this.jobs.set(jobId,{resolve,reject,timer});
-                try{this.worker.postMessage({workerId:'attendance',jobId,action,payload},transfer);}catch(error){this.stop(error);}
+                this.jobs.set(jobId,{resolve,reject,timer,action});
+                try{this.worker.postMessage({workerId:'attendance',jobId,action,payload},transfer);}catch(error){this.disposeWorker(ocrFailure(error,action,this.started,this.corePath));}
             });
         }
         async initialize(){
-            await this.request('load',{options:{lstmOnly:true,corePath:this.base,logging:false}});
-            await this.request('loadLanguage',{langs:'kor+eng',options:{langPath:this.base.replace(/\/$/u,''),lstmOnly:true,gzip:true,cachePath:'footsal-ocr-v7',cacheMethod:'write'}});
-            await this.request('initialize',{langs:'kor+eng',oem:1,config:{load_system_dawg:'0',load_freq_dawg:'0'}});
-            // Polls are vertical name lists. Sparse mode can split Hangul syllables into unrelated fragments.
-            await this.request('setParameters',{params:{tessedit_pageseg_mode:'6',preserve_interword_spaces:'1',user_defined_dpi:'300'}});
+            try{
+                try{await this.request('load',{options:{lstmOnly:true,corePath:this.corePath,logging:false}});}
+                catch(error){
+                    if(this.closed||!error.started)throw error;
+                    // Some phones cannot start the detected SIMD build. Retry once in a fresh Worker.
+                    this.disposeWorker(error);this.corePath=new URL('tesseract-core-lstm.wasm.js',this.base).href;this.openWorker();
+                    this.onProgress({status:'loading compatible core',progress:0});
+                    await this.request('load',{options:{lstmOnly:true,corePath:this.corePath,logging:false}});
+                }
+                await this.request('loadLanguage',{langs:'kor+eng',options:{langPath:this.base.replace(/\/$/u,''),lstmOnly:true,gzip:true,cachePath:'footsal-ocr-v7',cacheMethod:'write'}});
+                await this.request('initialize',{langs:'kor+eng',oem:1,config:{load_system_dawg:'0',load_freq_dawg:'0'}});
+                // Polls are vertical name lists. Sparse mode can split Hangul syllables into unrelated fragments.
+                await this.request('setParameters',{params:{tessedit_pageseg_mode:'6',preserve_interword_spaces:'1',user_defined_dpi:'300'}});
+            }catch(error){
+                if(this.closed)throw this.failure||error;
+                this.disposeWorker(error);throw await this.diagnose(error);
+            }
+        }
+        async diagnose(error){
+            if(!this.fetcher||this.closed)return this.failure||error;
+            const assets=error.asset?[error.asset]:error.action==='loadLanguage'||error.action==='initialize'?['kor.traineddata.gz','eng.traineddata.gz']:[];
+            for(const asset of assets){
+                const controller=new root.AbortController();this.diagnostic=controller;let timer,response;
+                try{
+                    response=await Promise.race([
+                        this.fetcher(new URL(asset,this.base).href,{cache:'reload',signal:controller.signal}),
+                        new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('파일 확인 시간 초과'));},8000);})
+                    ]);
+                    const type=response.headers.get('content-type')||'',file='assets/ocr/'+asset;
+                    error.httpStatus=response.status;
+                    if(!response.ok){
+                        error.asset=asset;error.message=response.status===404?`사진 인식 파일이 사이트에 빠져 있어요. ${file}을 같은 경로에 업로드해주세요.`:`${file}을 불러오지 못했어요. 서버 응답 ${response.status}를 확인해주세요.`;return error;
+                    }
+                    if(/text\/html/u.test(type)||(asset.endsWith('.js')&&!/(?:javascript|ecmascript)/iu.test(type))){
+                        error.asset=asset;error.message=`${file}이 실행 파일로 제공되지 않고 있어요. 업로드 경로와 파일 형식을 확인해주세요.`;return error;
+                    }
+                    if(asset==='worker.min.js')error.message='인식 파일은 확인했지만 브라우저에서 실행하지 못했어요. 카톡 안에서 열었다면 Chrome 또는 Safari에서 다시 열어주세요.';
+                    else if(error.action==='load')error.message='이 브라우저에서 사진 인식 엔진을 실행하지 못했어요. Chrome 또는 Safari를 최신 버전으로 업데이트한 뒤 다시 시도해주세요.';
+                }catch(problem){
+                    if(this.closed)return this.failure||error;
+                    error.message='사진 인식 파일에 연결하지 못했어요. 인터넷 연결을 확인하거나 Chrome 또는 Safari에서 다시 열어주세요.';
+                    error.connection=problem.message;return error;
+                }finally{
+                    clearTimeout(timer);if(response?.body)try{await response.body.cancel();}catch{}
+                    if(this.diagnostic===controller)this.diagnostic=null;
+                }
+            }
+            return error;
         }
         recognize(bytes){return this.request('recognize',{image:bytes,options:{},output:{text:true,blocks:true}},[bytes.buffer]);}
         stop(error=Error('사진 인식이 취소됐습니다.')){
-            if(this.closed)return;this.closed=true;this.worker.terminate();
-            for(const job of this.jobs.values()){clearTimeout(job.timer);job.reject(error);}this.jobs.clear();
+            if(this.closed)return;this.closed=true;this.diagnostic?.abort();this.disposeWorker(error);
         }
     }
     function maskProfileShapes(pixels){
@@ -227,6 +297,7 @@
                     <div class="ai-read-controls"><button type="button" class="ai-primary" data-ai="read" disabled>사진에서 이름 읽기</button><button type="button" class="ai-secondary" data-ai="stop" hidden>인식 중단</button></div>
                     <div class="ai-progress" hidden><progress max="1" value="0"></progress><span data-ai="progress-text">사진 인식 준비 중…</span></div>
                     <p class="ai-notice" role="status" data-ai="notice"></p>
+                    <details class="ai-error" data-ai="error-details" hidden><summary>오류 상세</summary><pre></pre></details>
                     <section class="ai-review" hidden>
                         <div class="ai-review-heading"><h3 tabindex="-1">참석 선수 확인</h3><strong data-ai="count"></strong></div>
                         <p class="ai-help">틀린 이름은 연결할 선수를 바꾸고, 참석자가 아니면 ‘제외’를 선택해주세요.</p>
@@ -263,7 +334,18 @@
                 else if(event.target.name==='aiMode')updateSummary();
             });
         }
-        function notice(text=''){ $('[data-ai="notice"]').textContent=text; }
+        function notice(text=''){
+            $('[data-ai="notice"]').textContent=text;
+            $('[data-ai="error-details"]').hidden=true;$('[data-ai="error-details"]').open=false;$('[data-ai="error-details"] pre').textContent='';
+        }
+        function failure(error){
+            notice(error.message||'사진 인식에 실패했어요. 다시 시도해주세요.');
+            if(!error.detail)return;
+            const phase={load:'엔진 준비',loadLanguage:'언어 파일 준비',initialize:'문자 인식 초기화',setParameters:'인식 설정',recognize:'사진 인식'}[error.action]||'엔진 준비';
+            const lines=['단계: '+phase];if(error.asset)lines.push('파일: assets/ocr/'+error.asset);if(error.httpStatus)lines.push('서버 응답: '+error.httpStatus);
+            lines.push('원인: '+error.detail);if(error.connection)lines.push('파일 확인: '+error.connection);
+            $('[data-ai="error-details"] pre').textContent=lines.join('\n');$('[data-ai="error-details"]').hidden=false;
+        }
         function setBusy(value){
             busy=value;dialog.setAttribute('aria-busy',String(value));$('.ai-progress').hidden=!value;
             $('[data-ai="stop"]').hidden=!value;$('#aiFiles').disabled=value;
@@ -359,7 +441,7 @@
             const progress=data=>{
                 if(token!==sequence)return;const reading=data.status==='recognizing text';
                 $('.ai-progress progress').value=reading?(item+Math.max(0,Math.min(1,Number(data.progress)||0)))/pending.length:0;
-                $('[data-ai="progress-text"]').textContent=reading?(item+1)+' / '+pending.length+'장 · 이름 읽는 중':'사진 인식 준비 중…';
+                $('[data-ai="progress-text"]').textContent=reading?(item+1)+' / '+pending.length+'장 · 이름 읽는 중':data.status==='loading compatible core'?'기기에 맞는 인식 엔진 준비 중…':'사진 인식 준비 중…';
             };
             try{
                 client=new OcrClient({Worker:environment.Worker,base,onProgress:progress});const running=client;await running.initialize();
@@ -373,7 +455,7 @@
                 }
                 review(true);notice(entries.length?'인식한 이름과 인원을 확인한 뒤 적용해주세요.':'이름을 찾지 못했어요. 이름이 크게 보이는 캡처로 다시 시도하거나 읽은 글자를 직접 수정해주세요.');
                 hidePreview();$('.ai-review h3').focus({preventScroll:true});scrollTo($('.ai-review-heading'));
-            }catch(error){if(token===sequence){review(true);notice(error.message||'사진 인식에 실패했어요. 다시 시도해주세요.');}}
+            }catch(error){if(token===sequence){review(true);failure(error);}}
             finally{if(token===sequence){client?.stop();client=null;photos();setBusy(false);}}
         }
         function stop(){sequence++;client?.stop();client=null;setBusy(false);photos();review(true);notice('인식을 중단했어요. 완료된 사진은 유지됩니다.');}

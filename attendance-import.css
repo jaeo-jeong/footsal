@@ -46,6 +46,9 @@
 .ai-progress progress { width: 100%; height: 9px; accent-color: #586dca; }
 .ai-notice:empty { display: none; }
 .ai-notice { padding: 11px 13px; margin: 14px 0; border-radius: 10px; background: #eef3fb; font-size: 13px; overflow-wrap: anywhere; }
+.ai-error { border: 1px solid var(--ai-line); border-radius: 10px; padding: 0 12px; color: var(--ai-muted); }
+.ai-error summary { display: flex; align-items: center; min-height: 44px; font-size: 13px; cursor: pointer; }
+.ai-error pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; margin: 0 0 12px; }
 .ai-review { border-top: 1px solid var(--ai-line); margin-top: 20px; padding-top: 18px; }
 .ai-review-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
 .ai-review h3 { font-size: 19px; margin: 0; }
