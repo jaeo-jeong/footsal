@@ -50,10 +50,14 @@
     }
     function runner(time=0){
         time=nonnegative(time);
-        return {level:1+Math.floor(time/12),speed:Math.min(1320,290+time*4.2+Math.max(0,time-75)*4),
-            gap:Math.max(.39,1.32-time*.0065),relayGap:Math.max(.225,.43-Math.max(0,time-48)*.001),relayChance:time<48?0:Math.min(.85,.25+(time-48)/160),
-            tripleChance:time<108?0:Math.min(.75,(time-108)/100),
-            switchChance:time<24?0:Math.min(.7,.35+(time-24)/240)};
+        // Keep the opening familiar, then continue tightening without crossing movement-safe limits.
+        const decay=(age,span)=>1/(1+age/span);
+        return {level:1+Math.floor(time/12),speed:time<=150?290+time*4.2+Math.max(0,time-75)*4:1480-260*decay(time-150,32),
+            gap:time<=135?1.32-time*.0065:.29+.1525*decay(time-135,25),
+            relayGap:time<=160?.43-Math.max(0,time-48)*.001:.175+.143*decay(time-160,60),
+            relayChance:time<48?0:time<=132?.25+(time-48)/160:.99-.215*decay(time-132,55),
+            tripleChance:time<108?0:time<=175?(time-108)/100:.99-.32*decay(time-175,24),
+            switchChance:time<24?0:time<=96?.35+(time-24)/240:.96-.31*decay(time-96,65)};
     }
 
     // Gameplay deadlines use active time; pausing preserves every pending result and shot.

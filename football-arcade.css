@@ -1,3 +1,4 @@
+:is(.am-dialog, .fa-dialog):is([data-phase="playing"], [data-phase="countdown"], [data-phase="paused"], [data-phase="ending"], [data-phase="finishing"]) { touch-action: none; overscroll-behavior: none; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .am-dialog {
     --am-top: max(12px, env(safe-area-inset-top)); --am-bottom: max(12px, env(safe-area-inset-bottom));
     --am-left: max(12px, env(safe-area-inset-left)); --am-right: max(12px, env(safe-area-inset-right));
@@ -31,7 +32,7 @@
 .am-vitals small { margin-top: 3px; font-variant-numeric: tabular-nums; }
 .am-streak { position: absolute; top: 15%; left: 5%; right: 5%; display: flex; justify-content: space-between; align-items: center; gap: 9px; font-size: 10px; font-weight: 900; color: #fff4c6; text-shadow: 0 1px 3px #1b4635; pointer-events: none; }
 .am-fever { position: relative; width: 40%; border: 2px solid #fff1c8; border-radius: 20px; overflow: hidden; background: #325544; text-align: center; }
-.am-fever i { position: absolute; inset: 0 auto 0 0; background: #d5a454; }
+.am-fever i { position: absolute; inset: 0 auto 0 0; width: 100%; transform-origin: left center; background: #d5a454; }
 .am-fever b { position: relative; font-size: 9px; line-height: 15px; }
 .am-on-fire .am-stage { border-color: #ffdd8a; }
 .am-on-fire .am-fever i { background: #e68f5e; }
@@ -45,6 +46,7 @@
 .am-primary { display: flex; justify-content: center; align-items: center; gap: 25px; width: 100%; padding: 9px 16px; min-height: 48px !important; border: 2px solid #3a553c; border-radius: 14px; background: #ffda85; box-shadow: 0 4px 0 #b79859; color: #354d3a; font-size: 18px !important; font-weight: 900 !important; }
 .am-primary:hover { background: #ffe49e; }
 .am-primary:active { background: #f2c56d; }
+.am-dialog[data-bonus="true"] .am-controls .am-primary { background: #ffe5a3; border-color: #f4ce78; box-shadow: 0 4px 0 #a88449, 0 0 22px #ffd98650; }
 .am-home > small { display: block; margin-top: 10px; font-size: 9px; color: #7a876c; }
 .am-controls { padding-top: 11px; text-align: center; }
 .am-controls p { margin: 0 0 8px; font-size: 11px; font-weight: 800; }
@@ -53,7 +55,7 @@
 .am-controls > small { display: block; margin: 8px 0 0; color: #c2d3b5; font-size: 10px; overflow-wrap: anywhere; }
 .am-controls .am-streak { position: static; margin: 0 0 12px; font-size: 10px; }
 .am-dialog[data-game="donghyun"] .am-controls { padding: 14px 5px; }
-.am-banner { position: absolute; top: 24%; left: 4%; right: 4%; padding: 10px 7px; border: 2px solid #fff1b6; border-radius: 12px; background: #365848ed; text-align: center; color: #ffdf8c; font-size: clamp(11px, 3.2vw, 16px); font-weight: 900; pointer-events: none; }
+.am-banner { position: absolute; top: 22%; left: 0; right: 0; width: max-content; max-width: 90%; margin: auto; padding: 6px 10px; border: 1px solid #fff1b6; border-radius: 20px; background: #294d43ed; text-align: center; color: #ffdf8c; font-size: clamp(10px, 2.8vw, 13px); font-weight: 900; pointer-events: none; }
 .am-countdown { position: absolute; inset: 0; display: grid; place-items: center; background: #264c4238; font-size: 75px; font-weight: 950; color: #ffecaa; -webkit-text-stroke: 6px #31563e; paint-order: stroke fill; pointer-events: none; }
 .am-pause { position: absolute; z-index: 4; inset: 60px 0 0; display: flex; flex-direction: column; justify-content: center; padding: 27px; border: 3px solid #ffebba; border-radius: 23px; background: #f9f2dff5; color: #36513d; text-align: center; }
 .am-pause > span { font-size: 10px; letter-spacing: 2px; color: #8b9577; font-weight: 900; }
@@ -338,6 +340,10 @@
 .fc-final-score small { display: block; margin-top: 5px; color: #9b9d7b; font-size: 9px; letter-spacing: 3px; }
 .fc-result-stats { display: flex; gap: 8px; justify-content: space-around; padding: 13px 0; margin-bottom: 14px; border-top: 1px solid #d8ddc4; border-bottom: 1px solid #d8ddc4; color: #80906d; font-size: 10px; }
 .fc-result-stats b { display: block; margin-top: 6px; font-size: 19px; color: #446139; }
+.fc-run-compare { margin: -9px 0 14px; color: #6b8156; font-size: 12px; font-weight: 800; }
+.fc-skill-badge { display: inline-block; margin: 0 0 12px; padding: 6px 12px; border-radius: 20px; background: #f7df99; color: #67542e; font-size: 12px; font-weight: 850; }
+.fc-run-review { display: grid; gap: 5px; margin: 0 auto 14px; padding: 11px 13px; max-width: 360px; border-radius: 13px; background: #e9edd9; color: #6c7f59; font-size: 11px; line-height: 1.55; word-break: keep-all; }
+.fc-run-review strong { color: #536945; font-size: 12px; }
 .fc-result p { margin: 12px 0; font-size: 11px; color: #8a8b70; line-height: 1.6; }
 .fc-result-buttons { display: flex; gap: 12px; margin-top: 20px; }
 .fc-result-ranking-title { margin: 22px 0 15px; font-size: 15px; }

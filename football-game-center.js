@@ -2,13 +2,15 @@
     'use strict';
     const RUN_ID='dribble-run-v2';
     const TOTAL_ID='all-games';
-    const RULE_VERSION=4;
+    const RULE_VERSION=5;
+    // Requested record reset; only this player's earlier records are retired.
+    const PLAYER_RESETS=Object.freeze({'정재오':1789362546047});
     const GAMES=Object.freeze([
-        {id:RUN_ID,title:'드리블 런',tag:'SURVIVAL',description:'원투 압박 · 황금 코인 · 피버 돌파',icon:'⚡',animal:'player',pose:1,color:'mint'},
-        {id:'penalty',title:'골든 부트',tag:'TIMING SHOT',description:'원터치 정밀 슛 · 골든 링 · 키퍼 돌파',icon:'⚽',animal:'player',pose:5,color:'peach'},
-        {id:'pass',title:'티키타카',tag:'ONE TOUCH PASS',description:'동료에게 패스 · 황금 루트 · 수비 돌파',icon:'🎯',animal:'player',pose:1,color:'sky'},
-        {id:'goalkeeper',title:'골든 글러브',tag:'MOVE & SAVE',description:'좌우 선방 · 강슛 펀칭 · 커브와 연속 슛',icon:'🧤',animal:'defender',pose:1,color:'lavender'},
-        {id:'donghyun',title:'동현이를 막아라',tag:'COMBO KICK',description:'컬러 연결 · 폭탄 연쇄 · 전방 압박',icon:'🧩',animal:'player',pose:7,color:'yellow'},
+        {id:RUN_ID,title:'드리블 런',tag:'SURVIVAL',description:'원투 압박 · 저스트 대시 · 피버 돌파',icon:'⚡',animal:'player',pose:1,color:'mint'},
+        {id:'penalty',title:'골든 부트',tag:'TIMING SHOT',description:'정밀 슛 · 골든 찬스 · 키퍼 돌파',icon:'⚽',animal:'player',pose:5,color:'peach'},
+        {id:'pass',title:'티키타카',tag:'ONE TOUCH PASS',description:'황금 패스 · 트라이앵글 · 수비 돌파',icon:'🎯',animal:'player',pose:1,color:'sky'},
+        {id:'goalkeeper',title:'골든 글러브',tag:'MOVE & SAVE',description:'좌우 선방 · 저스트 펀칭 · 연속 슛',icon:'🧤',animal:'defender',pose:1,color:'lavender'},
+        {id:'donghyun',title:'동현이를 막아라',tag:'SWAP & KICK',description:'타일 교환 · 로켓과 폭탄 · 연쇄 킥',icon:'🧩',animal:'player',pose:7,color:'yellow'},
         {id:'dribble',title:'터치라인 점프',tag:'DOUBLE JUMP',description:'더블 점프 · 황금 헤딩 · 연속 태클',icon:'💨',animal:'player',pose:2,color:'rose'}
     ]);
     const validGame=id=>GAMES.some(game=>game.id===id);
@@ -29,7 +31,21 @@
         if(!record || !validGame(record.gameId) || !Number.isSafeInteger(record.score) || record.score<0 || record.score>1e9)return null;
         const ruleVersion=record.ruleVersion??(record.gameId===RUN_ID?2:1);
         if(!Number.isSafeInteger(ruleVersion)||ruleVersion<1)return null;
-        try {return {...record,ruleVersion,playerName:normalizeName(record.playerName)};}catch{return null;}
+        try {
+            const playerName=normalizeName(record.playerName),cutoff=PLAYER_RESETS[playerName];
+            if(cutoff&&recordTime(record)<=cutoff)return null;
+            return {...record,ruleVersion,playerName};
+        }catch{return null;}
+    }
+    function recordTime(record) {
+        for(const value of [record.startedAt,record.playedAt,record.timestamp]){
+            if(typeof value==='number'&&Number.isFinite(value))return value;
+            if(value instanceof Date)return value.getTime();
+            if(typeof value?.toMillis==='function')return value.toMillis();
+            if(value&&Number.isFinite(Number(value.seconds??value._seconds)))return Number(value.seconds??value._seconds)*1000+Number(value.nanoseconds??value._nanoseconds??0)/1e6;
+            if(typeof value==='string'&&Number.isFinite(Date.parse(value)))return Date.parse(value);
+        }
+        return 0;
     }
     function rankRecords(records,gameId) {
         if(gameId===TOTAL_ID)return rankTotals(records);
@@ -67,8 +83,15 @@
         constructor({database=()=>null,storage=null,now=Date.now,timestamp=()=>new Date(),makeId=null}={}) {
             this.database=database;this.storage=storage;this.now=now;this.timestamp=timestamp;
             this.makeId=makeId||(()=>root.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
-            this.key='footsalArcadeRecordsV2';this.records=[];this.finished=new Map();this.inflight=new Map();this.cache=new Map();this.fetchVersions=new Map();
+            this.key='footsalArcadeRecordsV2';this.records=[];this.finished=new Map();this.inflight=new Map();this.cache=new Map();this.fetchVersions=new Map();this.live=null;
             try {const rows=JSON.parse(storage?.getItem(this.key)||'[]');if(Array.isArray(rows))this.records=rows.map(cleanRecord).filter(r=>r&&typeof r.id==='string');}catch{/* Storage is optional. */}
+            for(const [name,cutoff] of Object.entries(PLAYER_RESETS))try{
+                const marker='faRecordReset:'+encodeURIComponent(name);
+                if(storage&&storage.getItem(marker)!==String(cutoff)){
+                    for(const game of GAMES)for(const prefix of ['faBest:','faBest:v3:'])storage.removeItem?.(prefix+game.id+':'+encodeURIComponent(name));
+                    this.persist();storage.setItem(marker,String(cutoff));
+                }
+            }catch{/* An unavailable local store must not block play. */}
         }
         begin(gameId,playerName) {
             if(!validGame(gameId))throw new Error('게임을 찾을 수 없습니다.');
@@ -116,9 +139,10 @@
                     await deadline(db.collection('miniGameScores').doc(record.id).set({
                         playerName:record.playerName,gameId:record.gameId,score:record.score,date:record.date,
                         runId:record.id,ruleVersion:record.ruleVersion,
+                        startedAt:record.startedAt??recordTime(record),playedAt:record.playedAt??recordTime(record),
                         timestamp:this.timestamp()
                     }));
-                    record.synced=true;this.cache.delete(record.gameId);
+                    record.synced=true;if(!this.live?.ready)this.cache.delete(record.gameId);
                     this.fetchVersions.set(record.gameId,(this.fetchVersions.get(record.gameId)||0)+1);
                 }catch(cause){error=cause;}
                 const persisted=this.persist();
@@ -131,14 +155,64 @@
             if(!record)return Promise.reject(new Error('저장할 기록을 찾지 못했습니다.'));
             return this.submit(record);
         }
+        cached(gameId) {
+            if(gameId===TOTAL_ID){
+                const values=GAMES.map(game=>this.cached(game.id)),online=values.every(value=>value.online);
+                return {records:values.flatMap(value=>value.records),online,partial:!online&&values.some(value=>value.online)};
+            }
+            return this.cache.get(gameId)?.value||{records:this.records.filter(record=>record.gameId===gameId),online:false};
+        }
+        watch(onChange) {
+            this.stopWatching();
+            let collection;try{collection=this.database()?.collection('miniGameScores');}catch{return;}
+            if(typeof collection?.onSnapshot!=='function')return;
+            let resolve;
+            const live={ready:false,closed:false,unsubscribe:null,initial:new Promise(done=>{resolve=done;})};live.resolve=resolve;
+            this.live=live;
+            const fail=error=>{
+                if(live.closed)return;
+                live.ready=true;live.failed=true;resolve();
+                for(const game of GAMES){
+                    this.fetchVersions.set(game.id,(this.fetchVersions.get(game.id)||0)+1);
+                    this.cache.set(game.id,{time:this.now(),value:{...this.cached(game.id),online:false,error}});
+                }
+                onChange();
+            };
+            try{
+                // One subscription supplies the six game rankings and their combined total.
+                live.unsubscribe=collection.onSnapshot({includeMetadataChanges:true},snapshot=>{
+                    if(live.closed)return;
+                    const grouped=new Map(GAMES.map(game=>[game.id,[]]));
+                    snapshot.forEach(doc=>{const record=cleanRecord({...doc.data(),id:doc.id});if(record)grouped.get(record.gameId).push(record);});
+                    for(const [id,records] of grouped){
+                        this.fetchVersions.set(id,(this.fetchVersions.get(id)||0)+1);
+                        this.cache.set(id,{time:this.now(),value:{records,online:!snapshot.metadata?.fromCache}});
+                    }
+                    live.ready=true;resolve();onChange();
+                },fail);
+                if(live.closed)live.unsubscribe?.();
+            }catch(error){fail(error);}
+        }
+        stopWatching() {
+            const live=this.live;if(!live)return;
+            live.closed=true;live.resolve();live.unsubscribe?.();this.live=null;
+            for(const game of GAMES){
+                this.fetchVersions.set(game.id,(this.fetchVersions.get(game.id)||0)+1);
+                const cached=this.cache.get(game.id);if(cached)cached.time=-Infinity;
+            }
+        }
         async fetch(gameId,force=false) {
             if(gameId===TOTAL_ID){
                 const results=await Promise.all(GAMES.map(game=>this.fetch(game.id,force)));
+                if(this.live?.ready)return this.cached(TOTAL_ID);
                 const online=results.every(data=>data.online);
                 return {records:results.flatMap(data=>data.records),online,partial:!online&&results.some(data=>data.online)};
             }
+            const live=this.live;
+            if(live&&!live.ready)try{await deadline(live.initial);}catch{/* Fall back to a bounded read if a listener cannot initialize. */}
+            if(live?.closed)return this.cached(gameId);
             const cached=this.cache.get(gameId);
-            if(!force&&cached&&this.now()-cached.time<15000)return cached.value;
+            if(!force&&cached&&(this.live?.ready||this.now()-cached.time<15000))return cached.value;
             const version=(this.fetchVersions.get(gameId)||0)+1;this.fetchVersions.set(gameId,version);
             try {
                 const db=this.database();if(!db)throw new Error('랭킹 서버에 연결되지 않았습니다.');
@@ -146,9 +220,15 @@
                 const records=[];
                 snapshot.forEach(doc=>{const record=cleanRecord({...doc.data(),id:doc.id});if(record&&record.gameId===gameId)records.push(record);});
                 const value={records,online:!snapshot.metadata?.fromCache};
-                if(version===this.fetchVersions.get(gameId))this.cache.set(gameId,{time:this.now(),value});
-                return value;
-            }catch(error){return {records:this.records.filter(r=>r.gameId===gameId),online:false,error};}
+                if(version!==this.fetchVersions.get(gameId))return this.cache.get(gameId)?.value||value;
+                this.cache.set(gameId,{time:this.now(),value});return value;
+            }catch(error){
+                if(version!==this.fetchVersions.get(gameId)&&this.cache.has(gameId))return this.cache.get(gameId).value;
+                const value={records:[...this.cached(gameId).records,...this.records.filter(r=>r.gameId===gameId&&!r.synced)],online:false,error};
+                // Deduplicate cached and pending copies of the same run.
+                value.records=[...new Map(value.records.map(record=>[record.id,record])).values()];
+                this.cache.set(gameId,{time:-Infinity,value});return value;
+            }
         }
     }
     function createCenter(environment=root) {
@@ -157,10 +237,41 @@
         let config={},book=null,dialog,content,headerName,tabs,status;
         let playerName='',phase='closed',revision=0,priorFocus=null,priorOverflow='',active=null,result=null;
         let rankingGame=RUN_ID,entryNames=[];
+        const rendered=new WeakMap();
         const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const number=value=>Number(value).toLocaleString('ko-KR');
         function storage(){try{return root.localStorage;}catch{return null;}}
-        function configure(options){config=options;book=new RecordBook({...options,storage:storage()});}
+        function configure(options){book?.stopWatching();config=options;book=new RecordBook({...options,storage:storage()});}
+        function watchScores(){if(!book.live||book.live.failed)book.watch(refreshLive);}
+        function replaceLive(element,html){
+            if(!element||rendered.get(element)===html)return;
+            const details=element.querySelector('details'),expanded=!!details?.open,focus=document.activeElement;
+            let focusSelector=null;
+            if(element.contains?.(focus)){
+                if(focus.tagName==='SUMMARY')focusSelector='summary';
+                else if(focus.dataset.run)focusSelector='[data-run="'+focus.dataset.run+'"]';
+                else if(validGame(focus.dataset.game))focusSelector='[data-game="'+focus.dataset.game+'"]';
+            }
+            const scroll=[dialog.scrollTop,content.scrollTop];
+            element.innerHTML=html;rendered.set(element,html);
+            if(expanded){const next=element.querySelector('details');if(next)next.open=true;}
+            if(focusSelector)element.querySelector(focusSelector)?.focus({preventScroll:true});
+            [dialog.scrollTop,content.scrollTop]=scroll;
+        }
+        function refreshLive(){
+            if(phase==='closed'||!checkAccess())return;
+            if(phase==='games')GAMES.forEach(game=>renderCard(game.id,book.cached(game.id)));
+            else if(phase==='ranking')renderRank(book.cached(rankingGame),rankingGame);
+            else if(phase==='stats')renderStats(GAMES.map(game=>book.cached(game.id)));
+            else if(phase==='result'&&result)renderRank(book.cached(result.ticket.gameId),result.ticket.gameId);
+        }
+        function renderCard(id,data){
+            if(book.live?.ready)data=book.cached(id);
+            const rank=rankRecords(data.records,id),mine=rank.find(row=>row.playerName===playerName),leader=rank[0];
+            const best=Math.max(book.best(playerName,id),mine?.score||0);
+            replaceLive(content.querySelector('[data-record="'+id+'"]'),`내 최고 <b>${number(best)}점</b><span>${data.online?(leader?'1위 '+escape(leader.playerName)+' · '+number(leader.score)+'점':'첫 랭킹의 주인공이 되어보세요'):'연결 대기 · 저장된 기록'}</span>`);
+        }
+        function renderRank(data,id){replaceLive(content.querySelector('[data-node="ranking"]'),rankHTML(book.live?.ready?book.cached(id):data,id));}
         function checkAccess(){if(config.canAccess?.()===true)return true;close();return false;}
         function ensure() {
             if(dialog)return;
@@ -171,7 +282,7 @@
                 if(!checkAccess())return;
                 const button=event.target.closest('button[data-action]');if(!button||button.disabled)return;
                 const action=button.dataset.action;
-                if(action==='close')close();else if(action==='name')showName();else if(action==='enter')enter();
+                if(action==='close')dismiss();else if(action==='name')showName();else if(action==='enter')enter();
                 else if(action==='toggle-names')toggleNames();else if(action==='choose-name')chooseName(button.dataset.index);
                 else if(action==='games')showGames();else if(action==='ranking')showRanking();else if(action==='stats')showStats();
                 else if(action==='play')launch(button.dataset.game);else if(action==='again'&&result)launch(result.ticket.gameId);
@@ -182,7 +293,7 @@
                 if(!checkAccess())return;
                 if(event.target.id==='fcRankGame'){rankingGame=event.target.value;showRanking();}
             });
-            dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+            dialog.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
             // Isolate this native dialog from the app's document-level modal shortcuts.
             dialog.addEventListener('keydown',event=>{
                 event.stopPropagation();
@@ -203,6 +314,7 @@
         function visible(){if(!dialog.open)dialog.showModal();document.body.style.overflow='hidden';}
         function setView(next) {
             revision++;phase=next;dialog.dataset.view=next;status.textContent='';visible();updateNameViewport();
+            dialog.querySelector('.fc-close').setAttribute('aria-label',next==='result'?'게임 목록으로':'게임 센터 닫기');
             const named=next!=='name';tabs.hidden=!named;headerName.parentElement.hidden=!named;
             headerName.textContent=playerName+' ✎';
             tabs.querySelectorAll('button').forEach(button=>button.setAttribute('aria-current',button.dataset.action===next?'page':'false'));
@@ -214,7 +326,9 @@
             if(!book)configure({});ensure();priorFocus=document.activeElement;priorOverflow=document.body.style.overflow;
             showName();
         }
+        function dismiss(){if(phase==='result'){showGames();return;}close();}
         function close() {
+            book?.stopWatching();
             if(phase==='closed')return;
             const session=active;
             revision++;phase='closed';active=null;result=null;
@@ -256,13 +370,10 @@
         function showGames() {
             setView('games');const token=revision,name=playerName;
             content.innerHTML=`<div class="fc-section-heading"><div><span class="fc-kicker">PICK & PLAY</span><h3 tabindex="-1">우리 팀 1등에 도전!</h3></div><span class="fc-game-count">${GAMES.length} GAMES</span></div><div class="fc-game-grid">${GAMES.map((game,index)=>`<button type="button" class="fc-card fc-${game.color}${index===0?' fc-featured':''}" data-action="play" data-game="${game.id}"><div class="fc-card-art"><span class="fc-game-tag">${game.tag}</span>${mascot(game.animal,game.pose)}<span class="fc-prop" aria-hidden="true">${game.icon}</span></div><div class="fc-card-body"><h4>${game.title}</h4><p>${game.description}</p><div class="fc-card-record" data-record="${game.id}">내 최고 ${number(book.best(name,game.id))}점 <span>랭킹 확인 중…</span></div><span class="fc-card-go">플레이 <b>↗</b></span></div></button>`).join('')}</div>`;
-            focusTitle();
+            focusTitle();watchScores();
             GAMES.forEach(async game=>{
                 const data=await book.fetch(game.id);if(token!==revision||name!==playerName)return;
-                const rank=rankRecords(data.records,game.id),mine=rank.find(r=>r.playerName===name),leader=rank[0];
-                const el=content.querySelector('[data-record="'+game.id+'"]');if(!el)return;
-                const best=Math.max(book.best(name,game.id),mine?.score||0);
-                el.innerHTML=`내 최고 <b>${number(best)}점</b><span>${data.online?(leader?'1위 '+escape(leader.playerName)+' · '+number(leader.score)+'점':'첫 랭킹의 주인공이 되어보세요'):'연결 대기 · 저장된 기록'}</span>`;
+                renderCard(game.id,data);
             });
         }
         function rankHTML(data,gameId) {
@@ -279,20 +390,24 @@
             setView('ranking');const token=revision;
             content.innerHTML=`<div class="fc-section-heading"><h3 tabindex="-1">누적 랭킹</h3><button type="button" data-action="refresh" class="fc-text-button">새로고침 ↻</button></div><div class="fc-rank-filters"><label>게임<select id="fcRankGame"><option value="${TOTAL_ID}"${rankingGame===TOTAL_ID?' selected':''}>전체 게임 총합</option>${GAMES.map(game=>`<option value="${game.id}"${game.id===rankingGame?' selected':''}>${game.title}</option>`).join('')}</select></label></div><p class="fc-rank-note">${rankingGame===TOTAL_ID?'게임별 역대 개인 최고점 '+GAMES.length+'개 합산 · 미참여 게임 0점':'역대 개인 최고점 기준'} · 동점은 공동 순위</p><div data-node="ranking" aria-live="polite"><p class="fc-empty">순위 불러오는 중…</p></div>`;
 
-            focusTitle();const data=await book.fetch(rankingGame,force);if(token!==revision)return;
-            content.querySelector('[data-node="ranking"]').innerHTML=rankHTML(data,rankingGame);
+            focusTitle();watchScores();const data=await book.fetch(rankingGame,force);if(token!==revision)return;
+            renderRank(data,rankingGame);
         }
         async function showStats() {
             setView('stats');const token=revision,name=playerName;
             content.innerHTML='<div class="fc-section-heading"><h3 tabindex="-1">내 플레이 기록</h3></div><div data-node="stats"><p class="fc-empty">기록 불러오는 중…</p></div>';focusTitle();
-            const all=await Promise.all(GAMES.map(game=>book.fetch(game.id)));if(token!==revision||name!==playerName)return;
-            const pending=book.records.filter(row=>row.playerName===name&&!row.synced);
-            content.querySelector('[data-node="stats"]').innerHTML=`<div class="fc-stat-list">${GAMES.map((game,index)=>{
-                const data=all[index],records=data.records.filter(row=>row.playerName===name);
-                const best=Math.max(book.best(name,game.id),...records.map(row=>row.score),0);
-                const rank=rankRecords(data.records,game.id).find(row=>row.playerName===name);
+            watchScores();const all=await Promise.all(GAMES.map(game=>book.fetch(game.id)));if(token!==revision||name!==playerName)return;
+            renderStats(all);
+        }
+        function renderStats(all){
+            if(book.live?.ready)all=GAMES.map(game=>book.cached(game.id));
+            const pending=book.records.filter(row=>row.playerName===playerName&&!row.synced);
+            replaceLive(content.querySelector('[data-node="stats"]'),`<div class="fc-stat-list">${GAMES.map((game,index)=>{
+                const data=all[index],records=data.records.filter(row=>row.playerName===playerName);
+                const best=Math.max(book.best(playerName,game.id),...records.map(row=>row.score),0);
+                const rank=rankRecords(data.records,game.id).find(row=>row.playerName===playerName);
                 return `<button type="button" data-action="play" data-game="${game.id}" class="fc-stat-row"><span>${game.icon} ${game.title}<small>${data.online?records.length+'회 플레이':'이 기기 기록'}${rank?' · '+rank.rank+'위':''}</small></span><strong>${number(best)}<small>최고 점수</small></strong></button>`;
-            }).join('')}</div>${pending.length?'<h4 class="fc-pending-title">전송 대기 기록</h4>'+pending.map(row=>`<div class="fc-pending"><span>${escape(GAMES.find(g=>g.id===row.gameId).title)} · ${number(row.score)}점</span><button type="button" data-action="retry-score" data-run="${escape(row.id)}">다시 저장</button></div>`).join(''):''}`;
+            }).join('')}</div>${pending.length?'<h4 class="fc-pending-title">전송 대기 기록</h4>'+pending.map(row=>`<div class="fc-pending"><span>${escape(GAMES.find(g=>g.id===row.gameId).title)} · ${number(row.score)}점</span><button type="button" data-action="retry-score" data-run="${escape(row.id)}">다시 저장</button></div>`).join(''):''}`);
         }
         async function launch(gameId) {
             if(!checkAccess())return;
@@ -335,13 +450,27 @@
                 dribble:[['회피',detail.dodged||0],['헤딩',detail.headings||0],['최대 콤보',detail.maxCombo||0]]
             }[ticket.gameId];
             const stats='<div class="fc-result-stats">'+fields.map(([label,value])=>`<span>${label}<b>${escape(value)}</b></span>`).join('')+'</div>';
-            content.innerHTML=`<section class="fc-result"><span class="fc-kicker">${escape(game.title)} · ${escape(ticket.playerName)}</span><div class="fc-result-mascot">${mascot('player',score>previousBest?7:0)}</div><h3 tabindex="-1">${score>previousBest?'내 최고 기록 갱신!':'좋아, 한 번 더!'}</h3><strong class="fc-final-score">${number(score)}<small>POINTS</small></strong>${stats}<p data-node="save" role="status">점수를 저장하는 중…</p><button type="button" data-node="retry" class="fc-text-button" data-action="retry-score" data-run="${escape(ticket.id)}" hidden>점수 다시 저장</button><div class="fc-result-buttons"><button type="button" class="fc-primary" data-action="again">한 번 더 ↻</button><button type="button" class="fc-secondary" data-action="games">다른 게임</button></div></section><h4 class="fc-result-ranking-title">누적 랭킹</h4><div data-node="ranking"><p class="fc-empty">순위 확인 중…</p></div>`;
+            const tips={
+                [RUN_ID]:'위험한 순간에 대시를 맞추면 저스트 대시 보너스!',
+                penalty:detail.endReason==='키퍼 선방!'?'키퍼와 겹치면 링 정중앙을 노려보세요.':'5번째 골든 찬스는 정중앙 슛 보너스가 두 배예요.',
+                pass:'서로 다른 동료 세 명에게 연속으로 연결하면 트라이앵글 보너스!',
+                goalkeeper:'공이 도착하기 직전에 펀칭하면 저스트 세이브!',
+                donghyun:'로켓과 폭탄을 연쇄로 터뜨려 위험한 순간을 넘겨보세요.',
+                dribble:'짧게 누르면 빠르게 착지하고, 공중에서 한 번 더 누르면 더블 점프!'
+            };
+            const skills={
+                [RUN_ID]:['저스트 대시',detail.justDashes],penalty:['골든 슛',detail.goldenGoals],pass:['트라이앵글',detail.triangles],goalkeeper:['저스트 세이브',detail.justSaves],donghyun:['역전 킥',detail.clutchSaves],dribble:['아슬아슬 회피',detail.lowClears]
+            }[ticket.gameId];
+            const skill=skills[1]?`<span class="fc-skill-badge">✦ ${skills[0]} ${number(skills[1])}회</span>`:'';
+            const compare=previousBest>0?`<p class="fc-run-compare">${score>previousBest?'이전 최고보다 '+number(score-previousBest)+'점 더!':'내 최고 갱신까지 '+number(previousBest-score+1)+'점'}</p>`:'';
+            const review=`<div class="fc-run-review">${detail.endReason?'<strong>'+escape(detail.endReason)+'</strong>':''}<span>${tips[ticket.gameId]}</span></div>`;
+            content.innerHTML=`<section class="fc-result"><span class="fc-kicker">${escape(game.title)} · ${escape(ticket.playerName)}</span><div class="fc-result-mascot">${mascot('player',score>previousBest?7:0)}</div><h3 tabindex="-1">${score>previousBest?'내 최고 기록 갱신!':'한 번 더 도전!'}</h3><strong class="fc-final-score">${number(score)}<small>POINTS</small></strong>${compare}${skill}${stats}${review}<p data-node="save" role="status">점수를 저장하는 중…</p><button type="button" data-node="retry" class="fc-text-button" data-action="retry-score" data-run="${escape(ticket.id)}" hidden>점수 다시 저장</button><div class="fc-result-buttons"><button type="button" class="fc-primary" data-action="again">한 번 더 ↻</button><button type="button" class="fc-secondary" data-action="games">다른 게임</button></div></section><h4 class="fc-result-ranking-title">누적 랭킹</h4><div data-node="ranking"><p class="fc-empty">순위 확인 중…</p></div>`;
             focusTitle();
             try {
                 const saved=await book.finish(ticket,Math.floor(score));if(token!==revision)return;
                 content.querySelector('[data-node="save"]').textContent=resultMessage(saved);content.querySelector('[data-node="retry"]').hidden=saved.synced;
                 const data=await book.fetch(ticket.gameId,true);if(token!==revision)return;
-                content.querySelector('[data-node="ranking"]').innerHTML=rankHTML(data,ticket.gameId);
+                renderRank(data,ticket.gameId);
             }catch(error){if(token===revision)status.textContent=error.message;}
         }
         async function retryScore(id) {
@@ -353,11 +482,11 @@
                 content.querySelector('[data-node="save"]').textContent=resultMessage(saved);
                 if(button){button.hidden=saved.synced;button.disabled=false;}
                 const data=await book.fetch(saved.record.gameId,true);if(token!==revision)return;
-                content.querySelector('[data-node="ranking"]').innerHTML=rankHTML(data,saved.record.gameId);
+                renderRank(data,saved.record.gameId);
             }catch(error){if(token===revision){status.textContent=error.message;if(button)button.disabled=false;}}
         }
         return {configure,open,close};
     }
-    if(typeof module!=='undefined'&&module.exports)module.exports={RUN_ID,TOTAL_ID,RULE_VERSION,GAMES,normalizeName,dayKey,dailySeed,seededRandom,rankRecords,rankTotals,rivalFor,RecordBook,createCenter};
+    if(typeof module!=='undefined'&&module.exports)module.exports={RUN_ID,TOTAL_ID,RULE_VERSION,GAMES,PLAYER_RESETS,normalizeName,dayKey,dailySeed,seededRandom,rankRecords,rankTotals,rivalFor,RecordBook,createCenter};
     else root.FootballGameCenter=createCenter();
 })(typeof window!=='undefined'?window:globalThis);

@@ -44,7 +44,7 @@
             if(mode==='fall')frame=age<.12?5:6;
             else if(mode==='hit')frame=5;
             else if(mode==='slide')frame=4;
-            else if(mode==='celebrate')frame=7;
+            else if(mode==='celebrate'||mode==='punch')frame=7;
             else if(mode==='defend'||mode==='run')frame=Math.abs(lean)>.2?(lean<0?1:2):[0,1,3,2][Math.floor(phase*4)];
         } else {
             if(mode==='run'||mode==='dash') {
@@ -54,7 +54,9 @@
             } else if(mode==='hit')frame=4;
             else if(mode==='fall')frame=age<.12?4:5;
             else if(mode==='celebrate')frame=6;
-            else if(mode==='kick')frame=7;
+            else if(mode==='kick')frame=age<.05?0:7;
+            else if(mode==='jump')frame=3;
+            else if(mode==='land')frame=0;
         }
         if(moving) {
             lift=(1-Math.cos(phase*TAU*2))*1.1*amount;
@@ -71,6 +73,10 @@
             rotation=-.09*settle*amount;scaleY=1-.05*Math.abs(settle)*amount;
         } else if(mode==='celebrate')lift=Math.max(0,Math.sin(time*5))*6*amount;
         else if(mode==='slide')rotation=-.035*amount;
+        else if(mode==='kick'){const kick=Math.sin(clamp(age/.34,0,1)*Math.PI);rotation=-.09*kick*amount;scaleX=1+.025*kick*amount;}
+        else if(mode==='jump'){rotation=(age<.16?-.055:.045)*amount;scaleX=1-.025*Math.exp(-age*7)*amount;scaleY=1+.04*Math.exp(-age*7)*amount;}
+        else if(mode==='land'){const land=Math.sin(clamp(age/.16,0,1)*Math.PI);scaleX=1+.045*land*amount;scaleY=1-.08*land*amount;}
+        else if(mode==='punch'){const punch=Math.sin(clamp(age/.22,0,1)*Math.PI);lift=5*punch*amount;scaleY=1+.04*punch*amount;rotation=lean*.14*amount;}
         const ballX=Math.sin(phase*TAU)*6,ballLift=(1-Math.cos(phase*TAU*2))*1.8;
         return {sheet,frame,lift,rotation,scaleX,scaleY,ballX:ballX*amount,ballLift:ballLift*amount,shadowScale:1-lift*.018};
     }
@@ -94,12 +100,12 @@
     class DribbleRun {
         constructor(random = Math.random) {
             this.random = random;
-            this.time = 0; this.distance = 0; this.bonus = 0; this.hearts = 3;
+            this.time = 0; this.distance = 0; this.bonus = 0; this.hearts = 1;
             this.lane = 1; this.x = LANES[1]; this.objects = []; this.events = [];
             this.charge = 1; this.dashTime = 0; this.invincible = 0; this.hitTime = 0;
             this.combo = 0; this.maxCombo = 0; this.coins = 0; this.dodges = 0;
             this.spawnIn = 0.7; this.nextId = 0; this.ended = false; this.cleared = false;
-            this.waves = 0; this.lastSafe = 1; this.nearMisses = 0;
+            this.waves = 0; this.lastSafe = 1; this.nearMisses = 0; this.justDashes = 0;
             this.fever = 0; this.feverTime = 0; this.fevers = 0; this.accumulator = 0;
         }
         get score() { return Math.floor(this.distance) + this.bonus; }
@@ -216,14 +222,22 @@
             this.dodges++; this.combo++; this.maxCombo=Math.max(this.maxCombo,this.combo);
             const near=!dashed && object.closest>=41 && object.closest<80;
             if(near)this.nearMisses++;
-            const points=(dashed?45:near?35:10)*this.multiplier;
+            const just=dashed&&this.dashTime>.3;if(just)this.justDashes++;
+            const points=(just?75:dashed?45:near?35:10)*this.multiplier;
             this.bonus+=points;
             this.addFever(dashed?12:near?18:3);
-            this.events.push({type:dashed?'break':near?'near':'dodge',x:object.x,y:PLAYER_Y-95,points,combo:this.combo});
+            this.events.push({type:dashed?'break':near?'near':'dodge',x:object.x,y:PLAYER_Y-95,points,combo:this.combo,just});
         }
         takeEvents() { return this.events.splice(0); }
     }
 
+    function guardGestures(element,locked) {
+        const prevent=event=>{if(locked()&&event.cancelable)event.preventDefault();};
+        element.addEventListener('touchmove',prevent,{passive:false});
+        element.addEventListener('touchstart',event=>{if(event.touches?.length>1)prevent(event);},{passive:false});
+        element.addEventListener('gesturestart',prevent,{passive:false});
+        element.addEventListener('gesturechange',prevent,{passive:false});
+    }
     function createArcade() {
         const document=root.document;
         const assetBase=new URL('assets/arcade/', document.currentScript.src).href;
@@ -274,10 +288,10 @@
                 </header>
                 <div class="fa-stage">
                     <canvas data-node="canvas" width="480" height="720" tabindex="0" aria-label="드리블 런 경기장. 좌우 방향키로 이동, 스페이스 키로 대시, Escape 키로 일시정지합니다."></canvas>
-                    <div class="fa-hud" data-node="hud" hidden><div class="fa-score"><small data-node="playerName">SCORE</small><strong data-node="score">0</strong></div><div class="fa-life"><span data-node="hearts" aria-label="남은 기회 3회">♥ ♥ ♥</span><small data-node="timer">Lv.1 · 0초</small></div><button type="button" class="fa-icon" data-action="pause" aria-label="일시정지">${icon('pause')}</button></div>
+                    <div class="fa-hud" data-node="hud" hidden><div class="fa-score"><small data-node="playerName">SCORE</small><strong data-node="score">0</strong></div><div class="fa-life"><small data-node="timer">Lv.1 · 0초</small></div><button type="button" class="fa-icon" data-action="pause" aria-label="일시정지">${icon('pause')}</button></div>
                     <div class="fa-streak" data-node="streak" hidden><span data-node="multiplier">0 COMBO · ×1</span><span class="fa-fever-meter"><i data-node="feverBar"></i><b data-node="feverLabel">FEVER</b></span></div>
                     <section class="fa-home" data-node="home" hidden><div class="fa-logo"><span>더 오래, 더 아슬아슬하게!</span><h2>드리블 <em>런</em></h2><div class="fa-best">MY BEST <b data-node="homeBest">0</b></div></div>
-                        <div class="fa-start-box"><p><strong>12초마다 더 거센 압박!</strong><br>코인과 연속 회피로 피버 · 점수 2배<br><span data-node="rival">하트 3개로 어디까지 갈 수 있을까?</span></p><button type="button" class="fa-primary" data-action="start">킥오프 <span>→</span></button><small>좌우 스와이프 · 대시 0.4초 · 화살표는 수비 이동 예고</small></div>
+                        <div class="fa-start-box"><p><strong>한 번의 태클이면 경기 종료!</strong><br>코인과 연속 회피로 피버 · 점수 2배<br><span data-node="rival">어디까지 살아남을 수 있을까?</span></p><button type="button" class="fa-primary" data-action="start">킥오프 <span>→</span></button><small>좌우 스와이프 · 대시 0.4초 · 화살표는 수비 이동 예고</small></div>
                     </section>
                     <div class="fa-loading" data-node="loading"><div class="fa-loading-ball">⚽</div><strong data-node="loadMessage">경기장 준비 중</strong><progress data-node="progress" max="4" value="0" aria-label="게임 이미지 불러오기"></progress><button type="button" class="fa-primary" data-action="retry" data-node="retry" hidden>다시 불러오기</button></div>
                     <div class="fa-countdown" data-node="countdown" hidden aria-live="polite">3</div>
@@ -291,6 +305,7 @@
             document.body.appendChild(dialog);
             dialog.querySelectorAll('[data-node]').forEach(element=>nodes[element.dataset.node]=element);
             canvas=nodes.canvas;ctx=canvas.getContext('2d');
+            guardGestures(dialog,()=>['playing','countdown','paused','finishing'].includes(phase));
             dialog.addEventListener('click',event=>{
                 const button=event.target.closest('[data-action]');
                 if(button&&!button.disabled) action(button.dataset.action);
@@ -350,7 +365,7 @@
             if(options)settings=options;
             best=Number.isFinite(settings.best)?settings.best:readNumber(BEST_KEY);
             text(nodes.playerName,settings.playerName||'SCORE');
-            text(nodes.rival,settings.rival?'다음 상대 '+settings.rival.playerName+' · '+settings.rival.score.toLocaleString()+'점':'하트 3개로 어디까지 갈 수 있을까?');
+            text(nodes.rival,settings.rival?'다음 상대 '+settings.rival.playerName+' · '+settings.rival.score.toLocaleString()+'점':'어디까지 살아남을 수 있을까?');
             const token=++requestId;
             if(!dialog.open){previousFocus=document.activeElement;oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.showModal();}
             setPhase('loading');nodes.retry.hidden=true;text(nodes.loadMessage,'경기장 준비 중');
@@ -360,6 +375,7 @@
         }
         function close(notify=true) {
             if(phase==='closed')return;
+            if(notify&&phase==='finishing'){finish();return;}
             const onClose=settings.onClose;
             requestId++;phase='closed';pointer=null;run=null;stopFrames();resizeObserver?.disconnect();
             resetMotion();
@@ -401,7 +417,7 @@
         }
         function finish() {
             if(settings.onFinish) {
-                const score=run.score,detail={time:run.time,level:run.level,maxCombo:run.maxCombo,nearMisses:run.nearMisses,coins:run.coins,fevers:run.fevers};
+                const score=run.score,detail={time:run.time,level:run.level,maxCombo:run.maxCombo,nearMisses:run.nearMisses,justDashes:run.justDashes,coins:run.coins,fevers:run.fevers,endReason:'수비수에게 막혔어요.'};
                 const callback=settings.onFinish;close(false);callback(score,detail);return;
             }
             setPhase('result');resultAge=0;sound('finish');
@@ -457,7 +473,7 @@
             particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=120*dt;p.life-=dt;});particles=particles.filter(p=>p.life>0);
             labels.forEach(label=>{label.y-=28*dt;label.life-=dt;});labels=labels.filter(label=>label.life>0);
             if(run){
-                text(nodes.score,run.score.toLocaleString());text(nodes.hearts,'♥ '.repeat(run.hearts)+'♡ '.repeat(3-run.hearts));nodes.hearts.setAttribute('aria-label','남은 기회 '+run.hearts+'회');
+                text(nodes.score,run.score.toLocaleString());
                 text(nodes.timer,'Lv.'+run.level+' · '+Math.floor(run.time)+'초');nodes.charge.style.width=(run.charge*100)+'%';nodes.dash.disabled=phase!=='playing'||run.charge<1;
                 text(nodes.dashLabel,run.charge>=1?'대시!':Math.ceil((1-run.charge)*run.dashCooldown/(run.feverTime>0?1.5:1))+'초');
                 text(nodes.multiplier,run.combo+' COMBO · ×'+run.multiplier);nodes.feverBar.style.width=(run.feverTime>0?run.feverTime/6*100:run.fever)+'%';
@@ -475,14 +491,14 @@
         }
         function effect(event) {
             sound(event.type==='break'?'break':event.type);
-            if(event.type==='hit'){burst(event.x,event.y,['#fff5d2','#ff9072'],20);text(nodes.announce,'충돌. 남은 기회 '+run.hearts+'회.');}
+            if(event.type==='hit'){burst(event.x,event.y,['#fff5d2','#ff9072'],20);text(nodes.announce,'충돌. 경기 종료.');}
             else if(event.type==='coin'){burst(event.x,event.y,['#ffe7a0','#ffbf44']);labels.push({x:event.x,y:event.y-15,text:'+'+event.points,color:'#ffe286',life:0.65});}
             else if(event.type==='dash')burst(event.x,event.y,['#abf5dd','#fff7db'],20);
             else if(event.type==='level'||event.type==='fever'||event.type==='near'||event.type==='pattern') {
                 labels.push({x:240,y:event.type==='near'?360:240,text:event.type==='pattern'?event.text:event.type==='level'?'LEVEL '+event.level+' ↑':event.type==='fever'?'FEVER! ×2':'아슬아슬! +'+event.points,color:'#fff2a1',life:1.2});
                 if(event.type==='fever')burst(240,350,['#ffd36b','#ff967d','#dfffe8'],40);
             }
-            else if(event.type==='break'||event.combo%3===0){burst(event.x,event.y,['#f5ffdf','#ffe296']);labels.push({x:240,y:280,text:event.type==='break'?'돌파!':event.combo+' COMBO',color:'#fff2a1',life:0.9});}
+            else if(event.type==='break'||event.combo%3===0){burst(event.x,event.y,['#f5ffdf','#ffe296']);labels.push({x:240,y:280,text:event.type==='break'?(event.just?'JUST DASH!':'돌파!'):event.combo+' COMBO',color:'#fff2a1',life:0.9});}
             if(labels.length>8)labels.shift();
         }
         function shadow(x,y,width,opacity=0.18){ctx.fillStyle='rgba(23,63,29,'+opacity+')';ctx.beginPath();ctx.ellipse(x,y,width,width*0.26,0,0,Math.PI*2);ctx.fill();}
@@ -522,6 +538,11 @@
             } else {
                 ctx.save();ctx.beginPath();ctx.rect(68,140,344,HEIGHT-140);ctx.clip();ctx.strokeStyle='rgba(247,255,225,.16)';ctx.lineWidth=2;ctx.setLineDash([14,40]);ctx.lineDashOffset=-run.distance*14;
                 for(const x of [180,300]){ctx.beginPath();ctx.moveTo(x,140);ctx.lineTo(x,HEIGHT);ctx.stroke();}ctx.restore();
+                if(!run.ended){
+                    const danger=new Set(run.objects.filter(o=>o.type==='defender'&&!o.resolved&&o.y>PLAYER_Y-140&&o.y<PLAYER_Y+30).map(o=>o.lane));
+                    for(const lane of danger){ctx.fillStyle='#e9956e24';ctx.beginPath();ctx.roundRect(LANES[lane]-47,PLAYER_Y-45,94,94,18);ctx.fill();ctx.strokeStyle='#ffdb9360';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(LANES[lane]-26,PLAYER_Y+38);ctx.lineTo(LANES[lane],PLAYER_Y+28);ctx.lineTo(LANES[lane]+26,PLAYER_Y+38);ctx.stroke();}
+                    if(!reducedMotion){const speed=clamp((run.speed-290)/650,0,1);ctx.strokeStyle='rgba(235,255,235,'+(.08+speed*.18)+')';ctx.lineWidth=2;for(let i=0;i<8;i++){const x=i%2?428:52,y=150+(i*137+run.distance*18)%560;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+20+speed*60);ctx.stroke();}}
+                }
                 if(run.relayIntroduced){
                     const gates=new Map();
                     for(const object of run.objects.filter(o=>o.type==='defender'&&!o.resolved&&o.y<PLAYER_Y+30).sort((a,b)=>b.y-a.y))if(!gates.has(object.gate))gates.set(object.gate,object.safe);
@@ -571,7 +592,8 @@
         function legacyMotion(options={},portrait=false) {
             if(!portrait&&options.motion)return options.motion.sample(reducedMotion);
             const time=portrait?0:Number.isFinite(options.animationTime)?options.animationTime:root.performance.now()/1000;
-            return sampleCharacterMotion({...legacyPose(options),time,cycle:time*1.8+(options.phaseOffset||0),age:1,lean:options.lean||0,reduced:portrait||reducedMotion});
+            const pose=legacyPose(options);
+            return sampleCharacterMotion({...pose,mode:options.motionMode||pose.mode,time,cycle:time*1.8+(options.phaseOffset||0),age:Number.isFinite(options.motionAge)?options.motionAge:1,lean:options.lean||0,reduced:portrait||reducedMotion});
         }
         function drawMascot(target,x,y,size,options={}) {
             const pose=legacyMotion(options),height=size*.95;
@@ -595,7 +617,7 @@
             if(!images.stadium)return;
             if(source)target.drawImage(images.stadium,...source,x,y,width,height);else target.drawImage(images.stadium,x,y,width,height);
         };
-        return {open,close,prepare:()=>{ensureDialog();return loadImages();},mascotMarkup,drawMascot,drawStadium,mascotPortraitMarkup,createMotion:(x,cycle)=>new CharacterMotion(x,cycle)};
+        return {open,close,prepare:()=>{ensureDialog();return loadImages();},guardGestures,mascotMarkup,drawMascot,drawStadium,mascotPortraitMarkup,createMotion:(x,cycle)=>new CharacterMotion(x,cycle)};
     }
     if(typeof module!=='undefined'&&module.exports)module.exports={DribbleRun,LANES,PLAYER_Y,PLAYER_FRAMES,RUN_FRAMES,DEFENDER_FRAMES,sampleCharacterMotion,CharacterMotion,spriteGeometry};
     else root.FootballArcade=createArcade();
