@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="football-arcade.css">
+    <link rel="stylesheet" href="attendance-import.css">
     <style>
         /* ====== Theme CSS Custom Properties ====== */
         :root {
@@ -1041,6 +1042,7 @@
         /* 빠른 출석체크 모드 (칩 뷰) */
         .quick-check-toggle {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 8px;
             margin-bottom: 12px;
@@ -3620,6 +3622,7 @@
             <!-- 빠른 출석체크 모드 토글 -->
             <div class="quick-check-toggle">
                 <button class="toggle-btn" id="quickCheckToggle" onclick="toggleQuickCheckMode()">선택 모드</button>
+                <button type="button" class="toggle-btn" id="attendanceImportBtn" onclick="openAttendanceImport()">📷 캡처로 선택</button>
             </div>
 
             <!-- 선수 검색/필터 -->
@@ -3805,6 +3808,7 @@
     <!-- Firebase 설정 파일 -->
     <script src="firebase-config.js"></script>
     <script src="team-builder.js"></script>
+    <script src="attendance-import.js"></script>
 
     <script>
         // ===== 유틸리티 함수 =====
@@ -4785,6 +4789,40 @@
             });
             const removed = new Set(filtered.map(player => player.name));
             setSelectedPlayers([...selectedPlayers].filter(name => !removed.has(name)));
+            renderPlayers();
+            updateSelectionCounter();
+        }
+
+        function openAttendanceImport() {
+            if (!window.AttendanceImport) {
+                showToast('사진 선택 기능을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.', 'warning');
+                return;
+            }
+            AttendanceImport.open({
+                returnFocus: document.getElementById('attendanceImportBtn'),
+                players: () => players,
+                selected: () => [...selectedPlayers],
+                canApply: () => !teamGenerationRunning,
+                apply: applyAttendanceSelection,
+                notify: message => showToast(message)
+            });
+        }
+
+        function applyAttendanceSelection(names) {
+            if (teamGenerationRunning) throw new Error('팀 구성이 끝난 뒤 명단을 적용해주세요.');
+            if (!Array.isArray(names) || !names.length || names.some(name => !players.some(player => player.name === name))) {
+                throw new Error('선수 명단이 바뀌었어요. 이름을 다시 확인해주세요.');
+            }
+            setSelectedPlayers(names);
+            searchQuery = '';
+            tierFilter = 'all';
+            quickCheckMode = true;
+            document.getElementById('playerSearchInput').value = '';
+            document.getElementById('quickCheckToggle').classList.add('active');
+            document.querySelectorAll('.tier-filter-btn').forEach((button, index) => {
+                button.classList.toggle('active', index === 0);
+                button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+            });
             renderPlayers();
             updateSelectionCounter();
         }
