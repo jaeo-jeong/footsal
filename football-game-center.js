@@ -156,7 +156,7 @@
         const document=root.document;
         let config={},book=null,dialog,content,headerName,tabs,status;
         let playerName='',phase='closed',revision=0,priorFocus=null,priorOverflow='',active=null,result=null;
-        let rankingGame=RUN_ID;
+        let rankingGame=RUN_ID,entryNames=[];
         const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const number=value=>Number(value).toLocaleString('ko-KR');
         function storage(){try{return root.localStorage;}catch{return null;}}
@@ -172,6 +172,7 @@
                 const button=event.target.closest('button[data-action]');if(!button||button.disabled)return;
                 const action=button.dataset.action;
                 if(action==='close')close();else if(action==='name')showName();else if(action==='enter')enter();
+                else if(action==='toggle-names')toggleNames();else if(action==='choose-name')chooseName(button.dataset.index);
                 else if(action==='games')showGames();else if(action==='ranking')showRanking();else if(action==='stats')showStats();
                 else if(action==='play')launch(button.dataset.game);else if(action==='again'&&result)launch(result.ticket.gameId);
                 else if(action==='retry-score')retryScore(button.dataset.run);else if(action==='refresh')showRanking(true);
@@ -183,11 +184,25 @@
             });
             dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
             // Isolate this native dialog from the app's document-level modal shortcuts.
-            dialog.addEventListener('keydown',event=>event.stopPropagation());
+            dialog.addEventListener('keydown',event=>{
+                event.stopPropagation();
+                if(phase==='name'&&event.isComposing&&event.key==='Enter')event.preventDefault();
+            });
+            root.visualViewport?.addEventListener('resize',updateNameViewport);
+            root.visualViewport?.addEventListener('scroll',updateNameViewport);
+            root.addEventListener?.('resize',updateNameViewport);
+        }
+        function updateNameViewport() {
+            if(phase!=='name')return;
+            const height=root.visualViewport?.height||root.innerHeight;
+            if(!Number.isFinite(height)||height<=0)return;
+            dialog.style.setProperty('--fc-entry-height',height+'px');
+            dialog.style.setProperty('--fc-entry-top',(root.visualViewport?.offsetTop||0)+'px');
+            dialog.dataset.compact=height<460?'true':'false';
         }
         function visible(){if(!dialog.open)dialog.showModal();document.body.style.overflow='hidden';}
         function setView(next) {
-            revision++;phase=next;status.textContent='';visible();
+            revision++;phase=next;dialog.dataset.view=next;status.textContent='';visible();updateNameViewport();
             const named=next!=='name';tabs.hidden=!named;headerName.parentElement.hidden=!named;
             headerName.textContent=playerName+' ✎';
             tabs.querySelectorAll('button').forEach(button=>button.setAttribute('aria-current',button.dataset.action===next?'page':'false'));
@@ -209,11 +224,27 @@
             document.body.style.overflow=priorOverflow;priorFocus?.focus({preventScroll:true});
         }
         function showName() {
-            setView('name');
             let saved=playerName;try{saved=saved||storage()?.getItem('mgPlayerName')||'';}catch{}
-            const names=[...new Set((config.names?.()||[]).filter(name=>typeof name==='string'))].sort((a,b)=>a.localeCompare(b,'ko'));
-            content.innerHTML=`<section class="fc-welcome"><div class="fc-welcome-art">${mascot('player',7)}<span>★</span></div><span class="fc-kicker">READY, PLAYER?</span><h3 tabindex="-1">오늘의 주인공은?</h3><p>본인 이름을 입력해주세요.</p><form><label for="fcNickname">본인 이름</label><input id="fcNickname" name="name" list="fcNames" autocomplete="name" maxlength="40" placeholder="예: 문찬우" value="${escape(saved)}" required><datalist id="fcNames">${names.map(name=>`<option value="${escape(name)}"></option>`).join('')}</datalist><button type="submit" class="fc-primary">입장하기 <span>→</span></button></form></section>`;
-            content.querySelector('input').focus({preventScroll:true});
+            entryNames=[...new Set((config.names?.()||[]).filter(name=>typeof name==='string'&&name.trim()))].sort((a,b)=>a.localeCompare(b,'ko'));
+            content.innerHTML=`<section class="fc-welcome"><div class="fc-welcome-intro"><div class="fc-welcome-art">${mascot('player',7)}<span>★</span></div><div class="fc-welcome-copy"><span class="fc-kicker">READY, PLAYER?</span><h3 tabindex="-1">오늘의 주인공은?</h3><p>본인 이름을 입력해주세요.</p></div></div><form autocomplete="off"><label for="fcNickname">본인 이름</label><input id="fcNickname" name="player-name" type="text" autocomplete="off" enterkeyhint="go" autocapitalize="off" spellcheck="false" maxlength="40" placeholder="예: 문찬우" value="${escape(saved)}" required><button type="submit" class="fc-primary">입장하기 <span>→</span></button><button type="button" class="fc-name-toggle" data-action="toggle-names" aria-expanded="false" aria-controls="fcNames"${entryNames.length?'':' hidden'}>선수 목록에서 선택 <span aria-hidden="true">⌄</span></button><div id="fcNames" class="fc-name-list" role="group" aria-label="선수 이름 선택" hidden>${entryNames.map((name,index)=>`<button type="button" data-action="choose-name" data-index="${index}">${escape(name)}</button>`).join('')}</div></form></section>`;
+            // Replace the previous input before showModal can restore focus to it on re-entry.
+            setView('name');
+            // Focus the heading instead of opening a mobile keyboard and native suggestions.
+            focusTitle();dialog.scrollTop=0;
+        }
+        function toggleNames() {
+            if(phase!=='name')return;
+            const list=content.querySelector('#fcNames'),toggle=content.querySelector('[data-action="toggle-names"]');
+            list.hidden=!list.hidden;toggle.setAttribute('aria-expanded',String(!list.hidden));
+            if(!list.hidden){content.querySelector('input').blur();list.scrollTop=0;list.scrollIntoView({block:'nearest'});}
+        }
+        function chooseName(index) {
+            const position=Number(index);
+            if(phase!=='name'||!Number.isInteger(position)||position<0||position>=entryNames.length)return;
+            content.querySelector('input').value=entryNames[position];status.textContent='';
+            content.querySelector('#fcNames').hidden=true;
+            content.querySelector('[data-action="toggle-names"]').setAttribute('aria-expanded','false');
+            const submit=content.querySelector('[type="submit"]');submit.focus({preventScroll:true});submit.scrollIntoView({block:'nearest'});
         }
         function enter() {
             if(phase!=='name')return;

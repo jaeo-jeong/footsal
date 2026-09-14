@@ -231,6 +231,7 @@
 #mgOverlay .mg-game-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fc-dialog { box-sizing: border-box; width: 100vw; max-width: none; height: 100vh; height: 100dvh; max-height: none; margin: 0; padding: max(18px, env(safe-area-inset-top)) 14px max(24px, env(safe-area-inset-bottom)); border: 0; overflow-y: auto; overscroll-behavior: contain; background: #245646; color: #28483d; font: 15px Pretendard, -apple-system, BlinkMacSystemFont, sans-serif; }
 .fc-dialog[open] { display: block; }
+.fc-dialog[data-view="name"] { top: var(--fc-entry-top, 0px); height: var(--fc-entry-height, 100dvh); }
 .fc-dialog::backdrop { background: #183e34; }
 .fc-dialog *, .fc-dialog *::before, .fc-dialog *::after { box-sizing: border-box; }
 .fc-dialog [hidden] { display: none !important; }
@@ -293,6 +294,11 @@
 .fc-welcome input { display: block; width: 100%; min-height: 54px; padding: 12px 14px; border: 2px solid #b9c8a7; border-radius: 13px; background: #fffefa; color: #274e3d; font-size: 16px; }
 .fc-primary, .fc-secondary { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; min-height: 50px; padding: 12px 18px; border: 2px solid #39553e; border-radius: 13px; color: #294835; background: #ffdc80; box-shadow: 0 4px 0 #b39a57; font-weight: 900 !important; }
 .fc-welcome .fc-primary { margin-top: 14px; }
+.fc-name-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 12px; padding: 9px; border: 0; border-radius: 10px; color: #546e50; background: #edf0dd; font-size: 12px !important; font-weight: 750 !important; }
+.fc-name-toggle[aria-expanded="true"] span { transform: rotate(180deg); }
+.fc-name-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-height: 150px; margin-top: 8px; padding: 8px; border: 1px solid #cbd6b9; border-radius: 12px; overflow-y: auto; overscroll-behavior: contain; background: #fffefa; scroll-padding: 8px; }
+.fc-name-list button { min-width: 0; min-height: 44px; padding: 8px 6px; border: 1px solid #d8dfc9; border-radius: 8px; background: #f1f3e6; color: #355440; font-size: 13px !important; overflow-wrap: anywhere; }
+.fc-name-list button:active { background: #dce8cf; }
 .fc-secondary { background: #eef0db; box-shadow: 0 4px 0 #ccd4b7; }
 .fc-primary:hover { background: #ffe6a2; }
 .fc-text-button { min-height: 44px; padding: 7px 10px; color: #657955; background: #edf0dd; border: 1px solid #cdd9bd; border-radius: 9px; font-size: 11px !important; font-weight: 750 !important; }
@@ -348,10 +354,30 @@
     .fc-card:not(.fc-featured) .fc-card-art { min-height: 161px; }
     .fc-header h2 { font-size: 29px; }.fc-content h3 { font-size: 21px; }
     .fc-player-bar > span { font-size: 9px; }
+    .fc-welcome { margin: 20px auto 0; }
+    .fc-welcome-intro { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 16px; text-align: left; }
+    .fc-welcome-art { width: 76px; height: 76px; margin: 0; padding: 4px; }
+    .fc-welcome-art > span { top: 0; right: -7px; font-size: 22px; }
+    .fc-welcome-copy .fc-kicker { font-size: 8px; letter-spacing: 1px; }
+    .fc-welcome h3 { margin: 6px 0; font-size: 21px; }
+    .fc-welcome p { margin: 0; font-size: 11px; }
+    .fc-welcome form { margin-top: 22px; }
     .fc-rank-table th:first-child { width: 51px; }.fc-rank-table th:last-child { width: 91px; }
     .fc-rank-table td, .fc-rank-table th { padding-left: 8px; padding-right: 8px; }
     .fc-my-rank { padding: 13px 11px; gap: 12px; }.fc-my-rank b { font-size: 12px; }
 }
+.fc-dialog[data-view="name"][data-compact="true"] { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-shell { max-width: 560px; padding: 10px 14px 14px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-header .fc-kicker,
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome-intro { display: none; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-header h2 { margin: 0; font-size: 23px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome { margin: 10px auto 0; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome form { margin-top: 0; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome label { margin-bottom: 5px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome input { min-height: 48px; padding: 10px 12px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-welcome .fc-primary { min-height: 46px; margin-top: 9px; padding: 9px 14px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-name-toggle { margin-top: 9px; }
+.fc-dialog[data-view="name"][data-compact="true"] .fc-name-list { max-height: 100px; }
 @media (prefers-reduced-motion: reduce) { .fc-dialog * { animation: none !important; transition: none !important; } }
 .mg-overlay.mg-is-paused #mgGameArea * { animation-play-state: paused !important; }
 .gs-power-gauge { min-height: 44px; touch-action: manipulation; }
