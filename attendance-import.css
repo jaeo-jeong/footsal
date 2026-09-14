@@ -59,6 +59,7 @@
 .ai-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(135px, 45%); align-items: center; gap: 10px; border: 1px solid var(--ai-line); border-radius: 11px; padding: 10px 12px; }
 .ai-row.ai-pending { border-color: #dfbd7b; background: #fffaf0; }
 .ai-raw { font-weight: 700; overflow-wrap: anywhere; }
+.ai-name-sample { display: block; width: 100%; max-width: 180px; height: 35px; margin: 0 0 5px; object-fit: contain; object-position: left center; border-radius: 4px; }
 .ai-row small { display: block; font-size: 11px; color: var(--ai-muted); margin-top: 3px; }
 .ai-choice { min-width: 0; }
 .ai-choice select { width: 100%; min-height: 44px; border: 1px solid #cdd5e2; border-radius: 8px; padding: 6px 8px; color: var(--ai-ink); background: #fff; }

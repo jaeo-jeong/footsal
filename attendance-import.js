@@ -80,13 +80,13 @@
             const mixed=lines.some(line=>/(?:^|\s|[([【])(불참|미정|기권|참석\s*불가)(?:$|\s|\d|[)\]】])/u.test(cleanText(line.text)));
             if(mixed)warnings.push(source.name||'사진');
             lines.slice(0,200).forEach((line,index)=>{
-                lineNames(line.text,roster,aliases).forEach((text,part)=>{
+                (line.unreadable?['읽지 못한 이름']:lineNames(line.text,roster,aliases)).forEach((text,part)=>{
                     if(entries.length>=160)return;
                     const match=matchName(text,roster,aliases,Number.isFinite(line.confidence)?line.confidence:0);
-                    const automatic=mixed?null:match.automatic;
+                    const automatic=mixed||line.unreadable?null:match.automatic;
                     if(automatic&&seen.has(automatic)){seen.get(automatic).occurrences++;return;}
                     const entry={id:source.id+':'+index+':'+part,text,key:match.key,kind:match.kind,candidates:match.candidates,
-                        selectedId:automatic||'',selectedName:automatic?match.candidates[0].name:'',manual:false,occurrences:1,mixed};
+                        selectedId:automatic||'',selectedName:automatic?match.candidates[0].name:'',manual:false,occurrences:1,mixed,unreadable:!!line.unreadable,preview:line.preview||''};
                     entries.push(entry);if(automatic)seen.set(automatic,entry);
                 });
             });
@@ -110,7 +110,7 @@
     function aliasesAfterReview(entries,players,aliases){
         const roster=rosterIndex(players),next=new Map(aliases.map(a=>[a.key,a]));
         for(const entry of entries){
-            if(!entry.manual||!entry.selectedId||entry.selectedId==='-'||entry.key.length<2||entry.key.length>60)continue;
+            if(entry.unreadable||!entry.manual||!entry.selectedId||entry.selectedId==='-'||entry.key.length<2||entry.key.length>60)continue;
             // A shared given name is inherently ambiguous; never remember it as one person's alias.
             const direct=matchName(entry.text,roster,[]);
             if(['exact','given','ambiguous'].includes(direct.kind))continue;
@@ -188,10 +188,10 @@
                     this.onProgress({status:'loading compatible core',progress:0});
                     await this.request('load',{options:{lstmOnly:true,corePath:this.corePath,logging:false}});
                 }
-                await this.request('loadLanguage',{langs:'kor+eng',options:{langPath:this.base.replace(/\/$/u,''),lstmOnly:true,gzip:true,cachePath:'footsal-ocr-v7',cacheMethod:'write'}});
-                await this.request('initialize',{langs:'kor+eng',oem:1,config:{load_system_dawg:'0',load_freq_dawg:'0'}});
-                // Polls are vertical name lists. Sparse mode can split Hangul syllables into unrelated fragments.
-                await this.request('setParameters',{params:{tessedit_pageseg_mode:'6',preserve_interword_spaces:'1',user_defined_dpi:'300'}});
+                await this.request('loadLanguage',{langs:'kor',options:{langPath:this.base.replace(/\/$/u,''),lstmOnly:true,gzip:true,cachePath:'footsal-ocr-v7',cacheMethod:'write'}});
+                await this.request('initialize',{langs:'kor',oem:1,config:{load_system_dawg:'0',load_freq_dawg:'0'}});
+                // Korean names only. Do not constrain recognition to the registered roster's characters.
+                await this.request('setParameters',{params:{tessedit_pageseg_mode:'7',preserve_interword_spaces:'1',user_defined_dpi:'300',tessedit_char_blacklist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'}});
             }catch(error){
                 if(this.closed)throw this.failure||error;
                 this.disposeWorker(error);throw await this.diagnose(error);
@@ -199,7 +199,7 @@
         }
         async diagnose(error){
             if(!this.fetcher||this.closed)return this.failure||error;
-            const assets=error.asset?[error.asset]:error.action==='loadLanguage'||error.action==='initialize'?['kor.traineddata.gz','eng.traineddata.gz']:[];
+            const assets=error.asset?[error.asset]:error.action==='loadLanguage'||error.action==='initialize'?['kor.traineddata.gz']:[];
             for(const asset of assets){
                 const controller=new root.AbortController();this.diagnostic=controller;let timer,response;
                 try{
@@ -228,54 +228,120 @@
             }
             return error;
         }
-        recognize(bytes){return this.request('recognize',{image:bytes,options:{},output:{text:true,blocks:true}},[bytes.buffer]);}
+        recognize(bytes,options={}){return this.request('recognize',{image:bytes,options,output:{text:true,blocks:true}},[bytes.buffer]);}
         stop(error=Error('사진 인식이 취소됐습니다.')){
             if(this.closed)return;this.closed=true;this.diagnostic?.abort();this.disposeWorker(error);
         }
     }
-    function maskProfileShapes(pixels){
-        // Large, dense profile shapes can make a text line twice as tall as its Hangul letters.
-        // Remove only isolated, nearly square ink components in the left profile column.
-        const {width,height,data}=pixels,step=Math.max(1,Math.ceil(width/600)),sw=Math.ceil(width/step),sh=Math.ceil(height/step),scanWidth=Math.floor(sw*.45);
-        const mask=new Uint8Array(scanWidth*sh),queue=new Uint32Array(mask.length),boxes=[];
-        for(let y=0;y<sh;y++)for(let x=0;x<scanWidth;x++)mask[y*scanWidth+x]=data[(y*step*width+x*step)*4]<125?1:0;
-        const minimum=Math.max(24,sw*.055);
-        for(let start=0;start<mask.length;start++){
-            if(!mask[start])continue;let head=0,tail=1,minX=scanWidth,minY=sh,maxX=0,maxY=0;queue[0]=start;mask[start]=0;
-            while(head<tail){
-                const at=queue[head++],x=at%scanWidth,y=Math.floor(at/scanWidth);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
-                if(x&&mask[at-1]){mask[at-1]=0;queue[tail++]=at-1;}
-                if(x+1<scanWidth&&mask[at+1]){mask[at+1]=0;queue[tail++]=at+1;}
-                if(y&&mask[at-scanWidth]){mask[at-scanWidth]=0;queue[tail++]=at-scanWidth;}
-                if(y+1<sh&&mask[at+scanWidth]){mask[at+scanWidth]=0;queue[tail++]=at+scanWidth;}
-            }
-            const w=maxX-minX+1,h=maxY-minY+1;
-            if(minX>=sw*.3||maxX>=scanWidth-1||w<minimum||h<minimum||w/h<.65||w/h>1.5||tail/(w*h)<.68)continue;
-            boxes.push({x:Math.max(0,(minX-1)*step),y:Math.max(0,(minY-1)*step),right:Math.min(width,(maxX+2)*step),bottom:Math.min(height,(maxY+2)*step)});
+    function normalizePixels(pixels,invert){
+        const {data}=pixels;
+        if(invert===undefined){
+            let dark=0,count=0;
+            for(let i=0;i<data.length;i+=400){if(data[i]*.299+data[i+1]*.587+data[i+2]*.114<105)dark++;count++;}
+            invert=dark/count>.6;
         }
-        for(const box of boxes)for(let y=box.y;y<box.bottom;y++)for(let x=box.x;x<box.right;x++){const i=(y*width+x)*4;data[i]=data[i+1]=data[i+2]=255;}
-        return boxes;
+        for(let i=0;i<data.length;i+=4){const gray=data[i]*.299+data[i+1]*.587+data[i+2]*.114;data[i]=data[i+1]=data[i+2]=invert?255-gray:gray;data[i+3]=255;}
+        return invert;
     }
-    async function prepareImage(file,document){
-        const image=new root.Image(),url=root.URL.createObjectURL(file);
+    function inkBands(counts,minimum,gap){
+        const bands=[];let start=-1,last=-1;
+        for(let i=0;i<counts.length;i++)if(counts[i]>=minimum){
+            if(start<0)start=i;
+            else if(i-last>gap+1){bands.push({start,end:last+1});start=i;}
+            last=i;
+        }
+        if(start>=0)bands.push({start,end:last+1});return bands;
+    }
+    function findNameRegions(pixels){
+        // Split rows, then separate the short text spans from the taller square avatars.
+        // This uses image geometry, not player names or fixed one/two-column coordinates.
+        const {width,height,data}=pixels,edge=Math.max(1,Math.round(width*.018));
+        const rows=new Uint32Array(height),ink=(x,y)=>data[(y*width+x)*4]<170;
+        for(let y=0;y<height;y++)for(let x=edge;x<width-edge;x++)if(ink(x,y))rows[y]++;
+        const regions=[];
+        for(const band of inkBands(rows,2,Math.max(2,Math.round(width*.004)))){
+            const columns=new Uint32Array(width),bandHeight=band.end-band.start;
+            if(bandHeight<7)continue;
+            for(let y=band.start;y<band.end;y++)for(let x=edge;x<width-edge;x++)if(ink(x,y))columns[x]++;
+            const pieces=[];
+            for(const span of inkBands(columns,Math.max(2,Math.round(bandHeight*.015)),Math.max(2,Math.round(width*.004)))){
+                let top=band.end,bottom=band.start,count=0;
+                for(let y=band.start;y<band.end;y++)for(let x=span.start;x<span.end;x++)if(ink(x,y)){top=Math.min(top,y);bottom=Math.max(bottom,y+1);count++;}
+                if(bottom<=top)continue;
+                const box={left:span.start,top,width:span.end-span.start,height:bottom-top,count},prior=pieces.at(-1);
+                if(prior&&box.left-prior.left-prior.width<=Math.min(prior.height,box.height)*.65&&Math.max(prior.height,box.height)/Math.min(prior.height,box.height)<1.8&&Math.min(prior.top+prior.height,box.top+box.height)>Math.max(prior.top,box.top)){
+                    const bottom=Math.max(prior.top+prior.height,box.top+box.height);prior.top=Math.min(prior.top,box.top);prior.height=bottom-prior.top;prior.width=box.left+box.width-prior.left;prior.count+=box.count;
+                }else pieces.push(box);
+            }
+            for(const box of pieces){
+                const ratio=box.width/box.height,density=box.count/(box.width*box.height);
+                if(box.height>=8&&ratio>=1.45&&density>.035&&density<.7)regions.push({left:box.left,top:box.top,width:box.width,height:box.height});
+            }
+        }
+        return regions;
+    }
+    async function prepareImage(file,document,isCurrent=()=>true){
+        const image=new root.Image(),url=root.URL.createObjectURL(file),canvas=document.createElement('canvas'),crop=document.createElement('canvas');
+        const check=()=>{if(!isCurrent())throw Error('사진 인식이 취소됐습니다.');};
         try{
-            image.src=url;await image.decode();
+            image.src=url;await image.decode();check();
             const w=image.naturalWidth,h=image.naturalHeight;
             if(!w||!h||w*h>18000000||w>10000||h>16000)throw Error('사진이 너무 커요. 이름 목록을 여러 장으로 나눠 캡처해주세요.');
-            const scale=Math.min(2,1200/w,8000/h,Math.sqrt(6000000/(w*h)));
-            const canvas=document.createElement('canvas');canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+            const scale=Math.min(1,1200/w,6000/h,Math.sqrt(4000000/(w*h)));
+            canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
             const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
-            const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);let dark=0,count=0;
-            for(let i=0;i<pixels.data.length;i+=400){if(pixels.data[i]*.299+pixels.data[i+1]*.587+pixels.data[i+2]*.114<105)dark++;count++;}
-            const invert=dark/count>.6;
-            for(let i=0;i<pixels.data.length;i+=4){let gray=pixels.data[i]*.299+pixels.data[i+1]*.587+pixels.data[i+2]*.114;if(invert)gray=255-gray;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=gray;pixels.data[i+3]=255;}
-            maskProfileShapes(pixels);
+            const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),invert=normalizePixels(pixels),regions=findNameRegions(pixels);
             ctx.putImageData(pixels,0,0);
-            const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));canvas.width=canvas.height=1;
-            if(!blob)throw Error('사진을 읽지 못했어요. PNG 또는 JPG 캡처로 다시 시도해주세요.');
-            return new Uint8Array(await blob.arrayBuffer());
+            if(regions.length>160)throw Error('사진에 글자가 너무 많아요. 참석 이름 목록만 캡처해주세요.');
+            const segments=[],sx=w/canvas.width,sy=h/canvas.height;
+            const encode=async(target,preview)=>{
+                const blob=await new Promise(resolve=>target.toBlob(resolve,'image/png'));check();
+                if(!blob)throw Error('사진을 읽지 못했어요. PNG 또는 JPG 캡처로 다시 시도해주세요.');
+                const bytes=new Uint8Array(await blob.arrayBuffer());check();
+                let url='';if(preview){let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);url='data:image/png;base64,'+root.btoa(binary);}
+                return {bytes,preview:url};
+            };
+            for(const box of regions){
+                check();
+                // Crop from the original resolution before scaling each name to a readable glyph height.
+                const left=Math.max(0,(box.left-2)*sx),top=Math.max(0,(box.top-2)*sy),width=Math.min(w-left,(box.width+4)*sx),height=Math.min(h-top,(box.height+4)*sy);
+                const glyphHeight=box.height*sy<28?32:40,zoom=Math.min(3,glyphHeight/(box.height*sy),760/width);
+                crop.width=Math.ceil(box.width*sx*zoom)+24;crop.height=Math.ceil(box.height*sy*zoom)+24;
+                const c=crop.getContext('2d',{willReadFrequently:true});c.fillStyle=invert?'#000':'#fff';c.fillRect(0,0,crop.width,crop.height);c.drawImage(image,left,top,width,height,10,10,width*zoom,height*zoom);
+                const textPixels=c.getImageData(0,0,crop.width,crop.height);normalizePixels(textPixels,invert);c.putImageData(textPixels,0,0);
+                segments.push(await encode(crop,true));
+            }
+            if(!segments.length)segments.push(await encode(canvas,false));
+            return {segments,segmented:regions.length>0};
         }catch(error){if(error.message?.includes('사진'))throw error;throw Error('사진을 읽지 못했어요. PNG, JPG, WEBP 파일을 선택해주세요.');}
-        finally{image.src='';root.URL.revokeObjectURL(url);}
+        finally{canvas.width=canvas.height=crop.width=crop.height=1;image.src='';root.URL.revokeObjectURL(url);}
+    }
+    function koreanReading(data){
+        const lines=ocrLines(data),raw=lines.map(line=>line.text).join(' ').normalize('NFKC');
+        const text=cleanText(raw).replace(/^[^\p{L}\p{N}(]+|[^\p{L}\p{N})]+$/gu,'').trim();
+        const valid=/[가-힣]/u.test(text)&&/^[가-힣ㄱ-ㅎㅏ-ㅣ\d\s().·]+$/u.test(text);
+        return {text:valid?text:'읽지 못한 이름',confidence:valid&&lines.length?Math.min(...lines.map(line=>line.confidence)):0,unreadable:!valid};
+    }
+    async function recognizeImage(client,prepared,isCurrent=()=>true,onProgress=()=>{}){
+        const lines=[];
+        for(let i=0;i<prepared.segments.length;i++){
+            if(!isCurrent())throw Error('사진 인식이 취소됐습니다.');
+            const segment=prepared.segments[i];
+            const data=await client.recognize(segment.bytes.slice(),{tessedit_pageseg_mode:prepared.segmented?'7':'6'});
+            if(!isCurrent())throw Error('사진 인식이 취소됐습니다.');
+            if(!prepared.segmented)lines.push(...ocrLines(data).map(line=>koreanReading({text:line.text,confidence:line.confidence})));
+            else {
+                let line=koreanReading(data);
+                if(line.unreadable||line.confidence<85){
+                    const alternate=koreanReading(await client.recognize(segment.bytes.slice(),{tessedit_pageseg_mode:'13'}));
+                    if(!isCurrent())throw Error('사진 인식이 취소됐습니다.');
+                    if(alternate.confidence>line.confidence)line=alternate;
+                }
+                lines.push({...line,preview:segment.preview});
+            }
+            onProgress((i+1)/prepared.segments.length);
+        }
+        return lines;
     }
     function createImporter(environment=root){
         const document=environment.document;
@@ -402,7 +468,7 @@
             $('[data-ai="rows"]').innerHTML=entries.map(entry=>{
                 const recommended=entry.candidates.map(p=>p.id),ordered=[...roster.filter(p=>recommended.includes(p.id)),...roster.filter(p=>!recommended.includes(p.id))];
                 const label=entry.selectedId==='-'?'제외':!entry.selectedId?'확인 필요':entry.manual?'직접 확인':entry.kind==='given'?'성이 없는 이름':entry.kind==='alias'?'기억한 별명':'이름 일치';
-                return `<div class="ai-row${entry.selectedId?'':' ai-pending'}" data-row="${entry.id}"><div><span class="ai-raw">${escape(entry.text)}</span><small>${label}${entry.occurrences>1?' · '+entry.occurrences+'곳에서 인식':''}</small></div><label class="ai-choice"><span class="ai-sr">${escape(entry.text)}에 연결할 선수</span><select data-entry="${entry.id}"${busy?' disabled':''}><option value=""${!entry.selectedId?' selected':''}>선수 선택</option><option value="-"${entry.selectedId==='-'?' selected':''}>이 이름 제외</option>${ordered.map(player=>`<option value="${escape(player.id)}"${entry.selectedId===player.id?' selected':''}>${escape(player.name)}</option>`).join('')}</select></label></div>`;
+                return `<div class="ai-row${entry.selectedId?'':' ai-pending'}" data-row="${entry.id}"><div>${entry.preview?`<img class="ai-name-sample" src="${escape(entry.preview)}" alt="캡처 속 이름" loading="lazy">`:''}<span class="ai-raw">${escape(entry.text)}</span><small>${label}${entry.occurrences>1?' · '+entry.occurrences+'곳에서 인식':''}</small></div><label class="ai-choice"><span class="ai-sr">${escape(entry.text)}에 연결할 선수</span><select data-entry="${entry.id}"${busy?' disabled':''}><option value=""${!entry.selectedId?' selected':''}>선수 선택</option><option value="-"${entry.selectedId==='-'?' selected':''}>이 이름 제외</option>${ordered.map(player=>`<option value="${escape(player.id)}"${entry.selectedId===player.id?' selected':''}>${escape(player.name)}</option>`).join('')}</select></label></div>`;
             }).join('');
             updateSummary();
         }
@@ -436,10 +502,11 @@
         async function read(){
             if(busy||!sources.some(s=>!s.lines))return;
             if(!/^https?:$/u.test(environment.location.protocol)){notice('사진 인식은 게시된 사이트 주소에서 사용할 수 있어요. GitHub Pages 주소로 열어주세요.');return;}
-            const token=++sequence;notice();setBusy(true);let item=0;
+            const token=++sequence;notice();setBusy(true);let item=0,reviewReady=false;
             const pending=sources.filter(s=>!s.lines);
             const progress=data=>{
-                if(token!==sequence)return;const reading=data.status==='recognizing text';
+                if(token!==sequence)return;const reading=data.status==='reading names';
+                if(data.status==='recognizing text')return;
                 $('.ai-progress progress').value=reading?(item+Math.max(0,Math.min(1,Number(data.progress)||0)))/pending.length:0;
                 $('[data-ai="progress-text"]').textContent=reading?(item+1)+' / '+pending.length+'장 · 이름 읽는 중':data.status==='loading compatible core'?'기기에 맞는 인식 엔진 준비 중…':'사진 인식 준비 중…';
             };
@@ -448,15 +515,15 @@
                 for(const source of pending){
                     if(token!==sequence)return;source.error=false;
                     try{
-                        const bytes=await prepareImage(source.file,document);if(token!==sequence)return;
-                        const data=await running.recognize(bytes);if(token!==sequence)return;
-                        source.lines=ocrLines(data);item++;photos();
+                        const prepared=await prepareImage(source.file,document,()=>token===sequence);if(token!==sequence)return;
+                        source.lines=await recognizeImage(running,prepared,()=>token===sequence,value=>progress({status:'reading names',progress:value}));
+                        if(token!==sequence)return;item++;photos();
                     }catch(error){if(token!==sequence)return;source.error=true;throw error;}
                 }
                 review(true);notice(entries.length?'인식한 이름과 인원을 확인한 뒤 적용해주세요.':'이름을 찾지 못했어요. 이름이 크게 보이는 캡처로 다시 시도하거나 읽은 글자를 직접 수정해주세요.');
-                hidePreview();$('.ai-review h3').focus({preventScroll:true});scrollTo($('.ai-review-heading'));
+                hidePreview();reviewReady=true;
             }catch(error){if(token===sequence){review(true);failure(error);}}
-            finally{if(token===sequence){client?.stop();client=null;photos();setBusy(false);}}
+            finally{if(token===sequence){client?.stop();client=null;photos();setBusy(false);if(reviewReady){$('.ai-review h3').focus({preventScroll:true});scrollTo($('.ai-review-heading'));}}}
         }
         function stop(){sequence++;client?.stop();client=null;setBusy(false);photos();review(true);notice('인식을 중단했어요. 완료된 사진은 유지됩니다.');}
         function apply(){
@@ -488,7 +555,7 @@
         }
         return {open,close};
     }
-    const api={nameKey,givenName,rosterIndex,matchName,analyzeSources,selectionPlan,aliasesAfterReview,readAliases,ocrLines,maskProfileShapes,OcrClient,createImporter};
+    const api={nameKey,givenName,rosterIndex,matchName,analyzeSources,selectionPlan,aliasesAfterReview,readAliases,ocrLines,normalizePixels,findNameRegions,koreanReading,recognizeImage,prepareImage,OcrClient,createImporter};
     if(typeof module!=='undefined'&&module.exports)module.exports=api;
     else root.AttendanceImport=createImporter();
 })(typeof window!=='undefined'?window:globalThis);
