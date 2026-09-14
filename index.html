@@ -9,6 +9,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="football-arcade.css">
     <style>
         /* ====== Theme CSS Custom Properties ====== */
         :root {
@@ -3482,7 +3483,7 @@
             <button id="voteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal()" style="background: #17a2b8; color: white; display: none;">
                 티어 투표 이력 보기
             </button>
-            <button class="mg-btn" onclick="mgManager.open()" style="display: none;">🎮 미니게임 센터</button>
+            <button id="gameCenterBtn" type="button" class="fa-entry" onclick="FootballGameCenter.open()" style="display: none;" disabled>🎮 게임 센터</button>
             <button id="resetMiniGameBtn" class="btn btn-secondary" onclick="resetMiniGameScores()" style="background: #e67e22; color: white; display: none;">
                 미니게임 점수 초기화
             </button>
@@ -3962,6 +3963,8 @@
 
         // 모달 ESC/배경 클릭 닫기 + 포커스 트랩
         document.addEventListener('keydown', function(e) {
+            // Native game dialogs own keyboard handling while they are on top.
+            if (document.querySelector('dialog[open]')) return;
             if (e.key === 'Escape') {
                 // confirmModal은 항상 최우선 처리 (다른 모달 위에 열릴 수 있으므로)
                 const confirmModal = document.getElementById('confirmModal');
@@ -4427,6 +4430,14 @@
                 voteHistoryBtn.style.display = isAdmin ? 'inline-block' : 'none';
             }
             
+            // 게임 센터는 관리자에게만 표시
+            const gameCenterBtn = document.getElementById('gameCenterBtn');
+            if (gameCenterBtn) {
+                gameCenterBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+                gameCenterBtn.disabled = !isAdmin;
+            }
+            if (!isAdmin) window.FootballGameCenter?.close();
+
             // 미니게임 점수 초기화 버튼 (개발중 - 숨김)
             const resetMiniGameBtn = document.getElementById('resetMiniGameBtn');
             if (resetMiniGameBtn) {
@@ -9741,30 +9752,38 @@
         // ====== ChibiSprite Wrapper - 기존 코드와 연결 ======
         // GameSprites.drawPlayer를 ChibiSprite로 교체
         GameSprites._origDrawPlayer = GameSprites.drawPlayer;
-        GameSprites.drawPlayer = function(ctx, x, y, r, jerseyColor, dir, expression, number, squash) {
+        GameSprites.drawPlayer = function(ctx, x, y, r, jerseyColor, dir, expression, number, squash, animation = {}) {
             ChibiSprite.drawChibi(ctx, x, y, r * 2.2, {
                 jersey: jerseyColor || this.colors.jersey1,
                 expression: expression || 'neutral',
                 number: number || '10',
-                squash: squash || null
+                squash: squash || null,
+                ...animation
             });
         };
         // SVG 버전도 동일하게 교체
+        ChibiSprite.markup = function(size, options = {}) {
+            if (window.FootballArcade?.mascotPortraitMarkup) return FootballArcade.mascotPortraitMarkup(size, options);
+            return '<img src="' + this.svgChibi(size, options) + '" alt="" width="' + size + '" height="' + Math.round(size * .95) + '" style="vertical-align:middle;">';
+        };
         GameSprites._origSvgPlayer = GameSprites.svgPlayer;
-        GameSprites.svgPlayer = function(size, color, pose, expression) {
+        GameSprites.svgPlayer = function(size, color, pose, expression, animation = {}) {
             return ChibiSprite.svgChibi(size, {
                 jersey: color || this.colors.jersey1,
                 pose: pose || 'standing',
-                expression: expression || 'neutral'
+                expression: expression || 'neutral',
+                ...animation
             });
         };
         // drawDefender도 ChibiSprite로 교체 (오버레이 좌표 불일치 방지)
         GameSprites._origDrawDefender = GameSprites.drawDefender;
-        GameSprites.drawDefender = function(ctx, x, y, r) {
+        GameSprites.drawDefender = function(ctx, x, y, r, animation = {}) {
             ChibiSprite.drawChibi(ctx, x, y, r * 2.2, {
                 jersey: this.colors.jersey2,
                 expression: 'angry',
-                number: '4'
+                number: '4',
+                role: 'defender',
+                ...animation
             });
         };
 
@@ -10543,6 +10562,32 @@
             _heartbeatTimer: null,
             _confirmingName: false,
             _isChangingName: false,
+            _centerSession: null,
+            startCenterGame(gameId, session) {
+                this._centerSession = session;
+                this.playerName = session.playerName;
+                this.paused = false;
+                this._showingResult = false;
+                document.getElementById('mgOverlay').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                SoundManager.init();
+                SoundManager._updateMuteButtons();
+                this.startGame(gameId);
+            },
+            exitCenterGame() {
+                const session = this._centerSession;
+                this._centerSession = null;
+                this._showingResult = true;
+                if (this.currentGame && this.currentGame.cleanup) this.currentGame.cleanup();
+                this.currentGame = null;
+                this.currentGameId = null;
+                this.paused = false;
+                GameSprites.clearConfetti();
+                GameSprites.clearFlash();
+                this.hideAllScreens();
+                document.getElementById('mgOverlay').classList.remove('active');
+                session?.exit();
+            },
             open() {
                 document.getElementById('mgOverlay').classList.add('active');
                 document.body.style.overflow = 'hidden';
@@ -10556,6 +10601,7 @@
                 if (msg) msg.textContent = '';
             },
             close() {
+                if (this._centerSession) { this.exitCenterGame(); return; }
                 if (this.currentGame && this.currentGame.cleanup) this.currentGame.cleanup();
                 GameSprites.clearConfetti();
                 GameSprites.clearFlash();
@@ -10687,7 +10733,7 @@
                     this.close();
                 }
             },
-            backToHub() { this.showHub(); },
+            backToHub() { if (this._centerSession) this.exitCenterGame(); else this.showHub(); },
             showHubTab(tab) {
                 const tabMap = { games: 0, ranking: 1, mystats: 2 };
                 document.querySelectorAll('.mg-hub-tab').forEach((t, i) => {
@@ -10740,8 +10786,8 @@
                         '골대 9구역 중 슈팅할 위치를 선택하세요',
                         '파워 게이지가 좌우로 움직입니다 - 초록 구간에서 탭!',
                         '실패(선방/빗나감) 3회 시 게임 오버',
-                        '라운드가 올라갈수록 문찬우가 더 잘 막습니다',
-                        '같은 위치를 반복하면 읽힙니다!'
+                        '제한 시간 안에 슛! 후반에는 구간이 좁아지고 흔들립니다',
+                        '! 구역은 키퍼가 수비 중! 빨간 정타 구간이면 돌파'
                     ],
                     controls: '클릭: 구역 선택 → 게이지 탭 | 터치: 동일'
                 },
@@ -10750,9 +10796,9 @@
                     rules: [
                         '공을 드래그하여 움직이는 팀원에게 패스!',
                         '드래그 방향 반대로 공이 날아갑니다 (새총처럼)',
-                        '타겟 중심 적중 100점, 가장자리 50점',
+                        '중앙 조준 100점, 가장자리 50점 · 골든 표적은 1.75배',
                         '제한시간 40초 (최대 45초), 성공 시 시간 보너스',
-                        '수비수에 걸리면 -3초 패널티!'
+                        '수비에 걸리면 -3초 · 후반 횡이동 수비와 8자 표적 등장'
                     ],
                     controls: '공 드래그 후 놓기 | 터치 드래그 후 놓기'
                 },
@@ -10763,7 +10809,7 @@
                         '수비수를 피할 때마다 10점',
                         '코인 획득 시 50점 보너스',
                         '하트 3개, 충돌하면 하나씩 감소',
-                        '점수가 올라갈수록 수비수가 빨라지고 추적합니다',
+                        '시간이 갈수록 추격이 빨라지고 이중 수비·보스가 등장',
                         '◀▶ 버튼 더블탭 또는 더블클릭으로 대시! (쿨타임 7초)'
                     ],
                     controls: '좌우 방향키 + 스페이스바(대시) | ◀▶ 버튼 터치 + 더블탭(대시)'
@@ -10774,8 +10820,8 @@
                         '9칸 골대에서 날아오는 공을 막아라!',
                         '실점 5회 시 게임 오버',
                         '연속 세이브 시 콤보 보너스 (3연속 x1.5, 5연속 x2)',
-                        '후반에는 동시 다발슛 등장! 예고 메시지를 잘 봐!',
-                        '5연속 세이브 시 HOT 모드 - 공이 더 빨라짐!'
+                        '후반 연속 슛! 2 TAP 강슛은 두 번 쳐내세요',
+                        '커브 화살표를 보고 꺾인 뒤 터치 · 빈칸 연타는 잠시 경직'
                     ],
                     controls: '구역 클릭 | 구역 터치'
                 },
@@ -10784,15 +10830,16 @@
                     rules: [
                         '동현이가 골대로 돌진합니다! 퍼즐을 맞춰 뒤로 밀어내세요!',
                         '인접한 타일을 스와이프/클릭하여 3개 이상 매치',
-                        '4매치 → 특수 타일, 5매치 → 폭탄 타일 생성!',
+                        '4·5매치로 특수·폭탄 생성! 특수 타일은 탭해서 바로 사용',
                         '연쇄(체인) 매치 → 밀어내기 배수 증가!',
                         '동현이가 골대 앞에 3초 머무르면 골! 게임 오버!',
-                        '시간이 지날수록 동현이가 빨라지고 방해 타일 등장!'
+                        '후반 압박 타임! 두 번 깨야 하는 철벽 블록까지 등장'
                     ],
                     controls: '터치: 스와이프로 교환 | 클릭: 두 번 클릭으로 교환'
                 }
             },
             startGame(gameId) {
+                document.getElementById('mgOverlay')?.classList.remove('mg-is-paused');
                 this.hideAllScreens();
                 document.getElementById('mgGameScreen').style.display = 'flex';
                 const info = this.gameList.find(g => g.id === gameId);
@@ -10805,11 +10852,11 @@
                 const chibiExprs = { penalty: 'determined', pass: 'happy', dribble: 'determined', goalkeeper: 'surprised', donghyun: 'angry' };
                 const chibiColors2 = { penalty: '#1a73e8', pass: '#2ecc71', dribble: '#ff6b35', goalkeeper: '#ff9f43', donghyun: '#9b59b6' };
                 const chibiNums = { penalty: '10', pass: '7', dribble: '10', goalkeeper: 'GK', donghyun: '9' };
-                const startChibi = ChibiSprite.svgChibi(56, { jersey: chibiColors2[gameId] || '#1a73e8', pose: 'standing', expression: chibiExprs[gameId] || 'neutral', number: chibiNums[gameId] || '10' });
+                const startChibi = ChibiSprite.markup(56, { jersey: chibiColors2[gameId] || '#1a73e8', pose: 'standing', expression: chibiExprs[gameId] || 'neutral', number: chibiNums[gameId] || '10' });
                 document.getElementById('mgGameArea').innerHTML = `
                     <div style="background:linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.15); border-radius:20px; padding:28px; max-width:380px; width:100%; margin:20px auto; box-shadow:0 8px 32px rgba(0,0,0,0.3);">
                         <div style="text-align:center; margin-bottom:16px;">
-                            <img src="${startChibi}" alt="" style="width:56px; height:53px; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3)); animation:gsPopIn 0.5s ease-out;">
+                            <span style="display:inline-block;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));animation:gsPopIn 0.5s ease-out;">${startChibi}</span>
                         </div>
                         <h3 style="color:white; font-size:1.25em; margin-bottom:16px; text-align:center; letter-spacing:-0.02em;">${rules.title}</h3>
                         <div style="color:rgba(255,255,255,0.85); font-size:0.9em; line-height:1.8; margin-bottom:16px;">
@@ -10827,6 +10874,7 @@
                     </div>`;
             },
             launchGame() {
+                if (this._centerSession && !this._centerSession.begin()) return;
                 document.getElementById('mgGameArea').innerHTML = '';
                 this.paused = false;
                 this._showingResult = false;
@@ -10849,6 +10897,7 @@
             },
             async showResult(gameId, score, detail) {
                 if (this._showingResult) return;
+                if (this._centerSession && gameId !== this.currentGameId) return;
                 this._showingResult = true;
                 if (this.currentGame && this.currentGame.cleanup) this.currentGame.cleanup();
                 GameSprites.clearConfetti();
@@ -10858,6 +10907,15 @@
                 this.paused = false;
                 SoundManager.play('gameOver');
                 this.hideAllScreens();
+                if (this._centerSession) {
+                    const session = this._centerSession;
+                    this._centerSession = null;
+                    this.currentGame = null;
+                    this.currentGameId = null;
+                    document.getElementById('mgOverlay').classList.remove('active');
+                    session.finish(Math.floor(score), detail);
+                    return;
+                }
                 const resultEl = document.getElementById('mgResultScreen');
                 resultEl.style.display = 'block';
                 resultEl.classList.add('mg-scalein');
@@ -10869,7 +10927,7 @@
                 const resultExpr = isGoodScore ? 'celebrate' : (finalScore >= 100 ? 'happy' : 'sad');
                 const resultPose = isGoodScore ? 'celebrate' : 'standing';
                 const resultChibiColors = { penalty: '#1a73e8', pass: '#2ecc71', dribble: '#ff6b35', goalkeeper: '#ff9f43', donghyun: '#9b59b6' };
-                const resultChibi = ChibiSprite.svgChibi(52, { jersey: resultChibiColors[gameId] || '#1a73e8', pose: resultPose, expression: resultExpr, number: '10' });
+                const resultChibi = ChibiSprite.markup(52, { jersey: resultChibiColors[gameId] || '#1a73e8', pose: resultPose, expression: resultExpr, number: '10' });
 
                 // Star rating (1-3)
                 let starRating = 1;
@@ -10883,7 +10941,7 @@
                 // Insert chibi + stars at top of result
                 const chibiContainer = document.getElementById('mgResultChibi');
                 if (chibiContainer) {
-                    chibiContainer.innerHTML = `<img src="${resultChibi}" alt="" style="width:52px;height:49px;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.3));animation:gsPopIn 0.5s ease-out 0.2s both;">
+                    chibiContainer.innerHTML = `<span style="display:inline-block;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.3));animation:gsPopIn 0.5s ease-out 0.2s both;">${resultChibi}</span>
                         <div style="margin-top:8px;">${starsHtml}</div>`;
                     chibiContainer.style.display = 'block';
                 }
@@ -11051,8 +11109,9 @@
             },
             togglePause() {
                 if (!this.currentGame) return;
-                if (this.currentGame.gameOver || this.currentGame._stopped) return;
+                if (this.currentGame.gameOver || (!this.paused && this.currentGame._stopped)) return;
                 this.paused = !this.paused;
+                document.getElementById('mgOverlay')?.classList.toggle('mg-is-paused',this.paused);
                 const overlay = document.getElementById('mgPauseOverlay');
                 if (overlay) overlay.classList.toggle('active', this.paused);
                 if (this.paused) {
@@ -11284,13 +11343,17 @@
                 this.phase = 'aim'; this.shotHistory = []; this._shotTimeouts = [];
                 this._perfectCount = 0; this._zoneDiversityBonus = 0; this._pausedPhase = null;
                 this._stopped = false;
+                this._clock?.clear();
+                this._clock = new FootballGameRules.PausableClock();
                 this.render();
                 this.nextRound();
             },
             cleanup() {
-                if (this.powerInterval) { clearInterval(this.powerInterval); this.powerInterval = null; }
-                if (this._keeperSpeechTimeout) { clearTimeout(this._keeperSpeechTimeout); this._keeperSpeechTimeout = null; }
-                this._shotTimeouts.forEach(t => clearTimeout(t));
+                this._stopped=true;
+                this._clock?.clear();
+                this.powerInterval = null;
+                if (this._keeperSpeechTimeout) { this._clock.cancel(this._keeperSpeechTimeout); this._keeperSpeechTimeout = null; }
+                this._shotTimeouts.forEach(t => this._clock.cancel(t));
                 this._shotTimeouts = [];
                 this._cleanupTouchEvents();
                 const field = document.querySelector('.gs-penalty-field');
@@ -11298,49 +11361,36 @@
                 document.querySelectorAll('.gs-combo-banner, .gs-trajectory-ball').forEach(el => el.remove());
                 ParticleSystem.clear();
             },
-            _keeperSvg(state, isBoss) {
+            _keeperMarkup(state, isBoss) {
                 const expr = state === 'save' ? 'happy' : state === 'smirk' ? 'angry' : state === 'miss' ? 'sad' : 'determined';
                 const color = isBoss ? '#cc0000' : '#2c3e50';
                 const pose = state === 'save' ? 'celebrate' : 'standing';
-                return ChibiSprite.svgChibi(56, { jersey: color, expression: expr, pose: pose, number: 'GK', gloves: true });
+                return ChibiSprite.markup(160, { jersey: color, expression: expr, pose: pose, number: 'GK', gloves: true });
             },
-            pause() {
-                if (this.powerInterval) { clearInterval(this.powerInterval); this.powerInterval = null; }
-                if (this._keeperSpeechTimeout) { clearTimeout(this._keeperSpeechTimeout); this._keeperSpeechTimeout = null; }
-                this._shotTimeouts.forEach(t => clearTimeout(t));
-                this._shotTimeouts = [];
-                this._pausedPhase = this.phase;
-            },
-            resume() {
-                if (this._pausedPhase === 'power') this.resumePowerGauge();
-                else if (this._pausedPhase === 'shot') {
-                    // 슛 결과 대기 중이었으면 다음 라운드로 진행
-                    if (this.hearts > 0) {
-                        this._shotTimeouts.push(setTimeout(() => this.nextRound(), 500));
-                    } else {
-                        const shotMap = {};
-                        this.shotHistory.forEach(z => { shotMap[z] = (shotMap[z]||0) + 1; });
-                        const accuracy = this.shotHistory.length > 0 ? Math.round(this.goalsScored / this.shotHistory.length * 100) : 0;
-                        this._shotTimeouts.push(setTimeout(() => mgManager.showResult('penalty', this.score, {
-                            _summary: `라운드 ${this.round}까지 도달!`,
-                            round: this.round, goals: this.goalsScored,
-                            accuracy: accuracy, maxCombo: this.maxCombo, shotMap: shotMap,
-                            perfectShots: this._perfectCount, zoneDiversity: this._zoneDiversityBonus
-                        }), 500));
+            pause() { this._clock.pause(); },
+            resume() { this._clock.resume(); },
+            _startGaugeLoop() {
+                if(this.powerInterval)this._clock.cancel(this.powerInterval);
+                let previous=this._clock.now();
+                const tick=()=>{
+                    if(!['aim','power'].includes(this.phase)||this._stopped)return;
+                    const now=this._clock.now(),dt=Math.min(.05,(now-previous)/1000);previous=now;
+                    if(this.phase==='power') {
+                        this.powerPos+=this._profile.gaugeSpeed*dt*this.powerDir;
+                        if(this.powerPos>100){this.powerPos=200-this.powerPos;this.powerDir=-1;}
+                        if(this.powerPos<0){this.powerPos=-this.powerPos;this.powerDir=1;}
+                        const band=this.getGreenZone();
+                        document.getElementById('penaltyGreen').style.left=band.start+'%';
+                        document.getElementById('penaltyGreen').style.width=band.pct+'%';
+                        document.getElementById('penaltyRed').style.left=band.redStart+'%';
+                        document.getElementById('penaltyRed').style.width=band.redPct+'%';
+                        document.getElementById('penaltyBar').style.left=this.powerPos+'%';
                     }
-                }
-                this._pausedPhase = null;
-            },
-            resumePowerGauge() {
-                if (this.powerInterval) { clearInterval(this.powerInterval); this.powerInterval = null; }
-                let speed = 2 + this.round * 0.18;
-                this.powerInterval = setInterval(() => {
-                    this.powerPos += speed * this.powerDir;
-                    if (this.powerPos >= 100) { this.powerPos = 100; this.powerDir = -1; }
-                    if (this.powerPos <= 0) { this.powerPos = 0; this.powerDir = 1; }
-                    const bar = document.getElementById('penaltyBar');
-                    if (bar) bar.style.left = this.powerPos + '%';
-                }, 16);
+                    const label=document.getElementById('penaltyPowerLabel');
+                    if(label)label.textContent=Math.max(0,(this._deadline-now)/1000).toFixed(1)+'초 · '+(this._guardZones.includes(this.selectedZone)?'수비 구역은 빨간 정타 구간!':'초록 구간에서 슛!');
+                    this.powerInterval=this._clock.after(tick,16);
+                };
+                tick();
             },
             showKeeperSpeech(category) {
                 const lines = category === 'highRound' && this.round >= 7 ? keeperTaunts.highRound : keeperTaunts[category];
@@ -11349,15 +11399,15 @@
                 const el = document.getElementById('keeperSpeech');
                 if (!el) return;
                 el.textContent = text; el.style.display = 'block'; el.style.opacity = '1';
-                if (this._keeperSpeechTimeout) clearTimeout(this._keeperSpeechTimeout);
-                this._keeperSpeechTimeout = setTimeout(() => { if (el) { el.style.opacity = '0'; setTimeout(() => { el.style.display = 'none'; }, 300); } }, 2000);
+                if (this._keeperSpeechTimeout) this._clock.cancel(this._keeperSpeechTimeout);
+                this._keeperSpeechTimeout = this._clock.after(() => { if (el) { el.style.opacity = '0'; this._clock.after(() => { el.style.display = 'none'; }, 300); } }, 2000);
             },
             render() {
                 this.updateHud();
                 document.getElementById('mgGameArea').innerHTML = `
                     <div class="mg-keeper-msg" id="penaltyMsg">골대를 선택하세요!</div>
                     <div style="text-align:center;">
-                        <div class="mg-keeper" id="penaltyKeeper"><img src="${this._keeperSvg('ready', false)}" alt="keeper" style="vertical-align:middle;"><div style="color:rgba(255,255,255,0.8);font-size:0.75em;font-weight:700;margin-top:2px;">GK 문찬우</div></div>
+                        <div class="mg-keeper" id="penaltyKeeper">${this._keeperMarkup('ready', false)}<div style="color:rgba(255,255,255,0.8);font-size:0.75em;font-weight:700;margin-top:2px;">GK 문찬우</div></div>
                     </div>
                     <div id="keeperSpeech" style="display:none; text-align:center; background:rgba(0,0,0,0.75); color:white; padding:3px 14px; border-radius:12px; font-size:0.8em; white-space:nowrap; margin:4px auto 2px; width:fit-content; max-width:90vw; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.3s;"></div>
                     <div class="gs-penalty-field">
@@ -11429,29 +11479,35 @@
             },
             nextRound() {
                 this.round++; this.phase = 'aim'; this.selectedZone = -1;
+                this._profile=FootballGameRules.penalty(this._clock.now()/1000,this.round);
+                this._deadline=this._clock.now()+this._profile.deadline*1000;
+                const recent=this.shotHistory.slice(-3),guard=(this.round*2)%9;
+                this._guardZones=[...new Set([...recent.reverse(),guard])].slice(0,this._profile.guards);
+                for(let i=0;this._guardZones.length<this._profile.guards;i++){const zone=(guard+i+3)%9;if(!this._guardZones.includes(zone))this._guardZones.push(zone);}
+                this._roundTimer=this._clock.after(()=>this.stopPower(true),this._profile.deadline*1000);
                 this._isBossRound = this.round > 1 && this.round % 5 === 0;
                 this.updateHud();
                 const msg = document.getElementById('penaltyMsg');
                 if (this._isBossRound) {
                     SoundManager.play('boss');
                     if (msg) msg.textContent = `⚠️ 라운드 ${this.round} - 분노한 문찬우!`;
-                    setTimeout(() => this.showKeeperSpeech('roundStart'), 300);
+                    this._clock.after(() => this.showKeeperSpeech('roundStart'), 300);
                     const keeper = document.getElementById('penaltyKeeper');
-                    if (keeper) keeper.innerHTML = `<div style="position:relative;display:inline-block;"><img src="${this._keeperSvg('ready', true)}" alt="keeper" style="vertical-align:middle;"><div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);color:#ff4757;font-size:0.7em;font-weight:800;white-space:nowrap;text-shadow:0 0 8px rgba(255,71,87,0.5);">분노한 문찬우</div></div>`;
+                    if (keeper) keeper.innerHTML = `<div style="position:relative;display:inline-block;">${this._keeperMarkup('ready', true)}<div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);color:#ff4757;font-size:0.7em;font-weight:800;white-space:nowrap;text-shadow:0 0 8px rgba(255,71,87,0.5);">분노한 문찬우</div></div>`;
                     const field = document.querySelector('.gs-penalty-field');
                     if (field) field.classList.add('gs-boss-active');
                 } else {
                     if (msg) msg.textContent = `라운드 ${this.round} - 슈팅 위치를 선택하세요!`;
-                    setTimeout(() => this.showKeeperSpeech(this.round >= 7 ? 'highRound' : 'roundStart'), 300);
+                    this._clock.after(() => this.showKeeperSpeech(this.round >= 7 ? 'highRound' : 'roundStart'), 300);
                     const keeper = document.getElementById('penaltyKeeper');
-                    if (keeper) keeper.innerHTML = `<img src="${this._keeperSvg('ready', false)}" alt="keeper" style="vertical-align:middle;"><div style="color:rgba(255,255,255,0.8);font-size:0.75em;font-weight:700;margin-top:2px;">GK 문찬우</div>`;
+                    if (keeper) keeper.innerHTML = `${this._keeperMarkup('ready', false)}<div style="color:rgba(255,255,255,0.8);font-size:0.75em;font-weight:700;margin-top:2px;">GK 문찬우</div>`;
                     const field = document.querySelector('.gs-penalty-field');
                     if (field) field.classList.remove('gs-boss-active');
                 }
                 document.querySelectorAll('.gs-goal-zone').forEach((z, idx) => {
                     z.className = 'gs-goal-zone'; z.innerHTML = '';
-                    const recentCount = this.shotHistory.slice(-3).filter(h => h === idx).length;
-                    if (recentCount > 0) {
+                    z.setAttribute('aria-label',(idx+1)+'번 슈팅 구역'+(this._guardZones.includes(idx)?' · 키퍼 수비':''));
+                    if (this._guardZones.includes(idx)) {
                         z.classList.add('warned');
                         z.innerHTML = `<span class="warn-icon">!</span>`;
                     }
@@ -11460,9 +11516,10 @@
                 if (gauge) gauge.style.display = 'none';
                 const label = document.getElementById('penaltyPowerLabel');
                 if (label) { label.textContent = ''; label.style.color = 'white'; }
+                this._startGaugeLoop();
             },
             selectZone(i) {
-                if (this.phase !== 'aim') return;
+                if (this.phase !== 'aim'||this._stopped||mgManager.paused||!Number.isInteger(i)||i<0||i>8) return;
                 this.selectedZone = i; this.phase = 'power';
                 document.querySelectorAll('.gs-goal-zone').forEach((z, idx) => {
                     z.classList.remove('warned');
@@ -11472,13 +11529,7 @@
                 this.startPowerGauge();
             },
             getGreenZone() {
-                let pct = this.round <= 3 ? 70 : this.round <= 6 ? 50 : this.round <= 10 ? 35 : Math.max(3, 25 / (1 + (this.round - 10) * 0.08));
-                if (this._isBossRound) pct = Math.max(2, pct * 0.55);
-                const start = (100 - pct) / 2;
-                // 레드존: 초반 넉넉하게 → 후반 서서히 축소 (그린존과 독립적)
-                const redPct = this.round <= 3 ? 12 : this.round <= 6 ? 8 : this.round <= 10 ? 6 : Math.max(3, 5 / (1 + (this.round - 10) * 0.06));
-                const redStart = start + (pct - redPct) / 2;
-                return { start, end: start + pct, pct, redStart, redEnd: redStart + redPct, redPct };
+                return FootballGameRules.penaltyBand(this._profile,this._clock.now()/1000*1.6+this.round*.7);
             },
             startPowerGauge() {
                 const gauge = document.getElementById('penaltyGauge');
@@ -11490,23 +11541,20 @@
                 if (redEl) { redEl.style.left = green.redStart + '%'; redEl.style.width = green.redPct + '%'; }
                 document.getElementById('penaltyPowerLabel').textContent = '탭하여 슈팅!';
                 this.powerPos = 0; this.powerDir = 1;
-                let speed = 2 + this.round * 0.18;
-                this.powerInterval = setInterval(() => {
-                    this.powerPos += speed * this.powerDir;
-                    if (this.powerPos >= 100) { this.powerPos = 100; this.powerDir = -1; }
-                    if (this.powerPos <= 0) { this.powerPos = 0; this.powerDir = 1; }
-                    const bar = document.getElementById('penaltyBar');
-                    if (bar) bar.style.left = this.powerPos + '%';
-                }, 16);
+                this._startGaugeLoop();
             },
-            stopPower() {
-                if (this.phase !== 'power') return;
+            stopPower(expired=false) {
+                if(this._stopped||mgManager.paused)return;
+                if(expired&&this.phase==='aim'){this.phase='power';this.selectedZone=4;}
+                if(this.phase!=='power')return;
+                if(expired)this.powerPos=-Infinity;
+                this._clock.cancel(this._roundTimer);
                 this.phase = 'shot';
-                clearInterval(this.powerInterval); this.powerInterval = null;
+                this._clock.cancel(this.powerInterval); this.powerInterval = null;
                 const green = this.getGreenZone();
                 const inGreen = this.powerPos >= green.start && this.powerPos <= green.end;
                 const inRedZone = this.powerPos >= green.redStart && this.powerPos <= green.redEnd;
-                const accuracy = Math.max(0, 50 - Math.abs(this.powerPos - 50));
+                const accuracy = Math.max(0, 50 - Math.abs(this.powerPos - green.center));
                 // Power gauge result text
                 const center = (green.start + green.end) / 2;
                 const distFromCenter = Math.abs(this.powerPos - center);
@@ -11519,58 +11567,20 @@
                     else if (inGreen) { label.textContent = '아슬아슬'; label.style.color = '#e67e22'; }
                     else { label.textContent = '빗나갈 수도...'; label.style.color = '#e74c3c'; }
                 }
-                let saveProb = this.round <= 3 ? 0.20 : this.round <= 6 ? 0.35 : this.round <= 10 ? 0.50 : 0.60 + 0.30 * (1 - 1 / (1 + (this.round - 10) * 0.04));
-                if (this._isBossRound) saveProb += 0.15;
-                const zone = this.selectedZone;
-                // Pattern detection penalty (softened)
-                if (this.round > 3) {
-                    const recentSame = this.shotHistory.slice(-2).filter(z => z === zone).length;
-                    if (recentSame > 0) saveProb += 0.10 * recentSame;
-                }
-                if (this.round > 6 && this.shotHistory.filter(z => z === zone).length >= 2) saveProb += 0.15;
-                // 8라운드 이후 빈도 분석: 가장 많이 사용한 존이 25% 이상이면 추가 페널티
-                if (this.round > 8 && this.shotHistory.length > 0) {
-                    const freq = {};
-                    this.shotHistory.forEach(z => { freq[z] = (freq[z] || 0) + 1; });
-                    const maxFreq = Math.max(...Object.values(freq));
-                    if (maxFreq / this.shotHistory.length >= 0.25) saveProb += 0.05;
-                }
-                // Perfect power bonus: green zone center 30% hit → save prob -0.15
-                const isPerfect = inGreen && distFromCenter < greenHalf * 0.3;
-                if (isPerfect) saveProb -= 0.15;
-                // Zone diversity bonus: 4+ different zones in last 5 shots
-                if (this.shotHistory.length >= 4) {
-                    const recentZones = new Set(this.shotHistory.slice(-5));
-                    recentZones.add(zone);
-                    if (recentZones.size >= 4) {
-                        const diversityReduction = recentZones.size >= 5 ? 0.15 : 0.10;
-                        saveProb -= diversityReduction;
-                        this._zoneDiversityBonus++;
-                    }
-                }
-                // Kicker fatigue bonus: combo 3+ → slight save prob decrease
-                if (this.combo >= 3) {
-                    const fatigueBonus = Math.min(this.combo * 0.02, 0.10);
-                    saveProb -= fatigueBonus;
-                }
-                saveProb = Math.max(0.03, Math.min(saveProb, 0.95));
-                // 레드존 히트: 선방 불가능
-                if (inRedZone) saveProb = 0;
+                const zone=this.selectedZone;
+                const outcome=FootballGameRules.penaltyOutcome(this.powerPos,green,zone,this._guardZones);
+                const miss=outcome.miss,saved=outcome.saved,isPerfect=outcome.perfect;
+                const recentZones=new Set([...this.shotHistory.slice(-4),zone]);
+                if(recentZones.size>=4)this._zoneDiversityBonus++;
                 this.shotHistory.push(zone);
-                // Miss probability: smooth curve instead of sharp jump
-                const missPct = this.round <= 7 ? 0.5 : 0.5 + 0.40 * (1 - 1 / (1 + (this.round - 7) * 0.05));
-                // 10라운드 이후 그린존 내에서도 미세 빗나감 확률
-                const greenMissChance = this.round > 10 ? 0.40 * (1 - 1 / (1 + (this.round - 10) * 0.03)) : 0;
-                let miss = !inGreen && Math.random() < missPct;
-                if (!miss && inGreen && greenMissChance > 0 && Math.random() < greenMissChance) miss = true;
-                const saved = !miss && Math.random() < saveProb;
+                if(expired&&label)label.textContent='시간 초과!';
                 // Trajectory animation
                 this._showTrajectory(zone, miss);
-                this._shotTimeouts.push(setTimeout(() => {
+                this._shotTimeouts.push(this._clock.after(() => {
                     const zones = document.querySelectorAll('.gs-goal-zone');
                     if (miss) {
                         document.getElementById('penaltyMsg').textContent = '빗나갔다!';
-                        document.getElementById('penaltyKeeper').innerHTML = `<img src="${this._keeperSvg('smirk', this._isBossRound)}" alt="smirk" style="vertical-align:middle;">`;
+                        document.getElementById('penaltyKeeper').innerHTML = `${this._keeperMarkup('smirk', this._isBossRound)}`;
                         this.hearts--; this.combo = 0;
                         const mField = document.querySelector('.gs-penalty-field');
                         if (mField) mField.classList.remove('gs-combo-glow');
@@ -11579,7 +11589,7 @@
                     } else if (saved) {
                         if (zones[zone]) { zones[zone].classList.add('saved'); zones[zone].innerHTML = `<img src="${GameSprites.svgGlove(32, 'save')}" alt="save">`; }
                         document.getElementById('penaltyMsg').textContent = '문찬우 선방!';
-                        document.getElementById('penaltyKeeper').innerHTML = `<img src="${this._keeperSvg('save', this._isBossRound)}" alt="save" style="vertical-align:middle;">`;
+                        document.getElementById('penaltyKeeper').innerHTML = `${this._keeperMarkup('save', this._isBossRound)}`;
                         this.hearts--; this.combo = 0;
                         const sField = document.querySelector('.gs-penalty-field');
                         if (sField) sField.classList.remove('gs-combo-glow');
@@ -11588,7 +11598,7 @@
                     } else {
                         if (zones[zone]) { zones[zone].classList.add('scored'); zones[zone].innerHTML = `<img src="${GameSprites.svgBall(24)}" alt="goal">`; }
                         document.getElementById('penaltyMsg').textContent = '골!!';
-                        document.getElementById('penaltyKeeper').innerHTML = `<img src="${this._keeperSvg('miss', this._isBossRound)}" alt="miss" style="vertical-align:middle;">`;
+                        document.getElementById('penaltyKeeper').innerHTML = `${this._keeperMarkup('miss', this._isBossRound)}`;
                         this.combo++;
                         this.goalsScored++;
                         if (isPerfect) this._perfectCount++;
@@ -11609,7 +11619,7 @@
                         const field = document.querySelector('.gs-penalty-field');
                         if (this.combo >= 7) {
                             GameSprites.flashScreen('rgba(255,215,0,0.35)');
-                            if (field) { GameSprites.spawnConfetti(field, 40); field.classList.add('gs-combo-glow'); field.classList.add('gs-camera-shake'); this._shotTimeouts.push(setTimeout(() => field.classList.remove('gs-camera-shake'), 500)); }
+                            if (field) { GameSprites.spawnConfetti(field, 40); field.classList.add('gs-combo-glow'); field.classList.add('gs-camera-shake'); this._shotTimeouts.push(this._clock.after(() => field.classList.remove('gs-camera-shake'), 500)); }
                             this._showComboBanner('UNSTOPPABLE!');
                         } else if (this.combo >= 5) {
                             GameSprites.flashScreen('rgba(255,215,0,0.3)');
@@ -11635,14 +11645,14 @@
                         const shotMap = {};
                         this.shotHistory.forEach(z => { shotMap[z] = (shotMap[z]||0) + 1; });
                         const accuracy = this.shotHistory.length > 0 ? Math.round(this.goalsScored / this.shotHistory.length * 100) : 0;
-                        this._shotTimeouts.push(setTimeout(() => mgManager.showResult('penalty', this.score, {
+                        this._shotTimeouts.push(this._clock.after(() => mgManager.showResult('penalty', this.score, {
                             _summary: `라운드 ${this.round}까지 도달!`,
                             round: this.round, goals: this.goalsScored,
                             accuracy: accuracy, maxCombo: this.maxCombo, shotMap: shotMap,
                             perfectShots: this._perfectCount, zoneDiversity: this._zoneDiversityBonus
                         }), 1200));
                     } else {
-                        this._shotTimeouts.push(setTimeout(() => this.nextRound(), 1500));
+                        this._shotTimeouts.push(this._clock.after(() => this.nextRound(), 1500));
                     }
                 }, 500));
             },
@@ -11663,7 +11673,7 @@
                 ball.style.top = topPx + 'px';
                 field.style.position = 'relative';
                 field.appendChild(ball);
-                this._shotTimeouts.push(setTimeout(() => ball.remove(), 600));
+                this._shotTimeouts.push(this._clock.after(() => ball.remove(), 600));
             },
             _showComboBanner(text) {
                 const field = document.querySelector('.gs-penalty-field');
@@ -11672,7 +11682,7 @@
                 banner.className = 'gs-combo-banner';
                 banner.textContent = text;
                 field.appendChild(banner);
-                this._shotTimeouts.push(setTimeout(() => banner.remove(), 1300));
+                this._shotTimeouts.push(this._clock.after(() => banner.remove(), 1300));
             }
         };
 
@@ -11699,6 +11709,7 @@
                 this.centerHits = 0; this.defenderIntercepts = 0; this.maxCombo = 0;
                 this._longPasses = 0; this._throughPasses = 0;
                 this.targets = []; this.defenders = []; this.particles = [];
+                this._motionTime = 0;this._physicsRemainder=0;this._targetSequence=0;
                 this.dragging = false; this.defenderTimeout = null; this._ballTrail = [];
                 this._reactionText = ''; this._reactionTimer = 0; this._stopped = false;
                 this._timerBonus = 0; this._lastTickTime = Date.now();
@@ -11733,16 +11744,7 @@
                 window.addEventListener('orientationchange', this._orientationHandler);
                 this.updateHud();
                 this.spawnTarget();
-                this.timerInterval = setInterval(() => {
-                    const now = Date.now();
-                    const delta = Math.min((now - this._lastTickTime) / 1000, 0.5);
-                    this._lastTickTime = now;
-                    this.elapsed += delta;
-                    this.timer = Math.max(0, 40 + this._timerBonus - this.elapsed);
-                    this.timer = Math.min(this.timer, 45);
-                    this.updateHud();
-                    if (this.timer <= 0) { this.timer = 0; this.endGame(); }
-                }, 100);
+                this.timerInterval = setInterval(() => this.updateHud(), 100);
                 this.spawnInterval = setInterval(() => this.spawnTarget(), 3000);
                 this.defenderTimeout = setTimeout(() => this.spawnDefender(), 8000);
                 this.lastTime = performance.now();
@@ -11785,7 +11787,7 @@
                     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
                 };
                 this._md = (e) => {
-                    if (this.ball.active) return;
+                    if(this.ball.active||this._stopped||mgManager.paused)return;
                     const p = getPos(e);
                     if (Math.hypot(p.x - this.ball.x, p.y - this.ball.y) < 40) {
                         this.dragging = true;
@@ -11795,7 +11797,7 @@
                 };
                 this._mm = (e) => { if (this.dragging) this.dragEnd = getPos(e); };
                 this._mu = (e) => {
-                    if (!this.dragging) return;
+                    if(!this.dragging||this._stopped||mgManager.paused)return;
                     this.dragging = false;
                     const dx = this.dragStart.x - this.dragEnd.x, dy = this.dragStart.y - this.dragEnd.y;
                     const dist = Math.hypot(dx, dy);
@@ -11825,18 +11827,13 @@
                     ${GameSprites.comboIndicator(this.combo)}`;
             },
             _pickPattern() {
-                if (this.elapsed < 15) return 'linear';
-                if (this.elapsed < 25) return Math.random() < 0.5 ? 'circular' : 'linear';
-                if (this.elapsed < 35) return Math.random() < 0.5 ? 'circular' : 'zigzag';
-                const fig8Chance = Math.min(0.6, 0.3 + (this.elapsed - 35) * 0.008);
-                const r = Math.random();
-                if (r < (1 - fig8Chance) / 2) return 'circular';
-                if (r < (1 - fig8Chance)) return 'zigzag';
-                return 'figure8';
+                const patterns=FootballGameRules.passing(this.elapsed).patterns;
+                return patterns[this._targetSequence%patterns.length];
             },
             spawnTarget() {
-                const sz = this.elapsed < 15 ? 22 : this.elapsed < 25 ? 18 : Math.max(5, 14 - (this.elapsed - 25) * 0.15);
-                const sp = this.elapsed < 15 ? 1 : this.elapsed < 25 ? 1.8 : 3.0 + (this.elapsed - 25) * 0.12;
+                const profile=FootballGameRules.passing(this.elapsed);
+                if(this.targets.length>=profile.maxTargets)return;
+                const sz=profile.radius,sp=profile.speed;
                 const m = 40;
                 let tx, ty, tries = 0;
                 do {
@@ -11852,17 +11849,17 @@
                     vx: (Math.random() - 0.5) * sp * 2, vy: (Math.random() - 0.5) * sp * 2,
                     name: tName, pattern: pattern,
                     _t: Math.random() * Math.PI * 2,
-                    _cx: tx, _cy: ty, _sp: sp
+                    _cx: tx, _cy: ty, _sp: sp, life:profile.targetLife, maxLife:profile.targetLife, golden:++this._targetSequence%4===0
                 });
             },
             spawnDefender() {
                 if (!this.timerInterval) return;
-                const count = this.elapsed < 15 ? 1 : this.elapsed < 25 ? 2 : Math.min(6, 3 + Math.floor((this.elapsed - 25) / 25));
+                const profile=FootballGameRules.passing(this.elapsed),count=profile.defenders;
                 if (this.defenders.length < count) {
-                    const dSpeed = 2 + this.elapsed * 0.05;
+                    const dSpeed=profile.defenderSpeed;
                     this.defenders.push({
                         x: 30 + Math.random() * (this.w - 60), y: 50 + Math.random() * (this.h * 0.5),
-                        r: 16, vx: (Math.random() - 0.5) * dSpeed, vy: (Math.random() - 0.5) * dSpeed
+                        r: 16, vx: (Math.random() - 0.5) * dSpeed, vy: (Math.random() - 0.5) * dSpeed, screen:profile.movingGate&&!this.defenders.some(d=>d.screen), phase:0
                     });
                 }
                 this.defenderTimeout = setTimeout(() => this.spawnDefender(), 3500);
@@ -11870,24 +11867,38 @@
             loop() {
                 if (this._stopped) return;
                 const now = performance.now();
-                const dt = Math.min((now - this.lastTime) / 16.67, 3);
+                const dt = Math.min((now - this.lastTime) / (1000/60), 3);
                 this.lastTime = now;
-                this.update(dt); this.draw();
+                this._physicsRemainder+=dt;
+                while(this._physicsRemainder>=.5&&!this._stopped){this.update(.5);this._physicsRemainder-=.5;}
+                if(!this._stopped)this.draw();
                 if (!this._stopped) this.animFrame = requestAnimationFrame(() => this.loop());
             },
             update(dt) {
+                const seconds=dt/60,profile=FootballGameRules.passing(this.elapsed);
+                this.elapsed+=seconds;this._motionTime+=seconds;
+                this.timer=Math.max(0,this.timer-profile.drain*seconds);
+                if(this.timer<=0){this.endGame();return;}
+                for(const target of this.targets)target.life-=seconds;
+                const expired=this.targets.filter(target=>target.life<=0).length;
+                if(expired){this.targets=this.targets.filter(target=>target.life>0);this.combo=0;this.timer=Math.max(0,this.timer-expired*.6);}
+                if(!this.targets.length)this.spawnTarget();
                 if (this.ball.active) {
                     // Ball trail
                     if (!this._ballTrail) this._ballTrail = [];
                     this._ballTrail.push({ x: this.ball.x, y: this.ball.y });
                     if (this._ballTrail.length > 4) this._ballTrail.shift();
                     this.ball.x += this.ball.vx * dt; this.ball.y += this.ball.vy * dt;
-                    this.ball.vx *= 0.98; this.ball.vy *= 0.98;
+                    this.ball.vx *= Math.pow(.98,dt); this.ball.vy *= Math.pow(.98,dt);
                     for (let i = this.targets.length - 1; i >= 0; i--) {
                         const t = this.targets[i];
                         const dist = Math.hypot(this.ball.x - t.x, this.ball.y - t.y);
                         if (dist < t.r + this.ball.r) {
-                            const center = dist < t.r * 0.5;
+                            // The receiver catches at the outer radius. Judge aim along the
+                            // incoming path so a straight pass can still earn a center hit.
+                            const velocity=Math.hypot(this.ball.vx,this.ball.vy);
+                            const aimDistance=velocity>.01?Math.abs((t.x-this.ball.x)*this.ball.vy-(t.y-this.ball.y)*this.ball.vx)/velocity:dist;
+                            const center = aimDistance < t.r * 0.5;
                             this.combo++;
                             if (this.combo > this.maxCombo) this.maxCombo = this.combo;
                             if (center) this.centerHits++;
@@ -11906,16 +11917,16 @@
                             }
                             let throughPts = 0;
                             if (isThroughPass) { throughPts = 75; this._throughPasses++; }
-                            this.score += Math.floor((center ? 100 : 50) * mult * longPassMult) + throughPts;
+                            this.score += Math.floor((center ? 100 : 50) * mult * longPassMult * (t.golden?1.75:1)) + throughPts;
                             this.successPasses++;
                             SoundManager.play('goal');
-                            let timeBonus = Math.max(0.05, 0.7 - this.elapsed * 0.015);
+                            let timeBonus = profile.bonus;
                             if (isLongPass) timeBonus += 0.15;
                             if (isThroughPass) timeBonus += 0.25;
                             // Combo time bonus
                             if (this.combo >= 5) timeBonus += 0.25;
                             else if (this.combo >= 3) timeBonus += 0.15;
-                            this._timerBonus += timeBonus;
+                            this.timer=Math.min(45,this.timer+timeBonus);
                             // Time bonus floating animation
                             this._timeBonusAnim = 30;
                             this._timeBonusText = '+' + timeBonus.toFixed(1) + 's';
@@ -11924,7 +11935,8 @@
                             if (isThroughPass) { this._lastThroughPass = true; ParticleSystem.emit('confetti', t.x, t.y, 8, 30); }
                             else this._lastThroughPass = false;
                             let reactionText = passReactions.hit[Math.floor(Math.random() * passReactions.hit.length)];
-                            if (isThroughPass) reactionText = '스루패스!';
+                            if(t.golden)reactionText='골든 패스!';
+                            else if (isThroughPass) reactionText = '스루패스!';
                             else if (isLongPass) reactionText = '롱패스!';
                             this._reactionText = reactionText;
                             this._reactionTimer = 60; this._reactionX = t.x; this._reactionY = t.y - t.r - 15;
@@ -11933,13 +11945,13 @@
                                 x: t.x, y: t.y, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4,
                                 life: 20, color: particleColor
                             });
-                            this.targets.splice(i, 1); this.resetBall(); this.updateHud(); break;
+                            this.targets.splice(i, 1); this.resetBall(); this.spawnTarget(); this.updateHud(); break;
                         }
                     }
-                    for (const d of this.defenders) {
+                    if(this.ball.active)for (const d of this.defenders) {
                         if (Math.hypot(this.ball.x - d.x, this.ball.y - d.y) < d.r + this.ball.r) {
                             if (this.combo >= 3) this._showComboBreak();
-                            this.combo = 0; this._timerBonus = Math.max(this._timerBonus - 3, -10);
+                            this.combo = 0; this.timer=Math.max(0,this.timer-3);
                             this.defenderIntercepts++;
                             SoundManager.play('miss');
                             GameAnim.shakeCanvas(6);
@@ -11950,10 +11962,10 @@
                         }
                     }
                     const spd = Math.hypot(this.ball.vx, this.ball.vy);
-                    if (spd < 0.3) {
+                    if (this.ball.active && spd < 0.3) {
                         if (this.combo >= 3) this._showComboBreak();
                         this.combo = 0; this.resetBall(); this.updateHud();
-                    } else if (this.ball.x < -20 || this.ball.x > this.w+20 || this.ball.y < -20 || this.ball.y > this.h+20) {
+                    } else if (this.ball.active && (this.ball.x < -20 || this.ball.x > this.w+20 || this.ball.y < -20 || this.ball.y > this.h+20)) {
                         if (this.combo >= 3) this._showComboBreak();
                         this.combo = 0; this.resetBall(); this.updateHud();
                     }
@@ -11983,7 +11995,9 @@
                     t.y = Math.max(t.r, Math.min(this.h * 0.7, t.y));
                 });
                 this.defenders.forEach(d => {
-                    d.x += d.vx * dt; d.y += d.vy * dt;
+                    if(d.screen){d.phase+=seconds*(1+this.elapsed/180);d.x=this.w/2+Math.sin(d.phase)*this.w*.34;}
+                    else d.x+=d.vx*dt;
+                    d.y+=d.vy*dt;
                     if (d.x < d.r || d.x > this.w - d.r) d.vx *= -1;
                     if (d.y < d.r || d.y > this.h * 0.6) d.vy *= -1;
                 });
@@ -12096,7 +12110,9 @@
                     ctx.strokeStyle = `rgba(255,255,0,${0.15 + pulse * 0.2})`; ctx.lineWidth = 1; ctx.stroke();
                     // Player sprite with happy expression
                     const tExpr = t._justHit ? 'celebrate' : 'happy';
-                    GameSprites.drawPlayer(ctx, t.x, t.y, t.r, GameSprites.colors.jersey1, 'front', tExpr);
+                    ctx.save();ctx.strokeStyle=t.golden?'#ffd258':t.life<3?'#ff8269':'rgba(220,255,235,.65)';ctx.lineWidth=t.golden?3:2;
+                    ctx.beginPath();ctx.arc(t.x,t.y,t.r+5,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,t.life/t.maxLife));ctx.stroke();ctx.restore();
+                    GameSprites.drawPlayer(ctx, t.x, t.y, t.r, GameSprites.colors.jersey1, 'front', tExpr, null, null, {role:'player', pose:t._justHit?'celebrate':'running', animationTime:this._motionTime, phaseOffset:(t.r%7)/7});
                     // Target name label with outline
                     if (t.name) {
                         GameText.drawOutlined(ctx, t.name, t.x, t.y - t.r * 1.8 - 6, 10, '#fff', 'rgba(0,0,0,0.6)');
@@ -12136,7 +12152,7 @@
                     ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.restore();
-                    GameSprites.drawPlayer(ctx, d.x, d.y, d.r, GameSprites.colors.jersey2, 'front', 'angry');
+                    GameSprites.drawPlayer(ctx, d.x, d.y, d.r, GameSprites.colors.jersey2, 'front', 'angry', null, null, {role:'defender', pose:'running', animationTime:this._motionTime});
                 });
 
                 // Drag elastic band effect + power arc gauge
@@ -12324,6 +12340,7 @@
                 ctx.restore(); // end shake transform
             },
             pause() {
+                this.dragging=false;
                 if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
                 if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
                 if (this.spawnInterval) { clearInterval(this.spawnInterval); this.spawnInterval = null; }
@@ -12334,16 +12351,7 @@
                 this.lastTime = performance.now();
                 this._lastTickTime = Date.now();
                 if (this.timerInterval) clearInterval(this.timerInterval);
-                this.timerInterval = setInterval(() => {
-                    const now = Date.now();
-                    const delta = Math.min((now - this._lastTickTime) / 1000, 0.5);
-                    this._lastTickTime = now;
-                    this.elapsed += delta;
-                    this.timer = Math.max(0, 40 + this._timerBonus - this.elapsed);
-                    this.timer = Math.min(this.timer, 45);
-                    this.updateHud();
-                    if (this.timer <= 0) { this.timer = 0; this.endGame(); }
-                }, 100);
+                this.timerInterval = setInterval(() => this.updateHud(), 100);
                 if (this.spawnInterval) clearInterval(this.spawnInterval);
                 this.spawnInterval = setInterval(() => this.spawnTarget(), 3000);
                 if (this.defenderTimeout) clearTimeout(this.defenderTimeout);
@@ -12358,6 +12366,7 @@
                 this.loop();
             },
             endGame() {
+                if(this._stopped)return;
                 this.cleanup();
                 const rate = this.totalPasses > 0 ? Math.round(this.successPasses / this.totalPasses * 100) : 0;
                 const playTime = this.elapsed;
@@ -12414,6 +12423,9 @@
                 this.canvas = document.getElementById('dribbleCanvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.player = { x: this.w / 2, y: this.h - 50, r: 16 };
+                this._motionTime = 0;this.elapsed=0;this._physicsRemainder=0;this._spawnWaves=0;
+                this._runnerMotion = FootballArcade.createMotion(this.player.x);
+                this._motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 this.updateHud(); this.bindEvents();
                 this._doResize = () => {
                     if (this._stopped) return;
@@ -12428,6 +12440,8 @@
                     const sx = this.w / oldW, sy = this.h / oldH;
                     this.player.x = Math.max(this.player.r, Math.min(this.w - this.player.r, this.player.x * sx));
                     this.player.y = Math.max(this.player.r, Math.min(this.h - this.player.r, this.player.y * sy));
+                    this._runnerMotion.x = this.player.x;
+                    this._runnerMotion.lean = 0;
                     this.defenders.forEach(d => { d.x *= sx; d.y *= sy; });
                     this.coins.forEach(c => { c.x *= sx; c.y *= sy; });
                 };
@@ -12550,24 +12564,9 @@
                     ${GameSprites.comboIndicator(this.combo)}
                     <div style="color:rgba(255,255,255,0.8);font-size:0.8em;font-weight:700;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:8px;">${lvlText}</div>`;
             },
-            getDiff() {
-                const s = this.score;
-                if (s < 300) return { speed: 2, density: 1.5, lateral: 0, tracking: 0, level: 1 };
-                if (s < 700) return { speed: 2.5, density: 1.35, lateral: 0.3, tracking: 0, level: 2 };
-                if (s < 1200) return { speed: 3, density: 1.15, lateral: 0.5, tracking: 0.02, level: 3 };
-                if (s < 1800) return { speed: 3.5, density: 1.0, lateral: 0.65, tracking: 0.05, level: 4 };
-                if (s < 2500) return { speed: 4, density: 0.85, lateral: 0.8, tracking: 0.08, level: 5 };
-                if (s < 3500) return { speed: 4.8, density: 0.65, lateral: 0.95, tracking: 0.12, level: 6 };
-                if (s < 5000) return { speed: 5.5, density: 0.5, lateral: 1.1, tracking: 0.16, level: 7 };
-                // Level 8+: infinite scaling - gentler curve
-                const speed = 6 + (s - 5000) / 3000 + Math.pow((s - 5000) / 25000, 1.2);
-                const tracking = 0.16 + 0.3 * (1 - 1 / (1 + (s - 5000) / 6000));
-                const density = 0.15 + 0.35 / (1 + (s - 5000) / 8000);
-                const lateral = 1.1 + (s - 5000) / 8000 + Math.pow((s - 5000) / 25000, 1.1);
-                return { speed: speed, density: density, lateral: lateral, tracking: tracking, level: 8 };
-            },
+            getDiff() { return FootballGameRules.classic(this.elapsed,this.score); },
             _tryDash() {
-                if (this._dashCooldown > 0 || this._dashActive > 0) return;
+                if(this._stopped||mgManager.paused||this._dashCooldown>0||this._dashActive>0)return;
                 this._dashActive = 12; // ~0.2s at 60fps
                 this._dashCooldownEnd = performance.now() + 7000; // 7 seconds real time
                 this._dashCooldown = 300; // display fallback
@@ -12586,12 +12585,15 @@
             loop() {
                 if (this._stopped) return;
                 const now = performance.now();
-                const dt = Math.min((now - this.lastTime) / 16.67, 3);
+                const dt = Math.min((now - this.lastTime) / (1000/60), 3);
                 this.lastTime = now;
-                this.update(dt); this.draw();
+                this._physicsRemainder+=dt;
+                while(this._physicsRemainder>=.5&&!this._stopped){this.update(.5);this._physicsRemainder-=.5;}
+                if(!this._stopped)this.draw();
                 if (!this._stopped) this.animFrame = requestAnimationFrame(() => this.loop());
             },
             update(dt) {
+                this.elapsed+=dt/60;
                 const diff = this.getDiff();
                 if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
                 if (this.touchSide !== 0) {
@@ -12600,14 +12602,18 @@
                 this.player.x = Math.max(this.player.r, Math.min(this.w - this.player.r, this.player.x));
                 this.spawnTimer += dt;
                 if (this.spawnTimer > 60 * diff.density) {
-                    this.spawnTimer = 0;
+                    this.spawnTimer = 0;this._spawnWaves++;
                     let sx = Math.random() * (this.w - 40) + 20;
                     if (Math.abs(sx - this.player.x) < 40) sx = sx < this.player.x ? Math.max(20, sx - 50) : Math.min(this.w - 20, sx + 50);
+                    if(diff.gate&&this._spawnWaves%3===0){
+                        for(const side of [.23,.77])this.defenders.push({x:this.w*side,y:-20,r:14,vy:diff.speed,vx:0,tracking:0,screen:true});
+                    }else {
                     this.defenders.push({
                         x: sx, y: -20, r: 14,
                         vy: diff.speed, vx: (Math.random() - 0.5) * diff.lateral * 3,
                         tracking: Math.random() < diff.tracking ? (0.03 + diff.tracking * 0.08) : 0
                     });
+                    }
                 }
                 this.coinTimer += dt;
                 const coinInterval = this.score >= 1200 ? 90 : this.score >= 500 ? 110 : 140;
@@ -12718,8 +12724,8 @@
                 }
                 this.coins = this.coins.filter(c => c.y < this.h + 30);
                 // Boss check: every 1000 points
-                const bossThreshold = Math.floor(this.score / 1000);
-                if (bossThreshold > this._lastBossThreshold && this.score >= 1000) {
+                const bossThreshold = Math.floor(Math.max(this.score/1000,this.elapsed/diff.bossEvery));
+                if (bossThreshold > this._lastBossThreshold) {
                     this._lastBossThreshold = bossThreshold;
                     this._bossActive = true;
                     const bossTypes = [
@@ -12756,7 +12762,8 @@
                 if (this._nearMissTimer > 0) this._nearMissTimer -= dt;
                 for (const d of this.defenders) {
                     const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
-                    if (dist < this.player.r + d.r + 8 && dist >= this.player.r + d.r && this._nearMissTimer <= 0 && this.invincibleTimer <= 0 && this._dashActive <= 0) {
+                    if (!d._nearAwarded && dist < this.player.r + d.r + 8 && dist >= this.player.r + d.r && this._nearMissTimer <= 0 && this.invincibleTimer <= 0 && this._dashActive <= 0) {
+                        d._nearAwarded=true;
                         this._nearMissTimer = 30;
                         this._nearMissCount++;
                         const nmPts = d._isBoss ? 50 : 20;
@@ -12787,6 +12794,8 @@
                 this._particles = this._particles.filter(p => p.life > 0);
                 // hitFlash 감소 (dt 적용)
                 if (this._hitFlash > 0) this._hitFlash -= 0.05 * dt;
+                this._motionTime += dt / 60;
+                this._runnerMotion.advance(dt / 60, {x:this.player.x, speed:diff.speed*90, mode:this._hitFlash>.2?'hit':this._dashActive>0?'dash':'run'});
                 // Update shared systems
                 ParticleSystem.update(dt / 60);
                 GameAnim.updateTweens(dt);
@@ -12945,7 +12954,8 @@
                         ChibiSprite.drawChibi(ctx, d.x, d.y, d.r * 2.2, {
                             jersey: d._bossColor || '#cc0000',
                             expression: bossExpr,
-                            number: bossNum
+                            number: bossNum,
+                            role: 'defender', pose: 'running', animationTime: this._motionTime
                         });
 
                         // Boss name tag with glow
@@ -12959,7 +12969,7 @@
                         }
                     } else {
                         // Normal defenders with angry expression
-                        GameSprites.drawDefender(ctx, d.x, d.y, d.r);
+                        GameSprites.drawDefender(ctx, d.x, d.y, d.r, {pose:'running', animationTime:this._motionTime, phaseOffset:(d.r%7)/7});
                     }
                 });
 
@@ -13088,14 +13098,14 @@
                         for (let ai = 1; ai <= 4; ai++) {
                             ctx.save();
                             ctx.globalAlpha = 0.12 * (5 - ai) / 4;
-                            GameSprites.drawPlayer(ctx, px - dashDir * ai * 9, py, pr, '#70a1ff', 'front', 'determined');
+                            GameSprites.drawPlayer(ctx, px - dashDir * ai * 9, py, pr, '#70a1ff', 'front', 'determined', null, null, {motion:this._runnerMotion});
                             ctx.restore();
                         }
                         // Main player with glow
                         ctx.save();
                         ctx.shadowColor = '#70a1ff';
                         ctx.shadowBlur = 22;
-                        GameSprites.drawPlayer(ctx, px, py, pr, '#70a1ff', 'front', 'determined');
+                        GameSprites.drawPlayer(ctx, px, py, pr, '#70a1ff', 'front', 'determined', null, null, {motion:this._runnerMotion});
                         ctx.shadowBlur = 0;
                         // Dash aura ring
                         ctx.strokeStyle = 'rgba(112,161,255,0.4)';
@@ -13120,12 +13130,12 @@
                             ctx.setLineDash([]);
                             ctx.restore();
                         }
-                        GameSprites.drawPlayer(ctx, px, py, pr, GameSprites.colors.jersey1, 'front', expr);
+                        GameSprites.drawPlayer(ctx, px, py, pr, GameSprites.colors.jersey1, 'front', expr, null, null, {motion:this._runnerMotion});
                     }
 
                     // Ball dribble wobble
-                    const ballWobble = Math.sin(now / 120) * 3;
-                    GameSprites.drawSoccerBall(ctx, px + 4 + ballWobble, py + pr * 0.6, 6);
+                    const footstep = this._runnerMotion.sample(this._motionReduced);
+                    GameSprites.drawSoccerBall(ctx, px + 4 + footstep.ballX*.5, py + pr * 0.6-footstep.ballLift*.5, 6);
                 }
 
                 // Score texts with outlined style (drawn after player for z-order)
@@ -13298,6 +13308,8 @@
             },
             resume() {
                 this._stopped = false;
+                // Apply a viewport change that happened while the loop was paused.
+                if (this._doResize) this._doResize();
                 if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
                 if (this._dashCooldownRemaining > 0) {
                     this._dashCooldownEnd = performance.now() + this._dashCooldownRemaining;
@@ -13307,6 +13319,7 @@
                 this.loop();
             },
             endGame() {
+                if(this._stopped)return;
                 this.cleanup();
                 const diff = this.getDiff();
                 mgManager.showResult('dribble', this.score, {
@@ -13339,7 +13352,7 @@
             _reactionTimes: [], _isBossRound: false, _bossSpawned: false, _effectTimeouts: [],
             _deflectCount: 0, _lightningCount: 0, _fastCount: 0,
             _addTimeout(callback, delay) {
-                const id = setTimeout(() => {
+                const id = this._clock.after(() => {
                     callback();
                     const idx = this._effectTimeouts.indexOf(id);
                     if (idx !== -1) this._effectTimeouts.splice(idx, 1);
@@ -13348,39 +13361,28 @@
                 return id;
             },
             init() {
-                this.saves = 0; this.goals = 0; this.score = 0;
+                this.saves = 0; this.goals = 0; this._totalGoals=0; this.score = 0;
                 this.combo = 0; this.maxCombo = 0; this.balls = []; this.hot = false;
                 this._currentShooter = null; this._reactionTimes = []; this._isBossRound = false; this._bossSpawned = false; this._effectTimeouts = []; this._cutsceneActive = false; this._nextShooter = null; this._nextMultiCount = 0;
                 this._deflectCount = 0; this._lightningCount = 0; this._fastCount = 0;
                 this._stopped = false; this._touchUsed = false;
+                this._clock?.clear();this._clock=new FootballGameRules.PausableClock();
+                this._pendingShots=0;this._waveActive=false;this._waveNo=0;this._nextBallId=0;this._handReadyAt=0;this._reported=false;
                 this.render(); this.updateHud();
                 this.startSpawning();
             },
             cleanup() {
-                if (this.spawnTimer) { clearTimeout(this.spawnTimer); this.spawnTimer = null; }
-                this.balls.forEach(b => { if (b.timeout) clearTimeout(b.timeout); });
+                this._stopped=true;this._clock?.clear();
+                if (this.spawnTimer) { this._clock.cancel(this.spawnTimer); this.spawnTimer = null; }
+                this.balls.forEach(b => { if (b.timeout) this._clock.cancel(b.timeout); });
                 this.balls = [];
-                this._effectTimeouts.forEach(t => clearTimeout(t));
+                this._effectTimeouts.forEach(t => this._clock.cancel(t));
                 this._effectTimeouts = [];
                 this._cutsceneActive = false;
                 this._cleanupGkTouchEvents();
                 document.querySelectorAll('.gs-shooter-cutscene').forEach(el => el.remove());
             },
-            getDiff() {
-                const s = this.saves;
-                if (s < 6) return { speed: 1500, multi: 1 };
-                if (s < 12) return { speed: 1300, multi: 1 };
-                if (s < 18) return { speed: 1100, multi: 2 };
-                if (s < 24) return { speed: 950, multi: 2 };
-                if (s < 30) return { speed: 800, multi: 3 };
-                if (s < 38) return { speed: 650, multi: 3 };
-                if (s < 45) return { speed: 500, multi: 4 };
-                // 45+ infinite scaling
-                const extraSaves = s - 45;
-                const speed = Math.max(200, 450 * Math.pow(0.99, extraSaves));
-                const multi = Math.min(6, 4 + Math.floor(extraSaves / 20));
-                return { speed: speed, multi: multi };
-            },
+            getDiff() { return FootballGameRules.keeper(this._clock.now()/1000,this.saves); },
             render() {
                 const gloveImg = GameSprites.svgGlove(36, 'ready');
                 // Goal post SVG with 3D effect
@@ -13412,9 +13414,6 @@
                     const handler = (e) => {
                         if (e.type === 'touchstart') { e.preventDefault(); this._touchUsed = true; }
                         if (e.type === 'click' && this._touchUsed) return;
-                        const now = Date.now();
-                        if (now - this._lastTapTime < 80) return;
-                        this._lastTapTime = now;
                         this.tapZone(i);
                     };
                     zone.addEventListener('touchstart', handler, { passive: false });
@@ -13451,10 +13450,10 @@
                 const overlay = document.createElement('div');
                 overlay.className = 'gs-shooter-cutscene' + (isBoss ? ' boss' : '');
                 const shooterExpr = isBoss ? 'angry' : 'determined';
-                const playerSvg = ChibiSprite.svgChibi(56, { jersey: isBoss ? '#cc0000' : GameSprites.colors.jersey1, expression: shooterExpr, pose: 'running', number: isBoss ? '7' : '10' });
+                const playerMarkup = ChibiSprite.markup(56, { jersey: isBoss ? '#cc0000' : GameSprites.colors.jersey1, expression: shooterExpr, pose: 'running', number: isBoss ? '7' : '10' });
                 const line = shooter.lines[Math.floor(Math.random() * shooter.lines.length)];
                 overlay.innerHTML = `<div class="gs-shooter-cutscene-inner">
-                    <img src="${playerSvg}" alt="shooter" style="width:56px;height:53px;">
+                    ${playerMarkup}
                     <div><div class="name" style="${isBoss ? 'color:#ff4757;text-shadow:0 0 8px rgba(255,71,87,0.5);' : ''}">${escapeHtml(shooter.name)}</div><div class="line">"${escapeHtml(line)}"</div></div>
                 </div>`;
                 frame.style.position = 'relative';
@@ -13466,14 +13465,16 @@
                 }, 800);
             },
             startSpawning() {
-                if (this.goals >= 5) return;
+                if(this.goals>=5||this._stopped||this._waveActive)return;
+                this._waveActive=true;this._waveNo++;
                 // Reset boss flag when saves moved past the multiple of 15
                 if (this._bossSpawned && this.saves % 15 !== 0) this._bossSpawned = false;
                 const diff = this.getDiff();
-                const count = Math.min(diff.multi, 1 + Math.floor(Math.random() * diff.multi));
+                const count=diff.multi===1?1:2+(this._waveNo%(diff.multi-1));
+                this._pendingShots=count;this._waveBoss=this._waveNo%5===0;
                 const isMultiShot = count > 1;
                 // Pre-determine shooter for cutscene
-                const willBeBoss = this.saves > 0 && this.saves % 15 === 0 && !this._bossSpawned;
+                const willBeBoss=this._waveBoss;
                 let shooter;
                 if (willBeBoss) {
                     const pl = (typeof players !== 'undefined' && players.length > 0) ? players : defaultPlayers;
@@ -13501,7 +13502,7 @@
                         if (msg) msg.innerHTML = `<span style="color:#ff6b35; font-size:1.3em; font-weight:800; text-shadow:0 0 10px rgba(255,107,53,0.6);">⚡ 동시 다발슛 x${count}! ⚡</span>`;
                         this._addTimeout(() => {
                             for (let i = 0; i < count; i++) {
-                                this._addTimeout(() => this.spawnBall(), i * 120);
+                                this._addTimeout(() => this.spawnBall(), i * diff.gap);
                             }
                         }, 500);
                     } else {
@@ -13510,11 +13511,15 @@
                 });
             },
             spawnBall() {
-                if (this.goals >= 5) return;
+                this._pendingShots=Math.max(0,this._pendingShots-1);
+                if(this.goals>=5||this._stopped)return;
                 const diff = this.getDiff();
                 // Boss check: every 15 saves
-                this._isBossRound = this.saves > 0 && this.saves % 15 === 0 && !this._bossSpawned;
-                let target = Math.floor(Math.random() * 9);
+                this._isBossRound=this._waveBoss;
+                const occupied=new Set(this.balls.flatMap(ball=>[ball.target,ball.curveTarget]));
+                const free=Array.from({length:9},(_,i)=>i).filter(i=>!occupied.has(i));
+                if(!free.length){this._scheduleNextWave(300);return;}
+                const target=free[Math.floor(Math.random()*free.length)];
                 // Shooter identity - use pre-determined from cutscene or pick new
                 let shooter;
                 if (this._nextShooter) {
@@ -13538,68 +13543,75 @@
                 }
                 this._currentShooter = shooter;
                 const bossSpeedMult = this._isBossRound ? 0.7 : 1;
-                const speed = (this.hot ? diff.speed * 0.85 : diff.speed) * bossSpeedMult;
+                const speed = Math.max(310,(this.hot ? diff.speed * 0.9 : diff.speed) * bossSpeedMult);
                 const zones = document.querySelectorAll('.gs-gk-zone');
                 if (!zones[target]) return;
-                const ballId = Date.now() + Math.random();
-                const ball = { id: ballId, target, timeout: null, deadline: Date.now() + speed, spawnTime: Date.now(), _isBoss: this._isBossRound };
+                const ballId = ++this._nextBallId;
+                const ball = { id: ballId, target, timeout: null, deadline: this._clock.now() + speed, spawnTime: this._clock.now(), _isBoss: this._isBossRound };
+                ball.duration=speed;ball.hp=diff.power&&this._waveNo%3===0&&this.balls.length===0?2:1;
+                const adjacent=free.filter(i=>Math.abs(Math.floor(i/3)-Math.floor(target/3))+Math.abs(i%3-target%3)===1);
+                if(diff.curve&&this._waveNo%4===0&&this.balls.length===0&&adjacent.length){
+                    ball.curveTarget=adjacent[Math.floor(Math.random()*adjacent.length)];
+                    ball.readyAt=ball.spawnTime+speed*.35;
+                    ball.deadline+=120;
+                    this._addTimeout(()=>{if(!this.balls.includes(ball))return;ball.target=ball.curveTarget;ball.curveTarget=null;this._paintBalls();},speed*.35);
+                }
                 this.balls.push(ball);
-                const ballSvg = GameSprites.svgBall(32);
-                const gloveSvg = GameSprites.svgGlove(36, 'ready');
-                zones[target].innerHTML = `<img src="${ballSvg}" alt="ball" class="gs-ball-approach">`;
-                ball.timeout = setTimeout(() => {
-                    if (this.goals >= 5) return;
-                    const bi = this.balls.findIndex(b => b.id === ballId);
-                    if (bi === -1) return;
-                    this.balls.splice(bi, 1);
-                    this.goals++; this.combo = 0; this.hot = false;
-                    SoundManager.play('miss');
-                    if (zones[target]) {
-                        zones[target].innerHTML = `<img src="${GameSprites.svgExplosion(36)}" alt="goal">`;
-                        zones[target].classList.add('gs-gk-goal');
-                        const frame = document.getElementById('gkFrame');
-                        if (frame) { frame.classList.add('gs-shake'); this._addTimeout(() => frame.classList.remove('gs-shake'), 500); }
-                        this._addTimeout(() => { if (zones[target]) { zones[target].innerHTML = `<img src="${gloveSvg}" alt="glove">`; zones[target].classList.remove('gs-gk-goal'); } }, 700);
+                ball.timeout=this._clock.after(()=>this._expireBall(ballId),ball.deadline-this._clock.now());
+                this._paintBalls();
+            },
+            _paintBalls() {
+                const zones=document.querySelectorAll('.gs-gk-zone');
+                zones.forEach((zone,index)=>{
+                    if(this.balls.some(ball=>ball.target===index))return;
+                    zone.classList.remove('ball-active');
+                    if(!zone.classList.contains('gs-gk-save'))zone.innerHTML='<img src="'+GameSprites.svgGlove(36,'ready')+'" alt="glove">';
+                    delete zone.dataset.ballId;delete zone.dataset.ballTag;
+                    zone.setAttribute('aria-label',(index+1)+'번 방어 구역');
+                });
+                for(const ball of this.balls){
+                    const zone=zones[ball.target];if(!zone)continue;
+                    zone.classList.add('ball-active');zone.classList.remove('gs-gk-save');delete zone.dataset.saveId;
+                    let tag=ball.hp>1?'2 TAP':'';
+                    if(ball.curveTarget!==null&&ball.curveTarget!==undefined){const d=ball.curveTarget-ball.target;tag+=(tag?' ':'')+(d===1?'→':d===-1?'←':d>0?'↓':'↑');}
+                    if(zone.dataset.ballId!==String(ball.id)||zone.dataset.ballTag!==tag){
+                        const elapsed=this._clock.now()-ball.spawnTime,duration=ball.deadline-ball.spawnTime;
+                        zone.innerHTML='<img src="'+GameSprites.svgBall(32)+'" alt="ball" class="gs-ball-approach" style="animation-duration:'+duration+'ms;animation-delay:-'+elapsed+'ms"><b class="gk-shot-tag">'+tag+'</b>';
+                        zone.dataset.ballId=String(ball.id);zone.dataset.ballTag=tag;
                     }
-                    const msg = document.getElementById('gkMessage');
-                    if (msg) { msg.innerHTML = '<span style="color:#ff4757; font-size:1.2em;">실점!</span>'; }
-                    this.updateHud();
-                    if (this.goals >= 5) {
-                        this._addTimeout(() => this.endGame(), 800);
-                    } else {
-                        if (this.spawnTimer) clearTimeout(this.spawnTimer);
-                        this.spawnTimer = setTimeout(() => {
-                            if (document.getElementById('gkMessage')) document.getElementById('gkMessage').textContent = '';
-                            this.startSpawning();
-                        }, speed * 0.5);
-                    }
-                }, speed);
+                    zone.setAttribute('aria-label',(ball.target+1)+'번 공'+(ball.hp>1?' · 두 번 막기':'')+(tag&&ball.hp===1?' · 커브 예고 '+tag:''));
+                }
+            },
+            _scheduleNextWave(delay=400) {
+                if(this._stopped||this.goals>=5||this.balls.length||this._pendingShots||this._cutsceneActive||this.spawnTimer)return;
+                this._waveActive=false;
+                this.spawnTimer=this._clock.after(()=>{this.spawnTimer=null;this.startSpawning();},delay);
+            },
+            _expireBall(id) {
+                if(this._stopped)return;
+                const index=this.balls.findIndex(ball=>ball.id===id);if(index<0)return;
+                this.balls.splice(index,1);this.goals++;this._totalGoals++;this.combo=0;this.hot=false;
+                this._paintBalls();SoundManager.play('miss');GameSprites.flashScreen('rgba(255,71,87,.2)');
+                const msg=document.getElementById('gkMessage');if(msg)msg.textContent='실점!';this.updateHud();
+                if(this.goals>=5){this._stopped=true;this._clock.clear();this._addTimeout(()=>this.endGame(),800);}
+                else this._scheduleNextWave(this.getDiff().gap+180);
             },
             tapZone(zoneIdx) {
-                let matchingBalls = this.balls.filter(b => b.target === zoneIdx);
-                let isDeflect = false;
-                // Adjacent zone deflect: if no direct match, check adjacent zones
-                if (matchingBalls.length === 0) {
-                    const adjacent = [];
-                    const row = Math.floor(zoneIdx / 3), col = zoneIdx % 3;
-                    if (col > 0) adjacent.push(zoneIdx - 1);
-                    if (col < 2) adjacent.push(zoneIdx + 1);
-                    if (row > 0) adjacent.push(zoneIdx - 3);
-                    if (row < 2) adjacent.push(zoneIdx + 3);
-                    const adjBalls = this.balls.filter(b => adjacent.includes(b.target));
-                    if (adjBalls.length > 0) {
-                        const deflectChance = this.hot ? 0.40 : 0.25;
-                        if (Math.random() < deflectChance) {
-                            matchingBalls = [adjBalls[0]];
-                            isDeflect = true;
-                        }
-                    }
-                    if (matchingBalls.length === 0) return;
+                if(this._stopped||mgManager.paused||!Number.isInteger(zoneIdx)||zoneIdx<0||zoneIdx>8||!this.balls.length)return;
+                const now=this._clock.now();if(now<this._handReadyAt)return;
+                let matchingBalls=this.balls.filter(b=>b.target===zoneIdx&&now>=(b.readyAt||0)&&now<b.deadline);
+                let isDeflect=false;
+                if(!matchingBalls.length){
+                    const adjacent=this.balls.find(b=>b.hp===1&&now>=(b.readyAt||0)&&b.deadline-now>0&&b.deadline-now<b.duration*.2&&Math.abs(Math.floor(b.target/3)-Math.floor(zoneIdx/3))+Math.abs(b.target%3-zoneIdx%3)===1);
+                    if(adjacent){matchingBalls=[adjacent];isDeflect=true;}
+                    else {this._handReadyAt=now+this.getDiff().recovery;this.combo=0;this.hot=false;this.updateHud();const msg=document.getElementById('gkMessage');if(msg)msg.textContent='헛손질! 공을 보고 막아주세요';return;}
                 }
-                const tapTime = Date.now();
+                this._handReadyAt=now+90;
+                if(matchingBalls[0].hp>1){matchingBalls[0].hp--;this._paintBalls();SoundManager.play('deflect');const msg=document.getElementById('gkMessage');if(msg)msg.textContent='강슛! 한 번 더!';return;}
+                const tapTime = this._clock.now();
                 matchingBalls.forEach(b => {
-                    if (b.timeout) clearTimeout(b.timeout);
-                    if (b.spawnTime) this._reactionTimes.push(tapTime - b.spawnTime);
+                    if (b.timeout) this._clock.cancel(b.timeout);
+                    if (Number.isFinite(b.spawnTime)) this._reactionTimes.push(tapTime - b.spawnTime);
                 });
                 const ballIds = new Set(matchingBalls.map(b => b.id));
                 this.balls = this.balls.filter(b => !ballIds.has(b.id));
@@ -13619,7 +13631,7 @@
                 let baseScore = Math.floor(level * 50 * comboMult * matchingBalls.length * bossMult * scoreMult);
                 // Reaction speed bonus
                 let reactionLabel = '';
-                if (matchingBalls.length > 0 && matchingBalls[0].spawnTime) {
+                if (matchingBalls.length > 0 && Number.isFinite(matchingBalls[0].spawnTime)) {
                     const reactionMs = tapTime - matchingBalls[0].spawnTime;
                     if (reactionMs < 400) { baseScore += 25; reactionLabel = 'LIGHTNING!'; this._lightningCount++; }
                     else if (reactionMs < 600) { baseScore += 10; reactionLabel = 'FAST!'; this._fastCount++; }
@@ -13628,7 +13640,7 @@
                 // Heart recovery: every 20 combo, recover 1 heart (max 5)
                 let _heartRecovered = false;
                 const prevCombo = this.combo - matchingBalls.length;
-                if (this.combo >= 20 && Math.floor(this.combo / 20) > Math.floor(prevCombo / 20) && this.goals > 0) {
+                if (!isDeflect && this.combo >= 20 && Math.floor(this.combo / 20) > Math.floor(prevCombo / 20) && this.goals > 0) {
                     this.goals = Math.max(0, this.goals - 1);
                     _heartRecovered = true;
                 }
@@ -13638,6 +13650,7 @@
                 const saveZone = isDeflect ? matchingBalls[0].target : zoneIdx;
                 if (zones[saveZone]) {
                     zones[saveZone].classList.add('gs-gk-save');
+                    const saveId=String(matchingBalls[0].id);zones[saveZone].dataset.saveId=saveId;
                     zones[saveZone].innerHTML = `<img src="${saveSvg}" alt="save">`;
                     const popup = document.createElement('div');
                     popup.className = 'gs-save-popup';
@@ -13650,7 +13663,7 @@
                     zones[saveZone].appendChild(popup);
                     this._addTimeout(() => popup.remove(), 700);
                     this._addTimeout(() => {
-                        if (zones[saveZone]) { zones[saveZone].classList.remove('gs-gk-save'); zones[saveZone].innerHTML = `<img src="${gloveSvg}" alt="glove">`; }
+                        if (zones[saveZone]?.dataset.saveId===saveId&&!this.balls.some(b=>b.target===saveZone)) { zones[saveZone].classList.remove('gs-gk-save');delete zones[saveZone].dataset.saveId; zones[saveZone].innerHTML = `<img src="${gloveSvg}" alt="glove">`; }
                     }, 700);
                 }
                 const msg = document.getElementById('gkMessage');
@@ -13668,114 +13681,20 @@
                         this.updateHud();
                     }, 600);
                 }
-                // Clean up display zones of removed balls then show remaining balls
-                const allZones = document.querySelectorAll('.gs-gk-zone');
-                const ballSvg = GameSprites.svgBall(32);
-                // Reset matched balls' target zones to gloves (if not the saved zone)
-                matchingBalls.forEach(b => {
-                    if (b.target !== zoneIdx && b.target !== saveZone && allZones[b.target]) allZones[b.target].innerHTML = `<img src="${gloveSvg}" alt="glove">`;
-                });
-                this.balls.forEach(b => {
-                    if (allZones[b.target]) allZones[b.target].innerHTML = `<img src="${ballSvg}" alt="ball">`;
-                });
-                // Update ball-active indicators on zones
-                document.querySelectorAll('.gs-gk-zone').forEach(z => z.classList.remove('ball-active'));
-                this.balls.forEach(b => {
-                    const zones = document.querySelectorAll('.gs-gk-zone');
-                    if (zones[b.target]) zones[b.target].classList.add('ball-active');
-                });
-                if (this.balls.length === 0) {
-                    if (this.spawnTimer) clearTimeout(this.spawnTimer);
-                    this.spawnTimer = setTimeout(() => {
-                        if (document.getElementById('gkMessage')) document.getElementById('gkMessage').textContent = '';
-                        this.startSpawning();
-                    }, 600);
-                }
+                this._paintBalls();
+                this._scheduleNextWave(Math.max(180,420-this.getDiff().level*12));
             },
-            pause() {
-                const now = Date.now();
-                if (this.spawnTimer) { clearTimeout(this.spawnTimer); this.spawnTimer = null; }
-                this._effectTimeouts.forEach(t => clearTimeout(t));
-                this._effectTimeouts = [];
-                // Clean up pending visual effects immediately
-                const frame = document.getElementById('gkFrame');
-                if (frame) frame.classList.remove('gs-shake');
-                const zones = document.querySelectorAll('.gs-gk-zone');
-                zones.forEach(z => z.classList.remove('gs-gk-save', 'gs-gk-goal'));
-                // Remove cutscene overlay if active
-                if (this._cutsceneActive) {
-                    document.querySelectorAll('.gs-shooter-cutscene').forEach(el => el.remove());
-                    this._cutsceneActive = false;
-                    this._pausedDuringCutscene = true;
-                } else {
-                    this._pausedDuringCutscene = false;
-                }
-                this.balls.forEach(b => {
-                    if (b.timeout) { clearTimeout(b.timeout); b.timeout = null; }
-                    b.remaining = Math.max(0, (b.deadline || now) - now);
-                });
-            },
-            resume() {
-                if (this.goals >= 5) return;
-                const zones = document.querySelectorAll('.gs-gk-zone');
-                const gloveSvg = GameSprites.svgGlove(36, 'ready');
-                const ballSvg = GameSprites.svgBall(32);
-                // Reset all zones to normal glove state before re-showing balls
-                zones.forEach(z => { z.innerHTML = `<img src="${gloveSvg}" alt="glove">`; z.classList.remove('gs-gk-save', 'gs-gk-goal'); });
-                this.balls.forEach(b => {
-                    const ballId = b.id;
-                    const remaining = b.remaining || 500;
-                    // Re-show balls on zones
-                    if (zones[b.target]) zones[b.target].innerHTML = `<img src="${ballSvg}" alt="ball" class="gs-ball-approach">`;
-                    // spawnTime 갱신: 일시정지 시간을 제외한 반응속도 측정을 위해
-                    const originalDuration = (b.deadline && b.spawnTime) ? (b.deadline - b.spawnTime) : remaining;
-                    const elapsedBeforePause = originalDuration - remaining;
-                    b.spawnTime = Date.now() - elapsedBeforePause;
-                    b.deadline = Date.now() + remaining;
-                    b.timeout = setTimeout(() => {
-                        if (this.goals >= 5) return;
-                        const bi = this.balls.findIndex(x => x.id === ballId);
-                        if (bi === -1) return;
-                        this.balls.splice(bi, 1);
-                        this.goals++; this.combo = 0; this.hot = false;
-                        SoundManager.play('miss');
-                        if (zones[b.target]) {
-                            zones[b.target].innerHTML = `<img src="${GameSprites.svgExplosion(36)}" alt="goal">`;
-                            zones[b.target].classList.add('gs-gk-goal');
-                            const frame = document.getElementById('gkFrame');
-                            if (frame) { frame.classList.add('gs-shake'); this._addTimeout(() => frame.classList.remove('gs-shake'), 500); }
-                            this._addTimeout(() => { if (zones[b.target]) { zones[b.target].innerHTML = `<img src="${gloveSvg}" alt="glove">`; zones[b.target].classList.remove('gs-gk-goal'); } }, 700);
-                        }
-                        const resumeMsg = document.getElementById('gkMessage');
-                        if (resumeMsg) { resumeMsg.innerHTML = '<span style="color:#ff4757; font-size:1.2em;">실점!</span>'; }
-                        this.updateHud();
-                        if (this.goals >= 5) {
-                            this._addTimeout(() => this.endGame(), 800);
-                        } else {
-                            const diff = this.getDiff();
-                            const speed = this.hot ? diff.speed * 0.85 : diff.speed;
-                            if (this.spawnTimer) clearTimeout(this.spawnTimer);
-                            this.spawnTimer = setTimeout(() => this.startSpawning(), speed * 0.5);
-                        }
-                    }, remaining);
-                });
-                if (this.balls.length === 0) {
-                    if (this._pausedDuringCutscene) {
-                        this._pausedDuringCutscene = false;
-                        this.spawnTimer = setTimeout(() => this.startSpawning(), 300);
-                    } else {
-                        this.spawnTimer = setTimeout(() => this.startSpawning(), 600);
-                    }
-                }
-            },
+            pause() { this._clock.pause(); },
+            resume() { this._clock.resume(); },
             endGame() {
+                if(this._reported)return;this._reported=true;
                 this._stopped = true;
                 this.cleanup();
                 const avgReaction = this._reactionTimes.length > 0 ? Math.round(this._reactionTimes.reduce((a,b)=>a+b,0) / this._reactionTimes.length) : 0;
-                const saveRate = (this.saves + this.goals) > 0 ? Math.round(this.saves / (this.saves + this.goals) * 100) : 0;
+                const saveRate = (this.saves + this._totalGoals) > 0 ? Math.round(this.saves / (this.saves + this._totalGoals) * 100) : 0;
                 mgManager.showResult('goalkeeper', this.score, {
                     _summary: `${this.saves}세이브 (최대 ${this.maxCombo}연속)!`,
-                    saves: this.saves, goals: this.goals,
+                    saves: this.saves, goals: this._totalGoals,
                     saveRate: saveRate, maxCombo: this.maxCombo,
                     avgReaction: avgReaction,
                     deflects: this._deflectCount, lightning: this._lightningCount, fast: this._fastCount
@@ -13819,14 +13738,14 @@
                 this._posDisplay = 50; this._speechText = ''; this._speechTimer = 0;
                 this._maxLevel = 1; this._frame = 0; this._feverFlash = 0;
                 this._fallingTiles = []; this._removingTiles = []; this._specialFx = [];
-                this._lastBlockerSpawn = 0;
+                this._lastBlockerSpawn = 0;this._pressureActive=false;
                 this._swapData = null; this._matchedCells = []; this._pendingSpecials = [];
                 this._usedTouch = false; this._needsValidCheck = true;
 
                 const area = document.getElementById('mgGameArea');
                 const areaW = Math.min(360, area.clientWidth - 8);
                 this.barW = 70;
-                this.tileSize = Math.floor((areaW - this.barW - 6) / this.COLS);
+                this.tileSize = Math.max(20,Math.min(Math.floor((areaW-this.barW-6)/this.COLS),Math.floor((window.innerHeight-area.getBoundingClientRect().top-32)/this.ROWS)));
                 const gridW = this.tileSize * this.COLS;
                 const gridH = this.tileSize * this.ROWS;
                 this.gridX = 0; this.gridY = 0;
@@ -13836,8 +13755,11 @@
                 this.ctx = this.canvas.getContext('2d');
 
                 // Load player image
-                this._playerImg = new Image();
-                this._playerImg.src = GameSprites.svgPlayer(32, GameSprites.colors.jersey1, 'running', 'angry');
+                this._playerImg = null;
+                if (!window.FootballArcade) {
+                    this._playerImg = new Image();
+                    this._playerImg.src = GameSprites.svgPlayer(32, GameSprites.colors.jersey1, 'running', 'determined', {role:'player'});
+                }
 
                 this.createGrid();
                 this._onMD = this.handlePointerDown.bind(this);
@@ -13856,7 +13778,7 @@
                     const area = document.getElementById('mgGameArea');
                     if (!area || !this.canvas) return;
                     const areaW = Math.min(360, area.clientWidth - 8);
-                    const newTileSize = Math.floor((areaW - this.barW - 6) / this.COLS);
+                    const newTileSize = Math.max(20,Math.min(Math.floor((areaW-this.barW-6)/this.COLS),Math.floor((window.innerHeight-area.getBoundingClientRect().top-32)/this.ROWS)));
                     if (newTileSize === this.tileSize) return;
                     this.tileSize = newTileSize;
                     const gridW = this.tileSize * this.COLS;
@@ -13941,7 +13863,7 @@
             // ===== GAME LOOP =====
             gameLoop(ts) {
                 if (this.gameOver) return;
-                if (this.paused) { this._rafId = requestAnimationFrame(t => this.gameLoop(t)); return; }
+                if(this.paused)return;
                 const dt = Math.min((ts - this._lastTime) / 1000, 0.05);
                 this._lastTime = ts; this._frame++;
                 this.elapsed += dt;
@@ -13950,12 +13872,13 @@
                 const level = this.getLevel();
                 if (level > this._maxLevel) this._maxLevel = level;
                 const speed = this.getAdvanceSpeed();
-                if (!this.feverActive) {
+                const canAct=['idle','swapping','reverting'].includes(this.animState);
+                if(!this.feverActive&&canAct){
                     this.position = Math.min(100, this.position + speed * dt);
                 }
                 // Danger check
                 if (this.position >= 95) {
-                    this._dangerTimer += dt;
+                    if(canAct)this._dangerTimer += dt;
                     if (this._dangerTimer >= 3) { this.failGame(); return; }
                 } else {
                     this._dangerTimer = 0;
@@ -13997,9 +13920,12 @@
                 // Blocker spawning
                 if (this.animState === 'idle' && level >= 2) {
                     this._lastBlockerSpawn += dt;
-                    if (this._lastBlockerSpawn > 15) { this._lastBlockerSpawn = 0; this._maybeSpawnBlockers(); }
+                    if(this._lastBlockerSpawn>FootballGameRules.puzzle(this.elapsed).blockerInterval){this._lastBlockerSpawn=0;this._maybeSpawnBlockers();}
                 }
 
+                const pressing=this.elapsed>=45&&(this.elapsed-45)%18<4;
+                if(pressing&&!this._pressureActive){this._speechText='전방 압박! 연쇄로 밀어내!';this._speechTimer=3;}
+                this._pressureActive=pressing;
                 this._render();
                 ParticleSystem.update(dt);
                 this.updateHud();
@@ -14013,6 +13939,7 @@
                         const {r1,c1,r2,c2} = this._swapData;
                         [this.grid[r1][c1], this.grid[r2][c2]] = [this.grid[r2][c2], this.grid[r1][c1]];
                         const groups = this._findMatchGroups();
+                        if(!groups.length&&(this.grid[r1][c1]?.special||this.grid[r2][c2]?.special))groups.push({cells:[{r:r1,c:c1},{r:r2,c:c2}],dir:r1===r2?'h':'v',type:this.grid[r1][c1].type,len:2});
                         if (groups.length > 0) {
                             this.chainCount = 1;
                             this._startMatching(groups);
@@ -14086,12 +14013,13 @@
                     }
                 }
                 this._matchedCells = [...allCells].map(k => { const [r,c] = k.split(',').map(Number); return {r,c}; });
-                // Activate specials that are in matched cells (snapshot to avoid mutation during iteration)
-                const specialCells = this._matchedCells.filter(({r,c}) => { const t = this.grid[r][c]; return t && t.special; });
-                specialCells.forEach(({r,c}) => {
+                // Expanded explosions may reach another special; each tile fires once.
+                const activated=new Set();
+                for(let i=0;i<this._matchedCells.length;i++){
+                    const {r,c}=this._matchedCells[i],key=r+','+c;
                     const tile = this.grid[r][c];
-                    if (tile && tile.special) this._activateSpecial(r, c, tile.special);
-                });
+                    if(tile?.special&&!tile.blocker&&!activated.has(key)){activated.add(key);this._activateSpecial(r,c,tile.special);}
+                }
                 // Damage adjacent blockers
                 const blockerDamaged = new Set();
                 this._matchedCells.forEach(({r,c}) => {
@@ -14123,7 +14051,7 @@
                 pushback = Math.round(pushback * chainMult);
                 if (this.feverActive) pushback *= 2;
                 this.position = Math.max(0, this.position - pushback);
-                this._dangerTimer = 0;
+                if(this.position<95)this._dangerTimer=0;
                 // Score
                 let basePoints = 0;
                 groups.forEach(g => { basePoints += g.len >= 5 ? 100 : g.len === 4 ? 60 : 30; });
@@ -14314,6 +14242,7 @@
                 const cell = this._pixelToGrid(px, py);
                 if (!cell) return;
                 if (this.grid[cell.r][cell.c] && this.grid[cell.r][cell.c].blocker) return;
+                if(this.grid[cell.r][cell.c]?.special){this._useSpecial(cell.r,cell.c);return;}
                 if (this.selected) {
                     const dr = Math.abs(cell.r - this.selected.r), dc = Math.abs(cell.c - this.selected.c);
                     if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
@@ -14364,6 +14293,7 @@
                 } else {
                     // Tap (click-select)
                     const cell = this._pixelToGrid(ex, ey);
+                    if(cell&&this.grid[cell.r][cell.c]?.special&&!this.grid[cell.r][cell.c].blocker){this._useSpecial(cell.r,cell.c);this._touchR=-1;this._touchC=-1;return;}
                     if (cell && this.grid[cell.r][cell.c] && !this.grid[cell.r][cell.c].blocker) {
                         if (this.selected) {
                             const ddr = Math.abs(cell.r - this.selected.r), ddc = Math.abs(cell.c - this.selected.c);
@@ -14377,11 +14307,17 @@
             },
 
             _trySwap(r1, c1, r2, c2) {
+                if(this.gameOver||this.paused||this.animState!=='idle'||![r1,r2].every(r=>Number.isInteger(r)&&r>=0&&r<this.ROWS)||![c1,c2].every(c=>Number.isInteger(c)&&c>=0&&c<this.COLS)||Math.abs(r1-r2)+Math.abs(c1-c2)!==1||!this.grid[r1][c1]||!this.grid[r2][c2]||this.grid[r1][c1].blocker||this.grid[r2][c2].blocker)return;
                 this.movesMade++;
                 this.selected = null;
                 this._swapData = { r1, c1, r2, c2 };
                 this.animState = 'swapping'; this.animProgress = 0; this.animDuration = 0.2;
                 SoundManager.play('click');
+            },
+            _useSpecial(r,c) {
+                if(this.gameOver||this.paused||this.animState!=='idle'||!this.grid[r]?.[c]?.special||this.grid[r][c].blocker)return;
+                this.movesMade++;this.selected=null;this._swapData=null;this.chainCount=1;
+                this._startMatching([{cells:[{r,c}],dir:'h',type:this.grid[r][c].type,len:1}]);
             },
 
             // ===== RENDERING =====
@@ -14914,7 +14850,9 @@
                 const glowColor = 'rgb(' + glowR + ',' + glowG + ',' + glowB + ')';
                 ctx.save(); ctx.shadowColor = glowColor;
                 ctx.shadowBlur = 7 + 4 * Math.sin(this._frame * 0.08);
-                if (this._playerImg && this._playerImg.complete) {
+                if (window.FootballArcade) {
+                    FootballArcade.drawMascot(ctx, cx, charPosY-2, 28, {role:'player', pose:'running', animationTime:this.elapsed});
+                } else if (this._playerImg && this._playerImg.complete) {
                     ctx.drawImage(this._playerImg, cx - 13, charPosY - 15, 26, 26);
                 } else {
                     ctx.fillStyle = glowColor;
@@ -15003,25 +14941,10 @@
             _easeOut(t) { return 1 - (1 - t) * (1 - t); },
 
             // ===== DIFFICULTY =====
-            getLevel() {
-                const t = this.elapsed;
-                if (t < 30) return 1;
-                if (t < 60) return 2;
-                if (t < 120) return 3;
-                if (t < 180) return 4;
-                if (t < 240) return 5;
-                if (t < 300) return 6;
-                return 7;
-            },
+            getLevel() { return FootballGameRules.puzzle(this.elapsed).level; },
             getAdvanceSpeed() {
-                const t = this.elapsed;
-                if (t < 30) return 1.0;
-                if (t < 60) return 1.8;
-                if (t < 120) return 2.5;
-                if (t < 180) return 3.5;
-                if (t < 240) return 4.5;
-                if (t < 300) return 6.0;
-                return 6.0 + (t - 300) * 0.01;
+                const profile=FootballGameRules.puzzle(this.elapsed);
+                return profile.speed*(profile.pressure&&(this.elapsed-45)%18<4?1.3:1);
             },
 
             // ===== FEVER =====
@@ -15047,6 +14970,7 @@
 
             // ===== SHUFFLE =====
             _hasValidMoves() {
+                if(this.grid.some(row=>row.some(tile=>tile?.special&&!tile.blocker)))return true;
                 for (let r = 0; r < this.ROWS; r++) {
                     for (let c = 0; c < this.COLS; c++) {
                         if (!this.grid[r][c] || this.grid[r][c].blocker) continue;
@@ -15095,19 +15019,20 @@
             // ===== BLOCKERS =====
             _maybeSpawnBlockers() {
                 const level = this.getLevel();
-                const maxBlockers = level <= 2 ? 2 : level <= 3 ? 4 : level <= 4 ? 5 : level <= 5 ? 6 : 7;
+                const profile=FootballGameRules.puzzle(this.elapsed),maxBlockers=profile.maxBlockers;
                 let current = 0;
                 for (let r = 0; r < this.ROWS; r++) for (let c = 0; c < this.COLS; c++) {
                     if (this.grid[r][c] && this.grid[r][c].blocker) current++;
                 }
                 if (current >= maxBlockers) return;
-                const toSpawn = Math.min(maxBlockers - current, level <= 2 ? 1 : 2);
+                const toSpawn=Math.min(maxBlockers-current,profile.blockerCount);
+                this._needsValidCheck=true;
                 for (let i = 0; i < toSpawn; i++) {
                     let attempts = 0;
                     while (attempts++ < 20) {
                         const r = Math.floor(Math.random() * this.ROWS), c = Math.floor(Math.random() * this.COLS);
                         if (this.grid[r][c] && !this.grid[r][c].blocker && !this.grid[r][c].special) {
-                            const useMud = level >= 3 && Math.random() < 0.3;
+                            const useMud=profile.armored&&Math.random()<.4;
                             this.grid[r][c] = { type: null, special: null, blocker: useMud ? 'mud' : 'grass', blockerHP: useMud ? 2 : 1, fromY: -1, scale: 1, alpha: 1 };
                             break;
                         }
@@ -15117,6 +15042,7 @@
 
             // ===== GAME END =====
             failGame() {
+                if(this.gameOver)return;
                 this.gameOver = true;
                 this.cleanup();
                 SoundManager.play('miss');
@@ -15161,14 +15087,18 @@
                     <div style="background:linear-gradient(135deg,${lvColor},${lvColor}cc);color:white;border-radius:6px;padding:3px 8px;font-size:0.8em;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.3);">Lv${level}</div>`;
             },
             pause() {
-                this.paused = true;
+                this.paused=true;this.selected=null;
+                if(this._rafId){cancelAnimationFrame(this._rafId);this._rafId=null;}
             },
             resume() {
                 if (this.gameOver) return;
                 this.paused = false;
                 this._lastTime = performance.now();
+                this._doResize?.();
+                this._rafId=requestAnimationFrame(t=>this.gameLoop(t));
             },
             cleanup() {
+                this.gameOver=true;
                 if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
                 if (this.canvas) {
                     this.canvas.removeEventListener('mousedown', this._onMD);
@@ -15190,6 +15120,20 @@
             }
         };
 
+    </script>
+    <script src="football-game-rules.js"></script>
+    <script src="football-arcade.js"></script>
+    <script src="football-minigames.js"></script>
+    <script src="football-game-center.js"></script>
+    <script>
+        FootballGameCenter.configure({
+            canAccess: () => isAdmin,
+            names: () => (players.length ? players : defaultPlayers).map(player => player.name),
+            database: () => db,
+            timestamp: () => firebase.firestore.FieldValue.serverTimestamp(),
+            startMiniGame: (gameId, session) => FootballMiniGames.open(gameId, session),
+            closeMiniGame: () => FootballMiniGames.close(false)
+        });
     </script>
 </body>
 </html>
