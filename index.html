@@ -429,6 +429,45 @@
             color: #333;
         }
 
+        /* 풋살/축구 티어 보기 전환 */
+        .rating-view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .search-filter-bar .rating-view-toggle { margin-bottom: 0; }
+        .rating-view-btn {
+            min-height: 44px;
+            padding: 6px 18px;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            background: white;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .rating-view-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        .rating-view-note {
+            margin-bottom: 12px;
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+        }
+        /* 축구 표가 없어 풋살 평가를 쓰는 선수 */
+        .tier-player-fallback {
+            background: white;
+            border: 1px dashed #aaa;
+            color: #666;
+        }
+        .tier-player-fallback sup { margin-left: 2px; font-size: 0.7em; color: #999; }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -3480,10 +3519,16 @@
                 초기값으로 되돌리기
             </button>
             <button id="voteBtn" class="btn btn-primary" onclick="openVoteModal()">
-                티어 투표하기
+                풋살 티어 투표하기
+            </button>
+            <button id="soccerVoteBtn" class="btn btn-primary" onclick="openVoteModal('soccer')">
+                축구 티어 투표하기
             </button>
             <button id="voteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal()" style="background: #17a2b8; color: white; display: none;">
-                티어 투표 이력 보기
+                풋살 투표 이력 보기
+            </button>
+            <button id="soccerVoteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal('soccer')" style="background: #17a2b8; color: white; display: none;">
+                축구 투표 이력 보기
             </button>
             <button id="gameCenterBtn" type="button" class="fa-entry" onclick="FootballGameCenter.open()" style="display: none;" disabled>🎮 게임 센터</button>
             <button id="resetMiniGameBtn" class="btn btn-secondary" onclick="resetMiniGameScores()" style="background: #e67e22; color: white; display: none;">
@@ -3584,6 +3629,11 @@
 
         <div class="tier-table">
             <div class="tier-table-title">티어 표</div>
+            <div class="rating-view-toggle" role="group" aria-label="티어 기준 선택">
+                <button type="button" class="rating-view-btn active" data-rating-view="futsal" aria-pressed="true" onclick="setRatingView('futsal')">풋살</button>
+                <button type="button" class="rating-view-btn" data-rating-view="soccer" aria-pressed="false" onclick="setRatingView('soccer')">축구</button>
+            </div>
+            <div class="rating-view-note" id="ratingViewNote" hidden>점선으로 표시한 선수(풋)는 축구 표가 없어 풋살 평가를 사용합니다.</div>
             <div class="tier-list" id="tierList"></div>
         </div>
 
@@ -3628,6 +3678,10 @@
             <!-- 선수 검색/필터 -->
             <div class="search-filter-bar">
                 <input type="text" id="playerSearchInput" class="search-input" placeholder="선수 이름 검색..." aria-label="선수 이름 검색" oninput="filterPlayers()">
+                <div class="rating-view-toggle" role="group" aria-label="선수 목록 티어 기준 선택">
+                    <button type="button" class="rating-view-btn active" data-rating-view="futsal" aria-pressed="true" onclick="setRatingView('futsal')">풋살</button>
+                    <button type="button" class="rating-view-btn" data-rating-view="soccer" aria-pressed="false" onclick="setRatingView('soccer')">축구</button>
+                </div>
                 <div class="tier-filters" id="tierFilters">
                     <button class="tier-filter-btn active" aria-pressed="true" onclick="toggleTierFilter('all', this)">전체</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('황제', this)">👑</button>
@@ -4334,7 +4388,75 @@
         let teamConfigurationVersion = 0;
         let teamGenerationRunning = false;
         let playerRatingRevision = 0;
-        
+
+        // ====== 축구 티어 (풋살 투표와 분리) ======
+        // 축구 표는 한 기기당 문서 1개: soccerVotes/{deviceId} = { deviceId, tiers: { 선수이름: 티어 }, timestamp }
+        const SOCCER_VOTES_COLLECTION = 'soccerVotes';
+        const VOTE_SPORT_LABELS = { futsal: '풋살', soccer: '축구' };
+        let soccerVotesListener = null;
+        let latestSoccerBallots = null;
+        // 티어 표·선수 카드·티어 필터가 보여주는 기준 ('futsal' | 'soccer')
+        let ratingView = 'futsal';
+        // 현재 열려 있는 투표 모달의 종목
+        let currentVoteSport = 'futsal';
+        // 가장 최근의 투표 모달 열기 요청 번호, 그리고 열린 모달의 선수 이름 순서 (vote_idx_N ↔ 이름)
+        let voteModalRequest = 0;
+        let voteModalPlayerNames = [];
+
+        // 투표에 쓸 수 있는 값인지 (티어 또는 '모름')
+        function isVoteTier(tier) {
+            return tier === '모름' || (typeof tier === 'string' && Object.hasOwn(tierVoteScores, tier));
+        }
+
+        function getSoccerTier(player) {
+            return Object.hasOwn(tierWeights, player.soccerTier) ? player.soccerTier : player.tier;
+        }
+
+        // 축구 편성·전술판용 선수 복사본: tier/rating 자리에 축구 평가를 넣는다 (TeamBuilder는 그대로 사용)
+        function toSoccerPlayer(player) {
+            if (!Object.hasOwn(tierWeights, player.soccerTier)) return { ...player };
+            return { ...player, tier: player.soccerTier, rating: player.soccerRating };
+        }
+
+        function viewTier(player) {
+            return ratingView === 'soccer' ? getSoccerTier(player) : player.tier;
+        }
+
+        // 축구 평가 = 관리자 축구 티어 → 축구 투표 → (유효한 축구 표가 없으면) 풋살 평가.
+        // 집계 규칙(트림 평균·연속 레이팅)은 풋살과 같고, 결과는 풋살 값(tier/rating)과 별도 필드에 둔다.
+        function applySoccerRatings() {
+            const grouped = new Map();
+            (latestSoccerBallots || []).forEach(ballot => {
+                const tiers = ballot && ballot.tiers && typeof ballot.tiers === 'object' ? ballot.tiers : {};
+                Object.entries(tiers).forEach(([playerName, tier]) => {
+                    if (!isVoteTier(tier)) return;
+                    if (!grouped.has(playerName)) grouped.set(playerName, []);
+                    grouped.get(playerName).push({ playerName, tier });
+                });
+            });
+            const summaries = Object.create(null);
+            for (const player of players) {
+                const summary = summarizeVotes(grouped.get(player.name) || []);
+                if (summary) summaries[player.name] = summary;
+            }
+            const ratings = calculateRatings(summaries);
+            for (const player of players) {
+                const summary = summaries[player.name];
+                // 관리자 축구 티어가 없을 때 적용되는 값
+                const auto = summary
+                    ? { tier: tierFromScore(summary.mean), rating: Math.round(ratings[player.name] * 1000) / 1000, source: 'votes' }
+                    : { tier: player.tier, rating: player.rating, source: 'futsal' };
+                const manual = Object.hasOwn(tierWeights, player.soccerManualTier);
+                Object.assign(player, {
+                    soccerTier: manual ? player.soccerManualTier : auto.tier,
+                    soccerRating: manual ? tierWeights[player.soccerManualTier] : auto.rating,
+                    soccerSource: manual ? 'manual' : auto.source,
+                    soccerAutoTier: auto.tier,
+                    soccerVoteCount: summary ? summary.voteCount : 0
+                });
+            }
+        }
+
         // 페이지 로드 시 초기화
         function init() {
             // 모달은 항상 표시 (사용자가 선택하도록)
@@ -4367,6 +4489,7 @@
                 try {
                     await loadPlayersFromFirebase();
                     setupRealtimeListener();
+                    setupSoccerVotesListener();
                 } catch (error) {
                     console.error('데이터 로드 실패:', error.message);
                     players = defaultPlayers.map((p, idx) => ({ ...p, id: 'temp_' + idx }));
@@ -4433,7 +4556,17 @@
             if (voteHistoryBtn) {
                 voteHistoryBtn.style.display = isAdmin ? 'inline-block' : 'none';
             }
-            
+
+            // 축구 티어 투표·이력 버튼도 같은 규칙
+            const soccerVoteBtn = document.getElementById('soccerVoteBtn');
+            if (soccerVoteBtn) {
+                soccerVoteBtn.style.display = isAdmin ? 'none' : 'inline-block';
+            }
+            const soccerVoteHistoryBtn = document.getElementById('soccerVoteHistoryBtn');
+            if (soccerVoteHistoryBtn) {
+                soccerVoteHistoryBtn.style.display = isAdmin ? 'inline-block' : 'none';
+            }
+
             // 게임 센터는 관리자에게만 표시
             const gameCenterBtn = document.getElementById('gameCenterBtn');
             if (gameCenterBtn) {
@@ -4539,10 +4672,13 @@
         let ratingRefreshSequence = 0;
 
         function normalizePlayer(id, data) {
+            // 티어 값은 화면에 그대로 들어가므로 알려진 티어만 받는다.
+            const knownTier = value => Object.hasOwn(tierWeights, value) ? value : null;
             return {
-                ...data, id, name: data.name, tier: data.tier || 'B',
-                baseTier: data.baseTier || (Number.isFinite(data.rating) ? 'B' : (data.tier || 'B')),
+                ...data, id, name: data.name, tier: knownTier(data.tier) || 'B',
+                baseTier: knownTier(data.baseTier) || (Number.isFinite(data.rating) ? 'B' : (knownTier(data.tier) || 'B')),
                 manualTier: Object.hasOwn(tierWeights, data.manualTier) ? data.manualTier : null,
+                soccerManualTier: Object.hasOwn(tierWeights, data.soccerManualTier) ? data.soccerManualTier : null,
                 rating: Number.isFinite(data.rating) ? data.rating : undefined,
                 win: data.win || 0, draw: data.draw || 0, loss: data.loss || 0
             };
@@ -4573,6 +4709,28 @@
                 latestVotes = snapshot.docs.map(doc => doc.data());
                 updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(onError);
             }, onError);
+        }
+
+        // 축구 표 구독. 풋살 구독과 분리해 축구 쪽 오류가 풋살 평가·화면에 영향을 주지 않게 한다.
+        function setupSoccerVotesListener() {
+            if (soccerVotesListener) soccerVotesListener();
+            soccerVotesListener = null;
+            if (!db) return;
+            const refresh = () => {
+                applySoccerRatings();
+                // 풋살 보기에서는 축구 표가 바뀌어도 화면에 달라지는 것이 없다.
+                if (ratingView === 'soccer') renderPlayers();
+            };
+            soccerVotesListener = db.collection(SOCCER_VOTES_COLLECTION).onSnapshot(snapshot => {
+                latestSoccerBallots = snapshot.docs.map(doc => ({ deviceId: doc.id, ...doc.data() }));
+                refresh();
+            }, error => {
+                // 보안 규칙 미설정(permission-denied) 등: 방문자에게 경고하지 않고 풋살 평가로 대체한다.
+                console.warn('축구 투표 동기화 실패 — 풋살 평가를 사용합니다:', error);
+                soccerVotesListener = null;
+                latestSoccerBallots = null;
+                refresh();
+            });
         }
 
         // Firebase에 선수 목록 저장
@@ -4627,12 +4785,16 @@
                     changed ||= player.tier !== tier || player.rating !== rating;
                     Object.assign(player, { tier, rating, voteCount: summary ? summary.voteCount : 0 });
                 }
+                // 축구 표가 없는 선수는 풋살 평가를 따르므로, 풋살 값이 바뀔 때마다 축구 평가도 다시 계산한다.
+                applySoccerRatings();
                 // Votes and explicit manual overrides are the shared source of truth.
                 // Derived ratings stay local, avoiding competing admin snapshot writes.
                 if (changed) playerRatingRevision++;
             } catch (error) {
                 console.error('티어 업데이트 실패:', error);
                 showToast('최신 투표 평가를 불러오지 못했습니다.', 'warning');
+                // 풋살 표를 읽지 못해도 이미 받은 축구 표는 계속 적용한다 (선수 목록이 새 객체로 바뀐 직후 대비).
+                applySoccerRatings();
             }
         }
 
@@ -4657,7 +4819,7 @@
             // 필터링
             const filtered = players.filter(p => {
                 const matchName = !searchQuery || p.name.toLowerCase().includes(searchQuery);
-                const matchTier = tierFilter === 'all' || p.tier === tierFilter;
+                const matchTier = tierFilter === 'all' || viewTier(p) === tierFilter;
                 return matchName && matchTier;
             });
 
@@ -4709,6 +4871,15 @@
                     : '';
 
                 const safeName = escapeHtml(player.name);
+                // 축구 보기에서는 같은 선택 상자가 축구 티어(관리자 축구 티어)를 다룬다.
+                const soccerView = ratingView === 'soccer';
+                const manualTier = soccerView ? player.soccerManualTier : player.manualTier;
+                const tierChangeHandler = soccerView
+                    ? `updatePlayerSoccerTier('${playerId}', this.value)`
+                    : `updatePlayerById('${playerId}', 'tier', this.value)`;
+                const autoLabel = !soccerView ? `투표 자동 (${tierLabel(player.tier)})`
+                    : player.soccerVoteCount > 0 ? `투표 자동 (${tierLabel(player.soccerAutoTier)})`
+                    : `축구 표 없음 · 풋살 (${tierLabel(player.soccerAutoTier || player.tier)})`;
                 card.innerHTML = `
                     <div class="player-name">
                         <input type="checkbox" class="player-checkbox"
@@ -4719,18 +4890,18 @@
                     </div>
                     <div class="player-fields">
                         <div class="field-group">
-                            <label>티어</label>
-                            <select onchange="updatePlayerById('${playerId}', 'tier', this.value)" onclick="event.stopPropagation()" ${tierSelectDisabled}>
-                                <option value="auto" ${!player.manualTier ? 'selected' : ''}>투표 자동 (${tierLabel(player.tier)})</option>
-                                <option value="황제" ${player.manualTier === '황제' ? 'selected' : ''}>👑</option>
-                                <option value="S" ${player.manualTier === 'S' ? 'selected' : ''}>S</option>
-                                <option value="A+" ${player.manualTier === 'A+' ? 'selected' : ''}>A+</option>
-                                <option value="A" ${player.manualTier === 'A' ? 'selected' : ''}>A</option>
-                                <option value="A-" ${player.manualTier === 'A-' ? 'selected' : ''}>A-</option>
-                                <option value="B+" ${player.manualTier === 'B+' ? 'selected' : ''}>B+</option>
-                                <option value="B" ${player.manualTier === 'B' ? 'selected' : ''}>B</option>
-                                <option value="C" ${player.manualTier === 'C' ? 'selected' : ''}>C</option>
-                                <option value="D" ${player.manualTier === 'D' ? 'selected' : ''}>D</option>
+                            <label>${soccerView ? '축구 티어' : '티어'}</label>
+                            <select onchange="${tierChangeHandler}" onclick="event.stopPropagation()" ${tierSelectDisabled}>
+                                <option value="auto" ${!manualTier ? 'selected' : ''}>${autoLabel}</option>
+                                <option value="황제" ${manualTier === '황제' ? 'selected' : ''}>👑</option>
+                                <option value="S" ${manualTier === 'S' ? 'selected' : ''}>S</option>
+                                <option value="A+" ${manualTier === 'A+' ? 'selected' : ''}>A+</option>
+                                <option value="A" ${manualTier === 'A' ? 'selected' : ''}>A</option>
+                                <option value="A-" ${manualTier === 'A-' ? 'selected' : ''}>A-</option>
+                                <option value="B+" ${manualTier === 'B+' ? 'selected' : ''}>B+</option>
+                                <option value="B" ${manualTier === 'B' ? 'selected' : ''}>B</option>
+                                <option value="C" ${manualTier === 'C' ? 'selected' : ''}>C</option>
+                                <option value="D" ${manualTier === 'D' ? 'selected' : ''}>D</option>
                             </select>
                         </div>
                         ${deleteButtonHtml}
@@ -4772,7 +4943,7 @@
         function selectAllPlayers() {
             const filtered = players.filter(p => {
                 const matchName = !searchQuery || p.name.toLowerCase().includes(searchQuery);
-                const matchTier = tierFilter === 'all' || p.tier === tierFilter;
+                const matchTier = tierFilter === 'all' || viewTier(p) === tierFilter;
                 return matchName && matchTier;
             });
             setSelectedPlayers([...selectedPlayers, ...filtered.map(player => player.name)]);
@@ -4784,7 +4955,7 @@
         function deselectAllPlayers() {
             const filtered = players.filter(p => {
                 const matchName = !searchQuery || p.name.toLowerCase().includes(searchQuery);
-                const matchTier = tierFilter === 'all' || p.tier === tierFilter;
+                const matchTier = tierFilter === 'all' || viewTier(p) === tierFilter;
                 return matchName && matchTier;
             });
             const removed = new Set(filtered.map(player => player.name));
@@ -4846,6 +5017,19 @@
             document.querySelectorAll('.tier-filter-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
             btn.classList.add('active');
             btn.setAttribute('aria-pressed', 'true');
+            renderPlayers();
+        }
+
+        // 티어 표·선수 카드·티어 필터의 기준을 풋살/축구로 전환 (팀 구성 버튼은 각자의 종목 평가를 쓴다)
+        function setRatingView(view) {
+            ratingView = view === 'soccer' ? 'soccer' : 'futsal';
+            document.querySelectorAll('.rating-view-btn').forEach(button => {
+                const active = button.dataset.ratingView === ratingView;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            // 축구 표 구독이 끊겨 있었다면 다시 연결한다 (투표 버튼이 없는 관리자 화면도 새로고침 없이 복구).
+            if (ratingView === 'soccer' && !soccerVotesListener) setupSoccerVotesListener();
             renderPlayers();
         }
 
@@ -4969,17 +5153,25 @@
                         }
                         if (count2 > 0) await batch2.commit();
                     }
-                    
+
+                    // 축구 투표 데이터 삭제 (실패해도 나머지 초기화는 계속한다)
+                    const soccerVotesCleared = await clearSoccerVotes();
+
                     // 기본 선수 데이터 추가
                     await initializeDefaultPlayers();
-                    
+
                     // 선택된 선수 목록 초기화
                     setSelectedPlayers([]);
-                    
+
                     // 선수 목록 다시 로드
                     await loadPlayersFromFirebase();
-                    
-                    showToast('초기값으로 복원되었습니다.', 'success');
+
+                    if (soccerVotesCleared) {
+                        showToast('초기값으로 복원되었습니다.', 'success');
+                    } else {
+                        // 기본 선수는 이름이 같아서, 남은 축구 표가 그대로 다시 적용된다.
+                        showToast('초기값으로 복원했지만 축구 투표는 삭제하지 못했습니다. 남은 축구 표가 계속 적용됩니다.', 'warning');
+                    }
                 } catch (error) {
                     console.error('초기화 실패:', error);
                     showToast('초기화에 실패했습니다: ' + error.message, 'error');
@@ -5017,7 +5209,26 @@
             }
         }
 
-        async function openVoteModal() {
+        // 이 기기가 해당 종목에 한 기존 투표 { 선수이름: 티어 } (없으면 null)
+        async function loadOwnVotes(sport) {
+            const deviceId = getDeviceId();
+            if (sport === 'soccer') {
+                const ballot = await db.collection(SOCCER_VOTES_COLLECTION).doc(deviceId).get();
+                const tiers = ballot.exists ? ballot.data().tiers : null;
+                return tiers && typeof tiers === 'object' ? { ...tiers } : null;
+            }
+            const snapshot = await db.collection('votes').where('deviceId', '==', deviceId).get();
+            if (snapshot.empty) return null;
+            const own = {};
+            snapshot.docs.forEach(doc => {
+                const vote = doc.data();
+                own[vote.playerName] = vote.tier;
+            });
+            return own;
+        }
+
+        async function openVoteModal(sport = 'futsal') {
+            sport = sport === 'soccer' ? 'soccer' : 'futsal';
             if (!db) {
                 showToast('Firebase가 초기화되지 않았습니다. 투표 기능을 사용할 수 없습니다.', 'error');
                 return;
@@ -5028,44 +5239,47 @@
                 return;
             }
 
-            // 투표 상태 확인
-            const deviceId = getDeviceId();
-            try {
-                const votesSnapshot = await db.collection('votes')
-                    .where('deviceId', '==', deviceId)
-                    .get();
+            // 제출 중에는 다른 종목의 모달을 열지 않는다 (끝난 제출이 새로 연 모달을 닫지 않게).
+            if (submitting['vote']) return;
+            // 풋살·축구 버튼을 연달아 누르면 마지막 요청만 모달을 연다.
+            // 늦게 끝난 앞선 요청이 이미 열린 모달의 종목과 내용을 바꿔치기하지 않게 한다.
+            const request = ++voteModalRequest;
 
-                if (!votesSnapshot.empty) {
-                    const confirmed = await showConfirm('이미 투표하셨습니다. 다시 투표하시겠습니까?\n(기존 투표는 덮어씌워집니다)');
-                    if (!confirmed) return;
-                }
-            } catch (error) {
-                console.error('투표 상태 확인 실패:', error);
-            }
-            
-            // 기존 투표 데이터 가져오기 (있으면 미리 채우기)
-            const existingVotes = {};
+            // 투표 상태 확인 + 기존 투표 데이터 가져오기 (있으면 미리 채우기)
+            let existingVotes = null;
+            let loadError = null;
             try {
-                const existingVotesSnapshot = await db.collection('votes')
-                    .where('deviceId', '==', deviceId)
-                    .get();
-                
-                existingVotesSnapshot.docs.forEach(doc => {
-                    const voteData = doc.data();
-                    existingVotes[voteData.playerName] = voteData.tier;
-                });
+                existingVotes = await loadOwnVotes(sport);
             } catch (error) {
-                console.error('기존 투표 데이터 로드 실패:', error);
+                loadError = error;
             }
-            
+            if (request !== voteModalRequest) return;
+            if (loadError) {
+                console.error('투표 상태 확인 실패:', loadError);
+                if (sport === 'soccer' && loadError.code === 'permission-denied') {
+                    showToast('축구 티어 투표가 아직 열리지 않았습니다. 관리자에게 문의해주세요.', 'warning');
+                    return;
+                }
+            }
+            if (existingVotes) {
+                const confirmed = await showConfirm(`이미 ${VOTE_SPORT_LABELS[sport]} 티어 투표를 하셨습니다. 다시 투표하시겠습니까?\n(기존 투표는 덮어씌워집니다)`);
+                if (!confirmed || request !== voteModalRequest) return;
+            }
+            existingVotes = existingVotes || {};
+            currentVoteSport = sport;
+            document.getElementById('voteModalTitle').textContent = `${VOTE_SPORT_LABELS[sport]} 티어 투표`;
+
             // 투표 UI 생성
             const voteContent = document.getElementById('voteContent');
             voteContent.innerHTML = '<div id="emperorVoteNotice" class="emperor-vote-notice"></div><div class="vote-grid" id="voteGrid"></div>';
-            
+
             const voteGrid = document.getElementById('voteGrid');
+            // vote_idx_N이 어느 선수인지 모달을 만들 때 고정한다.
+            // 모달이 열린 동안 선수가 추가·삭제되어도 제출할 때 표가 옆 선수로 밀리지 않는다.
+            voteModalPlayerNames = players.map(player => player.name);
             players.forEach((player, idx) => {
                 // 기존 투표가 있으면 그 값을 사용, 없으면 기본값 모름 사용 (다른 사람의 투표 결과가 아닌)
-                const selectedTier = existingVotes[player.name] || '모름';
+                const selectedTier = isVoteTier(existingVotes[player.name]) ? existingVotes[player.name] : '모름';
 
                 const voteItem = document.createElement('div');
                 voteItem.className = 'vote-item';
@@ -5149,11 +5363,12 @@
             const deviceId = getDeviceId();
             const votes = [];
 
-            players.forEach((player, idx) => {
+            voteModalPlayerNames.forEach((playerName, idx) => {
                 const select = document.getElementById(`vote_idx_${idx}`);
-                if (select) {
+                // 모달을 연 뒤 삭제된 선수의 표는 저장하지 않는다.
+                if (select && players.some(player => player.name === playerName)) {
                     votes.push({
-                        playerName: player.name,
+                        playerName,
                         tier: select.value
                     });
                 }
@@ -5168,11 +5383,30 @@
             }
 
             try {
+                if (currentVoteSport === 'soccer') {
+                    // 축구 표는 기기당 문서 1개를 통째로 덮어쓴다 (풋살 votes 컬렉션은 건드리지 않는다)
+                    const tiers = {};
+                    votes.forEach(({ playerName, tier }) => {
+                        // 선수 이름이 문서의 필드 이름이 된다. Firestore가 받지 않는 이름(__이름__)은 건너뛴다.
+                        if (!/^__.*__$/.test(playerName)) tiers[playerName] = tier;
+                    });
+                    await db.collection(SOCCER_VOTES_COLLECTION).doc(deviceId).set({
+                        deviceId,
+                        tiers,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // 구독이 끊겨 있었다면(보안 규칙을 나중에 추가한 경우 등) 다시 연결한다
+                    if (!soccerVotesListener) setupSoccerVotesListener();
+                    closeVoteModal();
+                    showToast('축구 티어 투표가 완료되었습니다.', 'success');
+                    return;
+                }
+
                 // 기존 투표 삭제 (이 디바이스의 모든 투표)
                 const existingVotesSnapshot = await db.collection('votes')
                     .where('deviceId', '==', deviceId)
                     .get();
-                
+
                 const batch = db.batch();
                 existingVotesSnapshot.docs.forEach(doc => {
                     batch.delete(doc.ref);
@@ -5207,7 +5441,8 @@
         }
 
         // 투표 이력 모달 열기 (관리자 전용)
-        async function openVoteHistoryModal() {
+        async function openVoteHistoryModal(sport = 'futsal') {
+            sport = sport === 'soccer' ? 'soccer' : 'futsal';
             if (!db) {
                 showToast('Firebase가 초기화되지 않았습니다.', 'error');
                 return;
@@ -5217,48 +5452,64 @@
                 showToast('관리자만 접근할 수 있습니다.', 'error');
                 return;
             }
-            
+
             try {
                 // 모든 투표 데이터 가져오기
+                const collectionName = sport === 'soccer' ? SOCCER_VOTES_COLLECTION : 'votes';
                 let votesSnapshot;
                 try {
-                    votesSnapshot = await db.collection('votes')
+                    votesSnapshot = await db.collection(collectionName)
                         .orderBy('timestamp', 'desc')
                         .get();
                 } catch (error) {
                     // timestamp 인덱스가 없거나 timestamp 필드가 없으면 전체 가져오기
                     console.warn('timestamp로 정렬 실패, 전체 데이터 가져오기:', error);
-                    votesSnapshot = await db.collection('votes').get();
+                    votesSnapshot = await db.collection(collectionName).get();
                 }
-                
-                if (votesSnapshot.empty) {
-                    document.getElementById('voteHistoryContent').innerHTML = 
-                        '<div style="text-align: center; padding: 40px; color: #999;">아직 투표가 없습니다.</div>';
+
+                // 디바이스별로 그룹화 (축구는 문서 1개가 한 기기의 표 전체)
+                // 축구는 알려진 값이 아닌 표를 집계에서 빼므로 이력에서도 뺀다.
+                // 풋살은 그런 표도 집계에 들어가므로(B로 계산) 숨기지 않고 아래 tierBadgeHtml로 안전하게 보여준다.
+                const votesByDevice = {};
+                votesSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (sport === 'soccer') {
+                        const tiers = data.tiers && typeof data.tiers === 'object' ? data.tiers : {};
+                        const entries = Object.entries(tiers)
+                            .filter(([, tier]) => isVoteTier(tier))
+                            .map(([playerName, tier]) => ({ playerName, tier }));
+                        if (entries.length) votesByDevice[doc.id] = entries;
+                        return;
+                    }
+                    if (!votesByDevice[data.deviceId]) {
+                        votesByDevice[data.deviceId] = [];
+                    }
+                    votesByDevice[data.deviceId].push({ id: doc.id, ...data });
+                });
+
+                // 축구 표를 읽을 수 있는데 구독이 끊겨 있었다면 다시 연결한다.
+                if (sport === 'soccer' && !soccerVotesListener) setupSoccerVotesListener();
+
+                // 티어 값은 DB에서 온 문자열이다. 알려진 티어만 배지로 그리고, 그 밖의 값은 글자 그대로 이스케이프해서 보여준다.
+                const tierBadgeHtml = tier => isVoteTier(tier)
+                    ? `<span class="tier-badge tier-${tier.replace('+','plus').replace('-','minus')}">${tierLabel(tier)}</span>`
+                    : `<span style="color:#c0392b;" title="알 수 없는 티어 값">${escapeHtml(String(tier))}</span>`;
+
+                // 총 투표자 수 표시
+                const totalVoterCount = Object.keys(votesByDevice).length;
+                document.getElementById('voteHistoryModalTitle').textContent = `${VOTE_SPORT_LABELS[sport]} 티어 투표 이력 (관리자 전용)`;
+                document.getElementById('totalVoteCount').textContent = totalVoterCount;
+
+                const tableContainer = document.getElementById('voteHistoryTable');
+                tableContainer.innerHTML = '';
+
+                if (totalVoterCount === 0) {
+                    // 모달 안의 통계·표 영역은 남겨 둔다 (다음에 다른 종목 이력을 열 때 다시 쓴다)
+                    tableContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">아직 투표가 없습니다.</div>';
                     document.getElementById('voteHistoryModal').classList.add('active');
                     document.body.style.overflow = 'hidden';
                     return;
                 }
-                
-                const allVotes = votesSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                
-                // 디바이스별로 그룹화
-                const votesByDevice = {};
-                allVotes.forEach(vote => {
-                    if (!votesByDevice[vote.deviceId]) {
-                        votesByDevice[vote.deviceId] = [];
-                    }
-                    votesByDevice[vote.deviceId].push(vote);
-                });
-                
-                // 총 투표자 수 표시
-                const totalVoterCount = Object.keys(votesByDevice).length;
-                document.getElementById('totalVoteCount').textContent = totalVoterCount;
-                
-                const tableContainer = document.getElementById('voteHistoryTable');
-                tableContainer.innerHTML = '';
 
                 const sortedPlayers = [...players].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                 const deviceIds = Object.keys(votesByDevice);
@@ -5273,7 +5524,7 @@
                         deviceIds.forEach((deviceId, di) => {
                             const dv = votesByDevice[deviceId];
                             const pv = dv.find(v => v.playerName === player.name);
-                            const label = pv ? (pv.tier === '모름' ? '<span style="color:#999">모름</span>' : `<span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${tierLabel(pv.tier)}</span>`) : '-';
+                            const label = pv ? (pv.tier === '모름' ? '<span style="color:#999">모름</span>' : tierBadgeHtml(pv.tier)) : '-';
                             votesHtml += `<span class="vote-history-card-vote">투표${di+1}: ${label}</span>`;
                         });
                         card.innerHTML = `<div class="vote-history-card-header">${escapeHtml(player.name)}</div><div class="vote-history-card-votes">${votesHtml}</div>`;
@@ -5303,7 +5554,7 @@
                                 if (pv.tier === '모름') {
                                     cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#999;font-style:italic;">모름</td>`;
                                 } else {
-                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;"><span class="tier-badge tier-${pv.tier.replace('+','plus').replace('-','minus')}">${tierLabel(pv.tier)}</span></td>`;
+                                    cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;">${tierBadgeHtml(pv.tier)}</td>`;
                                 }
                             } else {
                                 cells += `<td style="padding:10px;border:1px solid #ddd;text-align:center;color:#ccc;">-</td>`;
@@ -5340,10 +5591,19 @@
 
             // 티어 순서
             const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            
+
+            // 축구 보기: 축구 표가 없어 풋살 평가를 쓰는 선수를 구분해 보여준다.
+            const soccerView = ratingView === 'soccer';
+            const usesFutsal = p => soccerView && p.soccerSource !== 'votes' && p.soccerSource !== 'manual';
+            const note = document.getElementById('ratingViewNote');
+            if (note) note.hidden = !players.some(usesFutsal);
+            const playerChip = p => usesFutsal(p)
+                ? `<span class="tier-player-name tier-player-fallback" title="축구 표가 없어 풋살 평가를 사용합니다">${escapeHtml(p.name)}<sup>풋</sup></span>`
+                : `<span class="tier-player-name">${escapeHtml(p.name)}</span>`;
+
             tierOrder.forEach(tier => {
-                const tierPlayers = players.filter(p => p.tier === tier);
-                
+                const tierPlayers = players.filter(p => viewTier(p) === tier);
+
                 const tierItem = document.createElement('div');
                 tierItem.className = 'tier-item';
                 
@@ -5354,7 +5614,7 @@
                     </div>
                     <div class="tier-item-players">
                         ${tierPlayers.length > 0
-                            ? tierPlayers.map(p => `<span class="tier-player-name">${escapeHtml(p.name)}</span>`).join('')
+                            ? tierPlayers.map(playerChip).join('')
                             : '<span class="tier-player-name" style="color: #999;">선수 없음</span>'
                         }
                     </div>
@@ -5447,6 +5707,26 @@
             }
         }
 
+        // 관리자 축구 티어 지정/해제 (풋살의 manualTier와 별도 필드)
+        async function updatePlayerSoccerTier(playerId, value) {
+            if (!isAdmin || !db) { showToast('관리자 연결 상태를 확인해주세요.', 'error'); return; }
+            const player = players.find(p => p.id === playerId);
+            if (!player || (value !== 'auto' && !Object.hasOwn(tierWeights, value))) return;
+            const changes = { soccerManualTier: value === 'auto' ? null : value };
+            try {
+                await db.collection('players').doc(playerId).update(changes);
+                const current = players.find(p => p.id === playerId);
+                if (current) Object.assign(current, changes);
+                applySoccerRatings();
+                renderPlayers();
+                showToast(value === 'auto' ? '축구 티어를 투표 자동 평가로 변경했습니다.' : '관리자 지정 축구 티어를 적용했습니다.');
+            } catch (error) {
+                console.error('축구 티어 업데이트 실패:', error);
+                showToast('업데이트에 실패했습니다.', 'error');
+                renderPlayers();
+            }
+        }
+
         // 선수 삭제 (ID로)
         async function deletePlayerById(playerId) {
             if (!isAdmin) {
@@ -5485,6 +5765,11 @@
                     renderPlayers();
                     renderTierTable();
 
+                    // 축구 표에서 제거 (자체적으로 오류를 처리하므로, 아래 풋살 표 정리의 성공 여부와 무관하게 실행된다)
+                    if (await removePlayerFromSoccerVotes(playerName) === false) {
+                        showToast('축구 투표에서 이 선수의 표를 지우지 못했습니다. 같은 이름으로 다시 추가하면 예전 축구 표가 적용될 수 있습니다.', 'warning');
+                    }
+
                     // 투표 데이터도 삭제
                     const votesSnapshot = await db.collection('votes')
                         .where('playerName', '==', playerName)
@@ -5501,6 +5786,58 @@
                     console.error('선수 삭제 실패:', error);
                     showToast('삭제에 실패했습니다: ' + error.message, 'error');
                 }
+            }
+        }
+
+        // 삭제한 선수의 축구 표를 각 투표 문서에서 지운다 (같은 이름으로 다시 추가될 때 예전 표가 되살아나지 않게).
+        // 실패해도 선수 삭제 결과에는 영향을 주지 않는다. 성공하면 true, 실패하면 false.
+        async function removePlayerFromSoccerVotes(playerName) {
+            if (!db) return true;
+            try {
+                const snapshot = await db.collection(SOCCER_VOTES_COLLECTION).get();
+                let batch = db.batch();
+                let count = 0;
+                for (const doc of snapshot.docs) {
+                    const tiers = doc.data().tiers;
+                    if (!tiers || typeof tiers !== 'object' || !Object.hasOwn(tiers, playerName)) continue;
+                    // 그 이름의 키만 지운다. tiers 전체를 다시 쓰면 같은 순간에 들어온 재투표를 예전 값으로 덮어쓸 수 있다.
+                    batch.update(doc.ref, new firebase.firestore.FieldPath('tiers', playerName), firebase.firestore.FieldValue.delete());
+                    count++;
+                    if (count >= 499) {
+                        await batch.commit();
+                        batch = db.batch();
+                        count = 0;
+                    }
+                }
+                if (count > 0) await batch.commit();
+                return true;
+            } catch (error) {
+                console.warn('축구 투표 정리 실패:', error);
+                return false;
+            }
+        }
+
+        // 축구 표 전체 삭제 (초기값 복원용). 실패해도 나머지 초기화는 계속한다. 성공하면 true, 실패하면 false.
+        async function clearSoccerVotes() {
+            if (!db) return true;
+            try {
+                const snapshot = await db.collection(SOCCER_VOTES_COLLECTION).get();
+                let batch = db.batch();
+                let count = 0;
+                for (const doc of snapshot.docs) {
+                    batch.delete(doc.ref);
+                    count++;
+                    if (count >= 499) {
+                        await batch.commit();
+                        batch = db.batch();
+                        count = 0;
+                    }
+                }
+                if (count > 0) await batch.commit();
+                return true;
+            } catch (error) {
+                console.warn('축구 투표 삭제 실패:', error);
+                return false;
             }
         }
 
@@ -5590,7 +5927,9 @@
             if (!Number.isInteger(onFieldCount) || onFieldCount < 1 || teamSizes.some(size => size < onFieldCount)) {
                 showToast('모든 팀에 출전 인원 이상의 선수가 필요합니다.', 'warning'); return;
             }
-            const roster = selectedPlayersList.map(p => ({ ...p }));
+            // 축구 편성은 축구 평가(축구 표가 없는 선수는 풋살 평가)를 tier/rating 자리에 넣어 넘긴다.
+            const forMode = mode === 'soccer' ? toSoccerPlayer : (p => ({ ...p }));
+            const roster = selectedPlayersList.map(forMode);
             const largerTeamPlayer = roster.find(p => p.name.trim() === '문찬우');
             const signature = list => JSON.stringify(list.map(p => [p.id || p.name, p.tier, getEffectiveWeight(p)]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
             const initialSignature = signature(roster);
@@ -5612,7 +5951,7 @@
                     lastKey: currentTeamsData ? TeamBuilder.teamKey(currentTeamsData) : ''
                 };
                 const result = await generateTeamsOffThread(roster, teamSizes, options);
-                if (teamConfigurationVersion !== initialConfigurationVersion || signature(players.filter(p => selectedPlayers.has(p.name))) !== initialSignature) {
+                if (teamConfigurationVersion !== initialConfigurationVersion || signature(players.filter(p => selectedPlayers.has(p.name)).map(forMode)) !== initialSignature) {
                     showToast('선택 선수나 편성 조건·평가가 변경되었습니다. 다시 편성해주세요.', 'warning'); return;
                 }
                 currentTeamMeta = { mode, onFieldCount, confirmed: false };
@@ -5621,7 +5960,7 @@
                 teamPreviewHistory.unshift(makeTeamHistoryEntry(result.teams, currentTeamMeta));
                 teamPreviewHistory = teamPreviewHistory.slice(0, 5);
                 document.getElementById('teamActions').style.display = 'flex';
-                document.getElementById('teamGenerationSummary').textContent = '티어 분산 우선 · 팀별 ' + onFieldCount + '명 출전 · 나머지는 교체 · 평균 차이 ' + result.metrics.spread.toFixed(2) +
+                document.getElementById('teamGenerationSummary').textContent = (mode === 'soccer' ? '축구 티어 기준 · ' : '') + '티어 분산 우선 · 팀별 ' + onFieldCount + '명 출전 · 나머지는 교체 · 평균 차이 ' + result.metrics.spread.toFixed(2) +
                     (result.largerTeamPlayerId ? ' · 문찬우(GK)는 인원이 많은 팀에 배정했습니다.' : '') +
                     (result.metrics.tierScore > 0 ? ' · 현재 배정 조건에서는 티어를 완전히 고르게 나눌 수 없습니다.' : '') +
                     (result.repeated ? ' · 현재 조건에서 다른 후보를 찾지 못했습니다.' : '');
@@ -6045,12 +6384,12 @@
             soccerBoard.bench.forEach(n => used.add(n));
             return players
                 .filter(p => !used.has(p.name))
-                .sort((a, b) => getEffectiveWeight(b) - getEffectiveWeight(a));
+                .sort((a, b) => getEffectiveWeight(toSoccerPlayer(b)) - getEffectiveWeight(toSoccerPlayer(a)));
         }
 
         function sbChipHtml(name, sub, picked) {
             const player = sbPlayerByName(name);
-            const tier = player ? tierLabel(player.tier) : '';
+            const tier = player ? tierLabel(getSoccerTier(player)) : '';
             const label = sub ? (showTier && tier ? `${sub} · ${tier}` : sub) : (showTier ? tier : '');
             const aria = [name, sub, tier].filter(Boolean).join(' ');
             return `<span class="sb-chip${picked ? ' sb-picked' : ''}" role="button" tabindex="0"
@@ -6476,8 +6815,10 @@
             select.value = '';
             if (isNaN(index) || !currentTeamsData || !currentTeamsData[index]) return;
 
+            // 칩에 표시하는 것과 같은 현재 축구 평가로 정렬한다 (풋살로 편성한 팀을 불러와도 축구 실력 순).
+            const soccerWeight = p => getEffectiveWeight(toSoccerPlayer(sbPlayerByName(p.name) || p));
             const roster = currentTeamsData[index].slice()
-                .sort((a, b) => getEffectiveWeight(b) - getEffectiveWeight(a))
+                .sort((a, b) => soccerWeight(b) - soccerWeight(a))
                 .map(p => p.name);
             const shape = SOCCER_FORMATIONS[soccerBoard.formation];
 
@@ -6655,7 +6996,7 @@
                 ctx.restore();
 
                 const player = sbPlayerByName(entry.name);
-                const tier = player ? tierLabel(player.tier) : '';
+                const tier = player ? tierLabel(getSoccerTier(player)) : '';
                 const sub = showTier && tier ? `${entry.pos} · ${tier}` : entry.pos;
 
                 ctx.textAlign = 'center';
