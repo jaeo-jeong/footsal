@@ -358,6 +358,7 @@
 
         .tier-황제 { background: linear-gradient(135deg, #8e2de2, #4a00e0); color: #ffe9a8; }
         .tier-S { background: #ff6b6b; }
+        .tier-Sminus { background: #ff8552; }
         .tier-Aplus { background: #ffa500; }
         .tier-A { background: #ffd93d; }
         .tier-Aminus { background: #d4e157; }
@@ -3686,6 +3687,7 @@
                     <button class="tier-filter-btn active" aria-pressed="true" onclick="toggleTierFilter('all', this)">전체</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('황제', this)">👑</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('S', this)">S</button>
+                    <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('S-', this)">S-</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('A+', this)">A+</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('A', this)">A</button>
                     <button class="tier-filter-btn" aria-pressed="false" onclick="toggleTierFilter('A-', this)">A-</button>
@@ -3707,6 +3709,7 @@
                         <select id="newPlayerTier">
                             <option value="황제">👑</option>
                             <option value="S">S</option>
+                            <option value="S-">S-</option>
                             <option value="A+">A+</option>
                             <option value="A">A</option>
                             <option value="A-">A-</option>
@@ -4895,6 +4898,7 @@
                                 <option value="auto" ${!manualTier ? 'selected' : ''}>${autoLabel}</option>
                                 <option value="황제" ${manualTier === '황제' ? 'selected' : ''}>👑</option>
                                 <option value="S" ${manualTier === 'S' ? 'selected' : ''}>S</option>
+                                <option value="S-" ${manualTier === 'S-' ? 'selected' : ''}>S-</option>
                                 <option value="A+" ${manualTier === 'A+' ? 'selected' : ''}>A+</option>
                                 <option value="A" ${manualTier === 'A' ? 'selected' : ''}>A</option>
                                 <option value="A-" ${manualTier === 'A-' ? 'selected' : ''}>A-</option>
@@ -5288,6 +5292,7 @@
                     <select id="vote_idx_${idx}" class="vote-select" data-player-name="${escapeHtml(player.name)}" onchange="enforceEmperorVoteLimit()">
                         <option value="황제" ${selectedTier === '황제' ? 'selected' : ''}>👑</option>
                         <option value="S" ${selectedTier === 'S' ? 'selected' : ''}>S</option>
+                        <option value="S-" ${selectedTier === 'S-' ? 'selected' : ''}>S-</option>
                         <option value="A+" ${selectedTier === 'A+' ? 'selected' : ''}>A+</option>
                         <option value="A" ${selectedTier === 'A' ? 'selected' : ''}>A</option>
                         <option value="A-" ${selectedTier === 'A-' ? 'selected' : ''}>A-</option>
@@ -5590,7 +5595,7 @@
             tierList.innerHTML = '';
 
             // 티어 순서
-            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierOrder = ['황제', 'S', 'S-', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
 
             // 축구 보기: 축구 표가 없어 풋살 평가를 쓰는 선수를 구분해 보여준다.
             const soccerView = ratingView === 'soccer';
@@ -7140,8 +7145,8 @@
             const minAvg = Math.min(...teamAverages);
             const avgDiff = maxAvg - minAvg;
 
-            const tierOrder = ['황제', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
-            const tierColors = { '황제': '#8e2de2', 'S': '#ff6b6b', 'A+': '#ffa500', 'A': '#ffd93d', 'A-': '#d4e157', 'B+': '#5dd68a', 'B': '#6bcf7f', 'C': '#4ecdc4', 'D': '#95a5a6' };
+            const tierOrder = ['황제', 'S', 'S-', 'A+', 'A', 'A-', 'B+', 'B', 'C', 'D'];
+            const tierColors = { '황제': '#8e2de2', 'S': '#ff6b6b', 'S-': '#ff8552', 'A+': '#ffa500', 'A': '#ffd93d', 'A-': '#d4e157', 'B+': '#5dd68a', 'B': '#6bcf7f', 'C': '#4ecdc4', 'D': '#95a5a6' };
             const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             const numTeams = teams.length;
 
@@ -13858,6 +13863,7 @@
                 if (willBeBoss) {
                     const pl = (typeof players !== 'undefined' && players.length > 0) ? players : defaultPlayers;
                     let bossCandidates = pl.filter(p => p.tier === 'S');
+                    if (bossCandidates.length === 0) bossCandidates = pl.filter(p => p.tier === 'S-');
                     if (bossCandidates.length === 0) bossCandidates = pl.filter(p => p.tier === 'A+');
                     if (bossCandidates.length > 0) {
                         const bp = bossCandidates[Math.floor(Math.random() * bossCandidates.length)];
@@ -13910,6 +13916,7 @@
                     this._bossSpawned = true;
                     const pl = (typeof players !== 'undefined' && players.length > 0) ? players : defaultPlayers;
                     let bossCandidates = pl.filter(p => p.tier === 'S');
+                    if (bossCandidates.length === 0) bossCandidates = pl.filter(p => p.tier === 'S-');
                     if (bossCandidates.length === 0) bossCandidates = pl.filter(p => p.tier === 'A+');
                     if (bossCandidates.length > 0) {
                         const bp = bossCandidates[Math.floor(Math.random() * bossCandidates.length)];

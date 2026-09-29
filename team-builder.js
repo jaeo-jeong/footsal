@@ -1,7 +1,7 @@
 (function (root) {
     'use strict';
 
-    const TIER_WEIGHTS = Object.freeze({ '황제': 11, S: 10, 'A+': 8, A: 6.5, 'A-': 5.5, 'B+': 5, B: 4, C: 2.5, D: 1 });
+    const TIER_WEIGHTS = Object.freeze({ '황제': 11, S: 10, 'S-': 9, 'A+': 8, A: 6.5, 'A-': 5.5, 'B+': 5, B: 4, C: 2.5, D: 1 });
     const TIERS = Object.keys(TIER_WEIGHTS);
     const EPSILON = 1e-9;
     const identity = player => String(player.id || player.name);
