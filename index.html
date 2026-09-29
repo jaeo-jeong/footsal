@@ -3635,6 +3635,7 @@
                 <button type="button" class="rating-view-btn" data-rating-view="soccer" aria-pressed="false" onclick="setRatingView('soccer')">축구</button>
             </div>
             <div class="rating-view-note" id="ratingViewNote" hidden>점선으로 표시한 선수(풋)는 축구 표가 없어 풋살 평가를 사용합니다.</div>
+            <div class="rating-view-note" id="emperorTierNote">👑 황제는 종목별 최종 점수 1위 한 명입니다. 동점이면 유효 투표 수, 이름순으로 정합니다. 팀 편성에는 기존 투표 점수를 그대로 사용합니다.</div>
             <div class="tier-list" id="tierList"></div>
         </div>
 
@@ -3992,7 +3993,7 @@
             return {
                 version: 2, date: new Date().toLocaleString('ko-KR'), timestamp: Date.now(),
                 mode: meta.mode, onFieldCount: meta.onFieldCount,
-                teams: teams.map(team => team.map(p => ({ id: p.id || p.name, name: p.name, tier: p.tier, rating: getEffectiveWeight(p) }))),
+                teams: teams.map(team => team.map(p => ({ id: p.id || p.name, name: p.name, tier: p.tier, displayTier: getDisplayTier(p), rating: getEffectiveWeight(p) }))),
                 teamSizes: teams.map(team => team.length)
             };
         }
@@ -4228,6 +4229,29 @@
             return tier === '황제' ? '👑' : tier;
         }
 
+        // 황제는 종목 전체의 최종 점수 1위에게 주는 표시다.
+        // 원래 tier/rating은 팀 분배·가중치 계산에 그대로 남긴다.
+        function assignEmperorTiers(roster, sport = 'futsal') {
+            const soccer = sport === 'soccer';
+            const baseTier = player => soccer && Object.hasOwn(tierWeights, player.soccerTier) ? player.soccerTier : player.tier;
+            const score = player => {
+                const rating = soccer && Object.hasOwn(tierWeights, player.soccerTier) ? player.soccerRating : player.rating;
+                return Number.isFinite(rating) ? rating : (tierWeights[baseTier(player)] || 4);
+            };
+            const voteCount = player => (soccer && player.soccerSource !== 'futsal' ? player.soccerVoteCount : player.voteCount) || 0;
+            const ranked = [...roster].sort((a, b) => score(b) - score(a) || voteCount(b) - voteCount(a) ||
+                a.name.localeCompare(b.name, 'ko') || String(a.id || a.name).localeCompare(String(b.id || b.name)));
+            const displayField = soccer ? 'soccerDisplayTier' : 'displayTier';
+            for (const player of roster) {
+                const tier = baseTier(player);
+                player[displayField] = player === ranked[0] ? '황제' : tier === '황제' ? 'S' : tier;
+            }
+        }
+
+        function getDisplayTier(player) {
+            return Object.hasOwn(tierWeights, player.displayTier) ? player.displayTier : player.tier;
+        }
+
         // localStorage 키
         const ADMIN_CODE_KEY = 'jeotjaFcAdminCode';
 
@@ -4412,17 +4436,19 @@
         }
 
         function getSoccerTier(player) {
-            return Object.hasOwn(tierWeights, player.soccerTier) ? player.soccerTier : player.tier;
+            return Object.hasOwn(tierWeights, player.soccerDisplayTier) ? player.soccerDisplayTier
+                : Object.hasOwn(tierWeights, player.soccerTier) ? player.soccerTier : getDisplayTier(player);
         }
 
         // 축구 편성·전술판용 선수 복사본: tier/rating 자리에 축구 평가를 넣는다 (TeamBuilder는 그대로 사용)
         function toSoccerPlayer(player) {
             if (!Object.hasOwn(tierWeights, player.soccerTier)) return { ...player };
-            return { ...player, tier: player.soccerTier, rating: player.soccerRating };
+            return { ...player, tier: player.soccerTier, rating: player.soccerRating,
+                displayTier: Object.hasOwn(tierWeights, player.soccerDisplayTier) ? player.soccerDisplayTier : player.soccerTier };
         }
 
         function viewTier(player) {
-            return ratingView === 'soccer' ? getSoccerTier(player) : player.tier;
+            return ratingView === 'soccer' ? getSoccerTier(player) : getDisplayTier(player);
         }
 
         // 축구 평가 = 관리자 축구 티어 → 축구 투표 → (유효한 축구 표가 없으면) 풋살 평가.
@@ -4458,6 +4484,8 @@
                     soccerVoteCount: summary ? summary.voteCount : 0
                 });
             }
+            assignEmperorTiers(players);
+            assignEmperorTiers(players, 'soccer');
         }
 
         // 페이지 로드 시 초기화
@@ -4748,7 +4776,7 @@
                 for (const player of players) {
                     if (player.id) {
                         const docRef = db.collection('players').doc(player.id);
-                        const { id, ...playerData } = player;
+                        const { id, displayTier, soccerDisplayTier, ...playerData } = player;
                         batch.update(docRef, playerData);
                     }
                 }
@@ -4814,6 +4842,8 @@
 
         // 선수 목록 렌더링
         function renderPlayers() {
+            assignEmperorTiers(players);
+            assignEmperorTiers(players, 'soccer');
             sortPlayersByName();
 
             const grid = document.getElementById('playersGrid');
@@ -4880,9 +4910,9 @@
                 const tierChangeHandler = soccerView
                     ? `updatePlayerSoccerTier('${playerId}', this.value)`
                     : `updatePlayerById('${playerId}', 'tier', this.value)`;
-                const autoLabel = !soccerView ? `투표 자동 (${tierLabel(player.tier)})`
-                    : player.soccerVoteCount > 0 ? `투표 자동 (${tierLabel(player.soccerAutoTier)})`
-                    : `축구 표 없음 · 풋살 (${tierLabel(player.soccerAutoTier || player.tier)})`;
+                const autoLabel = !soccerView ? `투표 자동 (${tierLabel(getDisplayTier(player))})`
+                    : player.soccerVoteCount > 0 ? `투표 자동 (${tierLabel(manualTier ? player.soccerAutoTier : getSoccerTier(player))})`
+                    : `축구 표 없음 · 풋살 (${tierLabel(manualTier ? player.soccerAutoTier : getSoccerTier(player))})`;
                 card.innerHTML = `
                     <div class="player-name">
                         <input type="checkbox" class="player-checkbox"
@@ -5048,7 +5078,7 @@
                 const tierSum = team.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
                 const avg = team.length > 0 ? (tierSum / team.length).toFixed(1) : 0;
                 text += `[팀 ${i + 1}] 평균 ${avg}\n`;
-                text += team.map(p => showTier ? `${p.name}(${tierLabel(p.tier)})` : p.name).join(', ') + '\n\n';
+                text += team.map(p => showTier ? `${p.name}(${tierLabel(getDisplayTier(p))})` : p.name).join(', ') + '\n\n';
             });
             const textToCopy = text.trim();
             if (navigator.clipboard && window.isSecureContext) {
@@ -5936,7 +5966,7 @@
             const forMode = mode === 'soccer' ? toSoccerPlayer : (p => ({ ...p }));
             const roster = selectedPlayersList.map(forMode);
             const largerTeamPlayer = roster.find(p => p.name.trim() === '문찬우');
-            const signature = list => JSON.stringify(list.map(p => [p.id || p.name, p.tier, getEffectiveWeight(p)]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
+            const signature = list => JSON.stringify(list.map(p => [p.id || p.name, p.tier, p.displayTier, getEffectiveWeight(p)]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))));
             const initialSignature = signature(roster);
             const initialConfigurationVersion = teamConfigurationVersion;
             const buttons = ['futsalBtn', 'soccerBtn'].map(id => document.getElementById(id));
@@ -7157,7 +7187,7 @@
                 teamDiv.setAttribute('data-team-index', index);
 
                 const sortedTeam = [...team].sort((a, b) => {
-                    return tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier);
+                    return tierOrder.indexOf(getDisplayTier(a)) - tierOrder.indexOf(getDisplayTier(b));
                 });
 
                 const tierSum = sortedTeam.reduce((sum, p) => sum + getEffectiveWeight(p), 0);
@@ -7171,7 +7201,7 @@
                 // 티어 분포 바
                 const tierCounts = {};
                 tierOrder.forEach(t => tierCounts[t] = 0);
-                team.forEach(p => { tierCounts[p.tier] = (tierCounts[p.tier] || 0) + 1; });
+                team.forEach(p => { const tier = getDisplayTier(p); tierCounts[tier] = (tierCounts[tier] || 0) + 1; });
                 const totalP = team.length || 1;
                 const distBar = tierOrder.map(t => {
                     const pct = (tierCounts[t] / totalP * 100).toFixed(1);
@@ -7204,7 +7234,7 @@
                                     ${isAdmin && numTeams > 1 ? `<button type="button" class="player-swap" aria-pressed="false"
                                         aria-label="${escapeHtml(player.name)} 맞교환 선수 선택"
                                         onclick="event.stopPropagation(); selectPlayerForSwap('${escapeForJsString(TeamBuilder.identity(player))}', ${index})">` : '<div>'}
-                                        ${isAdmin && numTeams > 1 ? '<span aria-hidden="true">↔ </span>' : ''}${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${player.tier.replace('+', 'plus').replace('-', 'minus')}">${tierLabel(player.tier)}</span>` : ''}
+                                        ${isAdmin && numTeams > 1 ? '<span aria-hidden="true">↔ </span>' : ''}${escapeHtml(player.name)}${showTier ? ` <span class="tier-badge tier-${getDisplayTier(player).replace('+', 'plus').replace('-', 'minus')}">${tierLabel(getDisplayTier(player))}</span>` : ''}
                                     ${isAdmin && numTeams > 1 ? '</button>' : '</div>'}
                                 </div>
                                 <button type="button" class="player-lock" aria-pressed="${Object.hasOwn(playerTeamLocks, TeamBuilder.identity(player))}"
@@ -7526,9 +7556,9 @@
             html += `<div class="fm-pos-section-label">선발 (${starterCount}명)</div>`;
             state.starters.forEach((pIdx, i) => {
                 const p = team[pIdx];
-                const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
+                const tierCls = 'tier-' + getDisplayTier(p).replace('+', 'plus').replace('-', 'minus');
                 html += `<div class="fm-pos-row">
-                    <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
+                    <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(getDisplayTier(p))}</span></span>
                     <select class="fm-pos-select" id="${prefix}_pos_${i}" onchange="enforceFmFormation('${prefix}',${i})">
                         ${FM_POSITIONS.map(pos =>
                             `<option value="${pos}" ${positions[i] === pos ? 'selected' : ''}>${FM_POS_LABELS[pos]}</option>`
@@ -7542,9 +7572,9 @@
                 html += `<div class="fm-pos-section-label" style="margin-top:8px;">교체 (${state.subs.length}명)</div>`;
                 state.subs.forEach(pIdx => {
                     const p = team[pIdx];
-                    const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
+                    const tierCls = 'tier-' + getDisplayTier(p).replace('+', 'plus').replace('-', 'minus');
                     html += `<div class="fm-pos-sub-row">
-                        <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
+                        <span class="fm-pos-name">${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(getDisplayTier(p))}</span></span>
                         <button class="fm-pos-swap-btn" onclick="fmSwapPlayer('${prefix}',${pIdx},true)">↑</button>
                     </div>`;
                 });
@@ -8200,7 +8230,7 @@
                     if (p.goals > 0) cls += ' has-goal';
                     if (p.redCard) cls += ' has-card-red';
                     else if (p.yellowCards > 0) cls += ' has-card-yellow';
-                    const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
+                    const tierCls = 'tier-' + getDisplayTier(p).replace('+', 'plus').replace('-', 'minus');
                     const posCls = 'fm-pos-' + (p.position || 'MF');
                     let icons = '';
                     for (let i = 0; i < p.goals; i++) icons += '⚽';
@@ -8209,18 +8239,18 @@
                     if (p.redCard) icons += '🟥';
                     for (let i = 0; i < p.saves; i++) icons += '🧤';
                     html += `<div class="${cls}">
-                        <span><span class="fm-pos-badge ${posCls}">${p.position || 'MF'}</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
+                        <span><span class="fm-pos-badge ${posCls}">${p.position || 'MF'}</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(getDisplayTier(p))}</span></span>
                         <span class="fm-roster-icons">${icons}</span>
                     </div>`;
                 });
                 if (subs.length > 0) {
                     html += '<div style="font-size:0.68em;color:#666;margin-top:3px;padding-left:4px;">교체</div>';
                     subs.forEach(p => {
-                        const tierCls = 'tier-' + p.tier.replace('+', 'plus').replace('-', 'minus');
+                        const tierCls = 'tier-' + getDisplayTier(p).replace('+', 'plus').replace('-', 'minus');
                         let icons = '';
                         if (p.redCard) icons += '🟥';
                         html += `<div class="fm-roster-player is-sub">
-                            <span><span class="fm-sub-badge">SUB</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(p.tier)}</span></span>
+                            <span><span class="fm-sub-badge">SUB</span>${escapeHtml(p.name)} <span class="tier-badge ${tierCls}" style="font-size:0.7em;">${tierLabel(getDisplayTier(p))}</span></span>
                             <span class="fm-roster-icons">${icons}</span>
                         </div>`;
                     });
