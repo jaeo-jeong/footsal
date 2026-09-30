@@ -3531,6 +3531,9 @@
             <button id="soccerVoteHistoryBtn" class="btn btn-info" onclick="openVoteHistoryModal('soccer')" style="background: #17a2b8; color: white; display: none;">
                 축구 투표 이력 보기
             </button>
+            <button id="skillAssessmentBtn" class="btn btn-info" onclick="SkillAssessmentHost.open()" style="background: #174e40; color: white; display: none;" disabled>
+                선수 실력 평가표
+            </button>
             <button id="gameCenterBtn" type="button" class="fa-entry" onclick="FootballGameCenter.open()" style="display: none;" disabled>🎮 게임 센터</button>
             <button id="resetMiniGameBtn" class="btn btn-secondary" onclick="resetMiniGameScores()" style="background: #e67e22; color: white; display: none;">
                 미니게임 점수 초기화
@@ -4605,6 +4608,7 @@
                 gameCenterBtn.disabled = !isAdmin;
             }
             if (!isAdmin) window.FootballGameCenter?.close();
+            window.SkillAssessmentHost?.syncPermission();
 
             // 미니게임 점수 초기화 버튼 (개발중 - 숨김)
             const resetMiniGameBtn = document.getElementById('resetMiniGameBtn');
@@ -4721,12 +4725,17 @@
             playersListener = votesListener = null;
             latestVotes = null;
             ratingRefreshSequence++;
+            window.SkillAssessmentHost?.setStatus('players', 'loading');
+            window.SkillAssessmentHost?.setStatus('futsal', 'loading');
             if (!db) return;
-            const onError = error => {
+            const onError = (source, error) => {
                 console.error('선수 평가 동기화 실패:', error);
                 showToast('최신 선수 평가를 받지 못했습니다. 연결 상태를 확인해주세요.', 'warning');
+                window.SkillAssessmentHost?.setStatus(source, 'error');
+                window.SkillAssessmentHost?.refresh();
             };
             playersListener = db.collection('players').onSnapshot(snapshot => {
+                window.SkillAssessmentHost?.setStatus('players', snapshot.metadata?.fromCache ? 'cached' : 'ready');
                 const previousIds = getSelectedPlayerIds();
                 players = snapshot.docs.map(doc => normalizePlayer(doc.id, doc.data()));
                 const names = new Set(players.map(p => p.name));
@@ -4734,25 +4743,29 @@
                 if (!selectionChanged && previousIds !== getSelectedPlayerIds()) {
                     resetPlayerLocks('선택한 선수 정보가 바뀌어 선수 잠금을 모두 해제했습니다.');
                 }
-                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(onError);
-            }, onError);
+                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(error => onError('players', error));
+            }, error => onError('players', error));
             votesListener = db.collection('votes').onSnapshot(snapshot => {
+                window.SkillAssessmentHost?.setStatus('futsal', snapshot.metadata?.fromCache ? 'cached' : 'ready');
                 latestVotes = snapshot.docs.map(doc => doc.data());
-                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(onError);
-            }, onError);
+                updateTiersFromVotes(false, latestVotes).then(() => renderPlayers()).catch(error => onError('futsal', error));
+            }, error => onError('futsal', error));
         }
 
         // 축구 표 구독. 풋살 구독과 분리해 축구 쪽 오류가 풋살 평가·화면에 영향을 주지 않게 한다.
         function setupSoccerVotesListener() {
             if (soccerVotesListener) soccerVotesListener();
             soccerVotesListener = null;
+            window.SkillAssessmentHost?.setStatus('soccer', 'loading');
             if (!db) return;
             const refresh = () => {
                 applySoccerRatings();
+                window.SkillAssessmentHost?.refresh();
                 // 풋살 보기에서는 축구 표가 바뀌어도 화면에 달라지는 것이 없다.
                 if (ratingView === 'soccer') renderPlayers();
             };
             soccerVotesListener = db.collection(SOCCER_VOTES_COLLECTION).onSnapshot(snapshot => {
+                window.SkillAssessmentHost?.setStatus('soccer', snapshot.metadata?.fromCache ? 'cached' : 'ready');
                 latestSoccerBallots = snapshot.docs.map(doc => ({ deviceId: doc.id, ...doc.data() }));
                 refresh();
             }, error => {
@@ -4760,6 +4773,7 @@
                 console.warn('축구 투표 동기화 실패 — 풋살 평가를 사용합니다:', error);
                 soccerVotesListener = null;
                 latestSoccerBallots = null;
+                window.SkillAssessmentHost?.setStatus('soccer', 'error');
                 refresh();
             });
         }
@@ -4845,6 +4859,7 @@
             assignEmperorTiers(players);
             assignEmperorTiers(players, 'soccer');
             sortPlayersByName();
+            window.SkillAssessmentHost?.refresh();
 
             const grid = document.getElementById('playersGrid');
             grid.innerHTML = '';
@@ -15550,6 +15565,93 @@
             startMiniGame: (gameId, session) => FootballMiniGames.open(gameId, session),
             closeMiniGame: () => FootballMiniGames.close(false)
         });
+
+        // The assessment shares this page's current administrator session and live roster.
+        // No password or role flag is placed in the assessment URL or local storage.
+        window.SkillAssessmentHost = (() => {
+            const dialog = document.createElement('dialog');
+            dialog.id = 'skillAssessmentDialog';
+            dialog.setAttribute('aria-label', '선수 실력 평가표');
+            dialog.style.cssText = 'padding:0;border:0;margin:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;background:#f5f6f2;';
+            const frame = document.createElement('iframe');
+            frame.id = 'skillAssessmentFrame';
+            frame.title = '관리자 선수 실력 평가표';
+            frame.style.cssText = 'display:block;width:100%;height:100%;border:0;';
+            dialog.append(frame);
+            document.body.append(dialog);
+            const status = {players:'loading', futsal:'loading', soccer:'loading'};
+            const targetOrigin = location.protocol === 'file:' ? '*' : location.origin;
+            let channel = null;
+            let lastSnapshot = '';
+            let previousOverflow = '';
+            let sessionOpen = false;
+            function cleanup() {
+                if (!sessionOpen) return;
+                sessionOpen = false;
+                if (channel) frame.contentWindow?.postMessage({type:'skill-assessment:revoked',channel},targetOrigin);
+                channel = null;
+                lastSnapshot = '';
+                frame.removeAttribute('src');
+                document.body.style.overflow = previousOverflow;
+                if (isAdmin) document.getElementById('skillAssessmentBtn').focus();
+            }
+            function close() {
+                if (dialog.open) dialog.close();
+                cleanup();
+            }
+            function snapshot() {
+                const connection = db ? {...status} : {players:'error',futsal:'error',soccer:'error'};
+                const roster = connection.players === 'loading' ? [] : players
+                    .filter(player => typeof player.id === 'string' && !player.id.startsWith('temp_') && typeof player.name === 'string')
+                    .map(player => ({
+                        id:player.id, name:player.name,
+                        futsal:{tier:getDisplayTier(player), source:Object.hasOwn(tierWeights,player.manualTier) ? 'manual' : player.voteCount ? 'votes' : 'default', votes:player.voteCount || 0},
+                        soccer:{tier:getSoccerTier(player), source:player.soccerSource || 'futsal', votes:player.soccerVoteCount || 0}
+                    }));
+                return {players:roster,status:connection};
+            }
+            function refresh(force = false) {
+                if (!dialog.open || !channel) return;
+                if (!isAdmin) { close(); return; }
+                const data = snapshot();
+                const serialized = JSON.stringify(data);
+                if (!force && serialized === lastSnapshot) return;
+                lastSnapshot = serialized;
+                frame.contentWindow?.postMessage({type:'skill-assessment:snapshot',channel,authorized:true,...data},targetOrigin);
+            }
+            function syncPermission() {
+                const button = document.getElementById('skillAssessmentBtn');
+                button.style.display = isAdmin ? 'inline-block' : 'none';
+                button.disabled = !isAdmin;
+                if (!isAdmin) close();
+            }
+            window.addEventListener('message', event => {
+                if (event.source !== frame.contentWindow || (location.protocol !== 'file:' && event.origin !== location.origin)) return;
+                if (!dialog.open || !isAdmin) return;
+                const message = event.data;
+                if (!message || typeof message !== 'object') return;
+                if (message.type === 'skill-assessment:ready' && typeof message.channel === 'string' && message.channel.length <= 100) {
+                    channel = message.channel;
+                    refresh(true);
+                } else if (message.type === 'skill-assessment:close' && message.channel === channel) close();
+            });
+            dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+            dialog.addEventListener('close', () => { if (!dialog.open) cleanup(); });
+            return {
+                open() {
+                    if (!isAdmin || dialog.open) return;
+                    channel = null;
+                    lastSnapshot = '';
+                    previousOverflow = document.body.style.overflow;
+                    sessionOpen = true;
+                    document.body.style.overflow = 'hidden';
+                    dialog.showModal();
+                    frame.src = 'skill-assessment.html?v=20260930-2';
+                },
+                close, refresh, syncPermission,
+                setStatus(key,value) { if (Object.hasOwn(status,key)) status[key] = value; }
+            };
+        })();
     </script>
 </body>
 </html>

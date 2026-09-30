@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#174e40">
+  <title>선수 실력 평가표 · 젓자FC</title>
+  <style>
+    :root { color-scheme:light; --ink:#24352b; --muted:#69766b; --green:#174e40; --pale:#edf4ed; --line:#dde5dc; --paper:#f5f6f2; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:14px/1.6 Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif; }
+    button,input { font:inherit; color:inherit; }
+    button { cursor:pointer; min-height:42px; }
+    button,a,summary,.rating-option { -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+    button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible { outline:3px solid #ca743d; outline-offset:3px; }
+    h1,h2,h3,p { margin:0; }
+    [hidden] { display:none!important; }
+    .shell { max-width:1320px; margin:auto; padding:0 32px; }
+    .topbar { background:#fff; border-bottom:1px solid var(--line); }
+    .topbar-inner { min-height:70px; display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    h1 { font-size:18px; letter-spacing:-.5px; }
+    h1 span { font-size:12px; font-weight:500; color:var(--muted); margin-right:9px; }
+    .top-actions { display:flex; align-items:center; gap:10px; }
+    .save-state { color:var(--muted); font-size:11px; }
+    .button { border:1px solid var(--line); border-radius:7px; background:white; padding:8px 13px; font-size:12px; font-weight:600; white-space:nowrap; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .button:hover { background:var(--pale); }
+    .button:disabled { opacity:.45; cursor:not-allowed; }
+    .button.danger { color:#9c4030; border-color:#e1c8bf; }
+    .button.confirm-clear { background:#a44133; border-color:#a44133; color:white; }
+    .mode-bar { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); margin:14px 0 18px; gap:10px; }
+    .sports { display:flex; gap:25px; }
+    .sport-tab { border:0; border-bottom:3px solid transparent; padding:11px 2px; color:var(--muted); background:none; font-weight:650; font-size:16px; }
+    .sport-tab[aria-pressed="true"] { border-bottom-color:var(--green); color:var(--green); }
+    .sport-tab span { font-size:10px; letter-spacing:.5px; margin-left:6px; font-weight:400; }
+    .sync-state { color:var(--muted); font-size:11px; }
+    .panel { background:white; border:1px solid var(--line); border-radius:11px; }
+    .player-panel { padding:18px 20px; margin-bottom:20px; }
+    .section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .section-heading h2 { font-size:15px; letter-spacing:-.2px; }
+    .section-heading small { color:var(--muted); font-size:11px; font-weight:400; }
+    .player-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(117px,1fr)); gap:7px; }
+    .player-choice { background:#fafbf8; border:1px solid #e0e6dd; border-radius:7px; min-width:0; padding:9px 10px; text-align:left; }
+    .player-choice:hover { border-color:#96b19b; background:#f1f6ee; }
+    .player-choice[aria-pressed="true"] { border-color:var(--green); background:var(--pale); box-shadow:inset 0 0 0 1px var(--green); }
+    .player-choice .name-line { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .player-choice strong { display:block; font-size:12px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .player-choice .tier { color:var(--green); font-size:10px; font-weight:650; flex-shrink:0; }
+    .player-choice small { display:block; font-size:10px; color:var(--muted); margin-top:1px; }
+    .empty-state { color:var(--muted); font-size:13px; padding:16px 0; }
+    .workspace { display:grid; grid-template-columns:minmax(0,1fr) 310px; align-items:start; gap:20px; padding-bottom:28px; }
+    #workspace { scroll-margin-top:75px; }
+    .assessment-panel { min-width:0; overflow:hidden; }
+    .assessment-head { padding:20px; border-bottom:1px solid var(--line); }
+    .assessment-head .section-heading { flex-wrap:wrap; }
+    .assessment-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+    #selectedName { font-size:18px; font-weight:700; }
+    .selected-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; color:var(--muted); font-size:11px; }
+    .current-tier { color:var(--green); background:var(--pale); padding:3px 8px; border-radius:5px; font-size:12px; font-weight:650; }
+    .view-switch { display:flex; flex-shrink:0; padding:3px; border:1px solid var(--line); background:#f4f6f1; border-radius:6px; }
+    .view-switch button { min-height:30px; padding:5px 10px; border:0; background:none; color:var(--muted); font-size:11px; border-radius:4px; }
+    .view-switch button[aria-pressed="true"] { background:white; color:var(--green); font-weight:650; box-shadow:0 1px 3px #143d2110; }
+    .score-guide { display:flex; flex-wrap:wrap; gap:3px 15px; background:#f5f7f2; padding:8px 11px; border-radius:6px; margin-top:14px; color:var(--muted); font-size:11px; }
+    .score-guide b { color:var(--green); margin-right:4px; }
+    .skill-row { padding:17px 20px 13px; border-bottom:1px solid #e8ede5; }
+    .skill-row:last-child { border:0; }
+    .skill-top { display:grid; grid-template-columns:minmax(0,1fr) 224px; gap:15px; align-items:start; }
+    .skill-title { display:flex; align-items:center; gap:8px; }
+    .skill-number { font-size:10px; color:#879387; font-variant-numeric:tabular-nums; }
+    .skill-title h3 { font-size:14px; font-weight:650; letter-spacing:-.3px; }
+    .weight { font-size:10px; padding:0 5px; color:var(--green); border:1px solid #dae7d9; background:#f2f7ee; border-radius:4px; white-space:nowrap; }
+    .skill-description { font-size:12px; color:var(--muted); margin:5px 0 0 22px; }
+    fieldset { border:0; padding:0; margin:0; min-width:0; }
+    .rating-options { display:flex; gap:6px; }
+    .rating-option { position:relative; flex:1; cursor:pointer; }
+    .rating-option input { position:absolute; width:1px; height:1px; opacity:0; }
+    .rating-option span { display:flex; align-items:center; justify-content:center; height:41px; border:1px solid var(--line); border-radius:6px; font-size:14px; font-weight:650; color:var(--muted); }
+    .rating-option:hover span { background:var(--pale); border-color:#97b49c; }
+    .rating-option input:checked+span { background:var(--green); border-color:var(--green); color:white; }
+    .rating-option input:focus-visible+span { outline:3px solid #ca743d; outline-offset:3px; }
+    .rating-footer { display:flex; align-items:center; justify-content:space-between; min-height:25px; font-size:10px; color:var(--muted); }
+    .clear-rating { min-height:25px; border:0; background:none; font-size:10px; color:var(--muted); text-decoration:underline; text-underline-offset:2px; padding:0 2px; }
+    .skill-row details { margin-left:22px; margin-top:2px; }
+    summary { font-size:11px; color:var(--muted); cursor:pointer; width:fit-content; }
+    .anchors { display:grid; grid-template-columns:22px 1fr; gap:6px 8px; margin-top:11px; padding:12px; background:#f6f8f3; border-radius:7px; font-size:12px; color:#58665b; }
+    .anchor-score { display:grid; place-items:center; height:22px; border:1px solid var(--line); background:white; border-radius:4px; font-size:10px; }
+    .aside { position:sticky; top:18px; display:grid; gap:15px; }
+    .result-card { padding:22px; background:var(--green); color:white; border-radius:11px; scroll-margin-top:75px; }
+    .result-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .result-heading h2 { font-size:13px; font-weight:550; overflow-wrap:anywhere; }
+    .result-heading span { font-size:9px; letter-spacing:1px; color:#c5d8c9; }
+    .total-line { display:flex; align-items:baseline; gap:8px; margin-top:13px; }
+    .total-score { font-size:64px; font-weight:600; line-height:1.2; letter-spacing:-3px; font-variant-numeric:tabular-nums; }
+    .total-max { color:#b6cebb; font-size:12px; }
+    .tier-result { font-size:14px; margin-top:5px; }
+    .tier-result strong { font-size:24px; margin-right:5px; }
+    .completion-line { display:flex; justify-content:space-between; color:#c5d8c9; font-size:10px; margin-top:15px; }
+    progress { display:block; width:100%; height:4px; border:0; background:#456f58; border-radius:4px; overflow:hidden; accent-color:#c5dfa9; margin-top:7px; }
+    progress::-webkit-progress-bar { background:#456f58; }
+    progress::-webkit-progress-value { background:#c5dfa9; }
+    progress::-moz-progress-bar { background:#c5dfa9; }
+    .radar { width:100%; max-width:280px; height:auto; display:block; margin:10px auto 0; }
+    .radar text { font-size:9px; fill:#d3e4d4; font-family:inherit; }
+    .comparison { border-top:1px solid #4b775f; padding-top:14px; font-size:12px; }
+    .comparison strong { display:block; margin-bottom:4px; color:#ecf8de; font-size:13px; }
+    .comparison p,.insight { color:#c5d8c9; font-size:11px; line-height:1.8; }
+    .insight { margin-top:9px; }
+    .side-panel { padding:18px 20px; }
+    .side-panel h2 { font-size:13px; margin-bottom:9px; }
+    .tier-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; }
+    .tier-item { display:flex; justify-content:space-between; align-items:center; padding:4px 5px; border-radius:4px; font-size:10px; color:var(--muted); }
+    .tier-item strong { color:var(--green); font-size:12px; }
+    .tier-item.active { background:var(--pale); box-shadow:inset 0 0 0 1px #bfd5be; }
+    .small-note { font-size:10px; color:var(--muted); line-height:1.8; margin-top:10px; }
+    .rubric-wrap { overflow-x:auto; }
+    .rubric { width:100%; min-width:810px; border-collapse:collapse; font-size:11px; line-height:1.7; }
+    .rubric th,.rubric td { padding:11px 10px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+    .rubric thead th { background:#f2f6ed; color:var(--green); font-size:10px; }
+    .rubric th:first-child { width:120px; }
+    .rubric tbody th { background:#fafcf7; font-weight:650; }
+    .rubric tbody th small { display:block; color:var(--muted); font-weight:400; }
+    .rubric td.chosen { background:#edf5e9; box-shadow:inset 3px 0 #648965; }
+    .rubric-help { padding:10px 20px; border-bottom:1px solid var(--line); color:var(--muted); font-size:11px; }
+    .mobile-summary { display:none; }
+    .notice { border:1px solid #e3d0af; background:#fff3dc; color:#7a532d; font-size:12px; border-radius:7px; padding:10px 14px; margin:14px 0; }
+    .access-gate { max-width:430px; margin:15vh auto; padding:30px; text-align:center; }
+    .access-gate h2 { font-size:20px; margin-bottom:9px; }
+    .access-gate p { color:var(--muted); font-size:13px; margin-bottom:20px; }
+    .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .print-summary { display:none; }
+    .clear-dialog { width:min(390px,calc(100% - 32px)); border:1px solid var(--line); border-radius:11px; padding:24px; color:var(--ink); box-shadow:0 18px 65px #10251a33; }
+    .clear-dialog::backdrop { background:#152c2580; }
+    .clear-dialog h2 { font-size:18px; margin-bottom:10px; }
+    .clear-dialog p { font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:22px; }
+    @media(max-width:1050px) { .shell { padding:0 22px; } .workspace { grid-template-columns:minmax(0,1fr) 280px; gap:16px; } .skill-top { grid-template-columns:1fr; gap:10px; } .rating-control { margin-left:22px; max-width:280px; } }
+    @media(max-width:740px) {
+      .shell { padding:0 15px; } .topbar-inner { min-height:66px; gap:8px; } h1 { font-size:15px; } h1 span { display:none; } .top-actions { gap:6px; } .button { font-size:10px; padding:7px 9px; } .save-state { display:none; }
+      .mode-bar { flex-wrap:wrap; padding-bottom:5px; gap:2px; margin-top:6px; } .sync-state { font-size:10px; } .sports { gap:23px; } .sport-tab { font-size:15px; }
+      .player-panel { padding:15px; } .player-list { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; } .player-choice { padding:8px; } .player-choice strong { font-size:11px; } .player-choice small { font-size:9px; }
+      .workspace { display:flex; flex-direction:column; gap:18px; } .assessment-panel,.aside { width:100%; } .aside { position:static; } .assessment-head { padding:17px; }
+      .assessment-head .section-heading { align-items:flex-start; flex-direction:column; gap:10px; } .assessment-actions { width:100%; justify-content:space-between; }
+      .skill-row { padding:17px; } .rating-control { max-width:none; } .rating-option span { height:43px; } .skill-description { font-size:11px; } .view-switch button { padding:5px 8px; }
+      .mobile-summary { position:sticky; top:0; z-index:3; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 11px; margin-bottom:15px; border:1px solid #c9dbc8; border-radius:7px; background:#edf4ed; color:var(--green); box-shadow:0 3px 8px #18332309; }
+      .mobile-summary strong { font-size:12px; } .mobile-summary small { display:block; font-size:10px; color:var(--muted); } .mobile-summary a { display:flex; align-items:center; min-height:38px; color:var(--green); font-size:11px; white-space:nowrap; text-underline-offset:3px; }
+      .result-upper { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:5px; } .total-score { font-size:51px; } .radar { margin-top:0; } .tier-result { font-size:12px; } .tier-grid { gap:4px 25px; }
+    }
+    @media(pointer:coarse) {
+      .button,.player-choice,.sport-tab,.view-switch button,.clear-rating { min-width:44px; min-height:44px; }
+      .rating-control { margin-left:0; }
+      .rating-option span { height:44px; }
+      .skill-row summary { min-height:44px; padding:12px 0; }
+      .mobile-summary a { min-height:44px; }
+    }
+    @media print {
+      @page { size:A4 landscape; margin:10mm; }
+      body { background:white; color:#111; } .shell { max-width:none; padding:0; }
+      .topbar,.mode-bar,.player-panel,.mobile-summary,.notice,.assessment-head,.skill-list,.aside,.rubric-help,.clear-dialog { display:none!important; }
+      .workspace { display:block; padding:0; } .panel { border:0; border-radius:0; } .assessment-panel { overflow:visible; }
+      .print-summary { display:block; font-size:10px; line-height:1.9; white-space:pre-line; padding-bottom:10px; }
+      #rubricView[hidden],#rubricView { display:block!important; } .rubric-wrap { overflow:visible; }
+      .rubric { min-width:0; font-size:9.5px; line-height:1.5; table-layout:fixed; } .rubric th,.rubric td { padding:7px 6px; } .rubric th:first-child { width:115px; }
+      .rubric tr { break-inside:avoid; } .rubric thead { display:table-header-group; } .rubric td.chosen { background:#edf5e9!important; print-color-adjust:exact; -webkit-print-color-adjust:exact; box-shadow:none; font-weight:700; }
+    }
+  </style>
+</head>
+<body>
+  <section id="accessGate" class="access-gate panel"><h2>관리자 전용 평가표</h2><p>젓자FC 관리자 화면에서 ‘선수 실력 평가표’를 열어주세요.</p><a class="button" href="index.html" target="_top">젓자FC로 이동</a></section>
+  <div id="assessmentApp" hidden>
+    <header class="topbar"><div class="shell topbar-inner"><h1><span>젓자FC</span>선수 실력 평가표</h1><div class="top-actions"><span id="saveState" class="save-state" role="status">이 브라우저에 자동 저장</span><button id="printButton" class="button" type="button">인쇄 / PDF</button><button id="backButton" class="button" type="button">닫기</button></div></div></header>
+    <main class="shell">
+      <div id="storageNotice" class="notice" role="status" hidden></div>
+      <nav class="mode-bar" aria-label="평가 종목"><div class="sports"><button class="sport-tab" type="button" data-sport="futsal" aria-pressed="true">풋살<span>FUTSAL</span></button><button class="sport-tab" type="button" data-sport="soccer" aria-pressed="false">축구<span>FOOTBALL</span></button></div><p id="syncState" class="sync-state" role="status">선수 목록을 불러오는 중</p></nav>
+      <section class="panel player-panel" aria-labelledby="playerHeading"><div class="section-heading"><h2 id="playerHeading">평가할 선수 <small id="playerCount"></small></h2><small>이름을 눌러 선택</small></div><div id="playerList" class="player-list" role="group" aria-label="평가할 선수 목록"></div><p id="emptyState" class="empty-state" hidden></p></section>
+      <div id="mobileSummary" class="mobile-summary" hidden><div><strong id="mobileResult"></strong><small id="mobileProgress"></small></div><a href="#resultCard">결과 보기 ↓</a></div>
+      <div id="printSummary" class="print-summary"></div>
+      <div id="workspace" class="workspace" hidden>
+        <section class="panel assessment-panel" aria-labelledby="selectedName">
+          <div class="assessment-head"><div class="section-heading"><h2 id="selectedName"></h2><div class="assessment-actions"><div class="view-switch" role="group" aria-label="평가표 보기 방식"><button type="button" data-view="score" aria-pressed="true">채점하기</button><button type="button" data-view="rubric" aria-pressed="false">전체 기준표</button></div><button id="clearAssessment" class="button danger" type="button" disabled>전체 지우기</button></div></div><div class="selected-meta"><span id="currentTier" class="current-tier"></span><span id="tierSource"></span></div><div class="score-guide"><span><b>1</b>입문</span><span><b>2</b>기초</span><span><b>3</b>안정</span><span><b>4</b>우수</span><span><b>5</b>탁월</span><span>미평가 항목은 비워두세요.</span></div></div>
+          <div id="skillList" class="skill-list"></div>
+          <div id="rubricView" hidden><p class="rubric-help">선택한 점수는 연두색으로 표시됩니다. 넓은 표는 가로로 스크롤할 수 있습니다.</p><div class="rubric-wrap"><table class="rubric"><caption class="sr-only">종목별 10개 실력 요소의 1~5점 평가 기준</caption><thead><tr><th scope="col">실력 요소 / 비중</th><th scope="col">1점 · 입문</th><th scope="col">2점 · 기초</th><th scope="col">3점 · 안정</th><th scope="col">4점 · 우수</th><th scope="col">5점 · 탁월</th></tr></thead><tbody id="rubricBody"></tbody></table></div></div>
+        </section>
+        <aside class="aside" aria-label="평가 결과">
+          <section class="result-card" id="resultCard" aria-labelledby="resultName"><div class="result-heading"><h2 id="resultName"></h2><span id="resultSport"></span></div><div class="result-upper"><div><div class="total-line"><span id="totalScore" class="total-score">—</span><span class="total-max">/ 100</span></div><p id="tierResult" class="tier-result"></p><div class="completion-line"><span>채점 진행</span><span id="completionCount">0 / 10</span></div><progress id="completionProgress" value="0" max="10" aria-label="평가 완료 항목 수"></progress></div><svg id="radar" class="radar" viewBox="0 0 280 246" role="img" aria-labelledby="radarTitle radarDesc"><title id="radarTitle">실력 요소별 점수</title><desc id="radarDesc"></desc><g id="radarGrid"></g><g id="radarValues"></g></svg></div><div class="comparison" aria-live="polite" aria-atomic="true"><strong id="comparisonTitle"></strong><p id="comparisonDetail"></p></div><p id="insight" class="insight" hidden></p></section>
+          <section class="panel side-panel" aria-labelledby="tierHeading"><h2 id="tierHeading">점수별 권장 티어</h2><div id="tierGrid" class="tier-grid"></div><p class="small-note">합계 = Σ(항목 점수 ÷ 5 × 비중)<br>가중치와 점수 구간은 필드 플레이어 대상 동호회용 제안 기준입니다.</p></section>
+        </aside>
+      </div>
+    </main>
+    <dialog id="clearAssessmentDialog" class="clear-dialog" aria-labelledby="clearAssessmentTitle" aria-describedby="clearAssessmentMessage"><h2 id="clearAssessmentTitle">평가를 전체 지울까요?</h2><p id="clearAssessmentMessage"></p><div class="dialog-actions"><button id="cancelClearAssessment" class="button" type="button">취소</button><button id="confirmClearAssessment" class="button confirm-clear" type="button">전체 지우기</button></div></dialog>
+  </div>
+  <script id="assessment-model">
+
+    'use strict';
+    const Assessment = (() => {
+      const tiers = [
+        { name:'황제', min:95 }, { name:'S', min:90 }, { name:'S-', min:85 },
+        { name:'A+', min:80 }, { name:'A', min:72 }, { name:'A-', min:65 },
+        { name:'B+', min:58 }, { name:'B', min:50 }, { name:'C', min:35 }, { name:'D', min:20 }
+      ];
+      const sports = {
+        futsal: {
+          label:'풋살', english:'FUTSAL',
+          description:'좁은 공간의 빠른 연결과 압박 대응이 핵심입니다. 짧은 패스, 볼 컨트롤, 판단과 수비에 높은 비중을 두었습니다.',
+          skills:[
+            { id:'passing', title:'패스·연계', short:'패스', weight:15, description:'짧은 패스의 정확도, 속도 조절, 원투·원터치 연결', criteria:[
+              '압박이 없어도 짧은 패스의 방향·세기가 자주 빗나간다.',
+              '정지한 동료에게는 연결하지만 이동 중이거나 압박을 받으면 흔들린다.',
+              '일반적인 압박에서 짧은 패스를 연결하고 기본 원투를 수행한다.',
+              '동료의 다음 동작에 맞춰 패스하며 원터치 연계를 반복한다.',
+              '강한 압박에서도 적은 터치로 수비 사이를 연결해 기회를 만든다.' ] },
+            { id:'control', title:'퍼스트 터치·볼 컨트롤', short:'터치', weight:13, description:'발바닥 컨트롤, 방향 있는 첫 터치, 좁은 공간의 볼 유지', criteria:[
+              '쉬운 공도 첫 터치가 길어져 소유권을 자주 잃는다.',
+              '여유가 있으면 멈추지만 상대가 붙으면 공을 놓친다.',
+              '보통 속도의 패스를 발 안에 두고 다음 동작으로 연결한다.',
+              '몸과 발바닥을 활용해 압박을 피하는 방향으로 첫 터치를 한다.',
+              '강하고 까다로운 공도 압박 속에서 제어해 즉시 유리한 상황을 만든다.' ] },
+            { id:'decision', title:'판단·주변 확인', short:'판단', weight:12, description:'공 받기 전 확인, 패스·드리블·슛의 선택과 타이밍', criteria:[
+              '공만 보다가 열린 동료나 가까운 상대를 자주 놓친다.',
+              '공을 받은 뒤 주변을 찾느라 좋은 선택의 시기를 놓친다.',
+              '받기 전 주변을 보고 무리한 선택을 줄인다.',
+              '상대 압박과 동료 움직임을 읽고 빠르게 유리한 선택을 한다.',
+              '한두 수 앞선 전개를 예상해 템포와 선택으로 수비를 흔든다.' ] },
+            { id:'defending', title:'수비·압박', short:'수비', weight:12, description:'1대1 지연, 패스 길 차단, 동료와 맞춘 압박', criteria:[
+              '공을 따라 달려들어 쉽게 제쳐지거나 자기 상대를 놓친다.',
+              '상대를 따라가지만 거리·각도 조절과 패스 길 차단이 부족하다.',
+              '무리하게 달려들지 않고 진행을 늦추며 기본 마크를 유지한다.',
+              '위험한 길을 막고 동료와 압박 시점을 맞춰 실수를 유도한다.',
+              '상대 의도를 읽고 커버와 압박을 조율해 반복해서 공을 회수한다.' ] },
+            { id:'offball', title:'오프 더 볼·지원', short:'지원', weight:10, description:'패스 각도, 패스 후 이동, 공간 교환과 뒷공간 침투', criteria:[
+              '패스 후 멈추거나 동료와 같은 공간에 겹친다.',
+              '지원하려 움직이지만 수비 뒤에 가려 패스 길을 자주 막는다.',
+              '패스 받을 각도를 만들고 공을 준 뒤 새 공간으로 이동한다.',
+              '원투·대각 침투·공간 교환으로 동료에게 선택지를 제공한다.',
+              '수비를 끌어내는 이동과 타이밍으로 팀 전체의 공격 공간을 만든다.' ] },
+            { id:'finishing', title:'슈팅·마무리', short:'슈팅', weight:10, description:'가까운 기회의 정확도, 빠른 슛 준비, 골키퍼를 본 마무리', criteria:[
+              '압박 없는 가까운 기회도 유효 슈팅으로 연결하기 어렵다.',
+              '자세를 잡을 시간이 충분해야 방향을 맞춘다.',
+              '일반적인 득점 기회에서 골문을 겨냥해 안정적으로 슛한다.',
+              '적은 터치와 빠른 준비로 수비가 붙기 전에 정확히 마무리한다.',
+              '좁은 각도·강한 압박에서도 상황에 맞는 발과 슛으로 위협을 만든다.' ] },
+            { id:'dribbling', title:'드리블·압박 탈출', short:'드리블', weight:9, description:'밀착 볼 운반, 방향 전환, 돌파 후 유효한 연결', criteria:[
+              '볼을 운반할 때 공이 멀어지며 수비 앞에서 쉽게 잃는다.',
+              '빈 공간에서는 운반하지만 압박 시 멈추거나 막힌다.',
+              '기본 방향 전환으로 공을 지키고 필요할 때만 돌파한다.',
+              '속도 변화와 양방향 전환으로 상대를 벗어나 전진한다.',
+              '밀집 압박에서도 돌파 후 패스·슛으로 실질적인 이득을 만든다.' ] },
+            { id:'transition', title:'공수 전환', short:'전환', weight:8, description:'공을 잃은 직후의 복귀·재압박, 탈취 후 빠른 공격 참여', criteria:[
+              '공을 잃거나 얻은 뒤 멈춰 다음 플레이에 늦는다.',
+              '전환에 반응하지만 복귀 위치나 첫 움직임이 늦다.',
+              '공을 잃으면 복귀하고 얻으면 즉시 공격을 지원한다.',
+              '상황에 따라 재압박·복귀를 구분하고 역습의 빈 공간을 채운다.',
+              '공 소유가 바뀌기 전부터 대비해 반복해서 수적 우위를 만든다.' ] },
+            { id:'agility', title:'민첩성·밸런스', short:'민첩', weight:6, description:'짧은 가속·감속, 방향 전환, 접촉 후 균형', criteria:[
+              '출발·정지·방향 전환이 늦고 작은 접촉에도 균형을 잃는다.',
+              '한 방향 이동은 가능하지만 급정지나 재출발이 둔하다.',
+              '짧은 가속과 방향 전환을 수행하며 보통 접촉에서 균형을 유지한다.',
+              '빠른 감속·재가속과 안정된 중심으로 공격과 수비에 대응한다.',
+              '연속된 방향 전환과 접촉 속에서도 움직임과 볼 기술의 질을 유지한다.' ] },
+            { id:'stamina', title:'반복 활동·지구력', short:'체력', weight:5, description:'반복 질주 후 회복, 출전 구간 후반의 움직임과 기술 유지', criteria:[
+              '짧게 뛴 뒤 활동이 크게 줄고 플레이 참여가 끊긴다.',
+              '초반은 참여하지만 반복 움직임 후 회복이 늦고 실수가 늘어난다.',
+              '정해진 출전 구간 동안 기본 활동량과 기술을 유지한다.',
+              '압박과 지원을 반복해도 빠르게 회복하고 수행을 유지한다.',
+              '높은 강도의 반복 움직임 뒤에도 후반까지 판단과 기술이 거의 떨어지지 않는다.' ] }
+          ]
+        },
+        soccer: {
+          label:'축구', english:'FOOTBALL',
+          description:'넓은 공간을 쓰는 전개와 위치 선정이 핵심입니다. 패스 범위, 전술 이해, 장거리 이동과 경합까지 함께 봅니다.',
+          skills:[
+            { id:'passing', title:'패스·전개', short:'패스', weight:14, description:'짧은 패스와 중장거리 패스의 정확도, 전진 패스·전환', criteria:[
+              '압박 없는 짧은 패스도 방향·세기가 자주 빗나간다.',
+              '가까운 동료에게 연결하지만 거리나 압박이 늘면 흔들린다.',
+              '짧은·중거리 패스를 안정적으로 연결하고 안전하게 전개한다.',
+              '전진 패스와 반대편 전환을 적절한 세기와 타이밍에 보낸다.',
+              '강한 압박에서도 다양한 거리의 패스로 수비 라인을 넘어 기회를 만든다.' ] },
+            { id:'control', title:'퍼스트 터치·볼 보호', short:'터치', weight:12, description:'지면·공중 패스 처리, 방향 있는 첫 터치와 몸을 쓴 볼 보호', criteria:[
+              '쉬운 패스도 첫 터치가 길어져 자주 빼앗긴다.',
+              '천천히 오는 지면 패스는 제어하지만 공중볼·압박에 흔들린다.',
+              '보통 속도와 높이의 공을 제어하고 몸으로 볼을 보호한다.',
+              '받는 방향과 몸 방향을 조절해 첫 터치로 다음 플레이를 준비한다.',
+              '빠르고 까다로운 공도 강한 압박 속에서 전진 가능한 방향으로 처리한다.' ] },
+            { id:'decision', title:'판단·시야', short:'판단', weight:12, description:'받기 전 확인, 반대편 공간 인지, 전진·유지의 선택', criteria:[
+              '공 주변만 보며 열린 동료나 가까운 상대를 놓친다.',
+              '가까운 선택은 보지만 반대편 공간과 뒤의 압박을 놓친다.',
+              '받기 전 주변을 보고 위험에 따라 전진과 소유를 선택한다.',
+              '여러 방향을 미리 확인해 압박을 피하고 템포를 조절한다.',
+              '상대 대형의 변화를 예상해 빠른 전환과 선택으로 팀에 우위를 만든다.' ] },
+            { id:'positioning', title:'위치 선정·오프 더 볼', short:'위치', weight:12, description:'포지션 역할, 팀 간격, 침투 타이밍과 오프사이드 관리', criteria:[
+              '자기 위치를 자주 벗어나 동료와 겹치고 팀 간격이 무너진다.',
+              '기본 위치는 알지만 공 위치가 바뀌면 이동 시점을 놓친다.',
+              '역할에 맞는 간격을 유지하고 패스 길·침투 공간을 만든다.',
+              '상대 라인과 동료 움직임을 보고 지원·침투의 시점을 맞춘다.',
+              '유기적인 위치 교환과 미끼 움직임으로 팀의 공간과 대형을 개선한다.' ] },
+            { id:'defending', title:'수비·커버', short:'수비', weight:10, description:'1대1 지연, 마크, 위험 지역 커버와 수비 라인 협력', criteria:[
+              '쉽게 달려들거나 마크를 놓쳐 위험한 공간을 내준다.',
+              '대인을 따라가지만 거리 조절과 동료 뒤 커버가 늦다.',
+              '상대 전진을 늦추고 기본 마크와 자기 구역을 유지한다.',
+              '패스 길을 차단하며 동료의 빈 공간과 침투를 먼저 커버한다.',
+              '공격을 예측해 수비 라인을 조율하고 실점 위험을 반복해서 줄인다.' ] },
+            { id:'finishing', title:'슈팅·마무리', short:'슈팅', weight:10, description:'골문을 향한 정확도, 상황에 맞는 슛, 움직이며 마무리', criteria:[
+              '여유 있는 기회도 골문을 향한 슈팅으로 연결하기 어렵다.',
+              '멈춘 공·편한 자세에서는 슛하지만 이동 중에는 정확도가 낮다.',
+              '일반적인 득점 기회에서 골문을 겨냥해 마무리한다.',
+              '압박·이동 중에도 골키퍼 위치에 맞춰 슛의 방향과 타이밍을 고른다.',
+              '어려운 공과 다양한 각도에서도 적은 준비 동작으로 꾸준히 위협을 만든다.' ] },
+            { id:'dribbling', title:'드리블·전진', short:'드리블', weight:9, description:'속도를 낸 볼 운반, 1대1 돌파, 돌파 이후의 연결', criteria:[
+              '운반 중 공이 멀어져 압박이 약해도 자주 잃는다.',
+              '빈 공간에서 운반하지만 속도를 내거나 상대를 만나면 막힌다.',
+              '안정적으로 전진하며 돌파와 패스를 구분해 소유를 지킨다.',
+              '속도 변화와 방향 전환으로 상대를 벗어나 유리한 공간에 진입한다.',
+              '강한 수비를 상대로도 전진과 돌파 후 연결로 결정적 이득을 만든다.' ] },
+            { id:'speed', title:'주력·민첩성', short:'주력', weight:8, description:'초기 가속, 긴 거리 질주, 수비·침투 시 방향 전환', criteria:[
+              '출발과 전환이 느려 비슷한 출발 위치에서도 자주 뒤처진다.',
+              '짧은 이동은 가능하지만 긴 추격이나 재가속에서 크게 밀린다.',
+              '보통의 침투·복귀 상황에서 상대 움직임을 따라간다.',
+              '초기 가속과 긴 질주로 공간을 선점하며 방향 전환도 빠르다.',
+              '볼 유무와 무관하게 가속·최고 속도·전환으로 지속적인 우위를 만든다.' ] },
+            { id:'stamina', title:'지구력·공수 전환', short:'체력', weight:7, description:'왕복 움직임과 회복, 경기 후반의 역할·집중력 유지', criteria:[
+              '초반 이후 움직임이 크게 줄어 공격·수비 참여가 끊긴다.',
+              '반복 이동 뒤 복귀가 늦고 후반에는 자기 역할을 놓친다.',
+              '정해진 출전 시간 동안 기본 왕복 움직임과 역할을 유지한다.',
+              '반복 침투·복귀 후에도 회복이 빠르고 후반 판단이 안정적이다.',
+              '높은 활동량 속에서도 경기 후반까지 전환 속도와 수행의 질을 유지한다.' ] },
+            { id:'duels', title:'몸싸움·공중볼', short:'경합', weight:6, description:'합법적인 신체 경합, 낙하지점 판단, 경합 후 볼 확보', criteria:[
+              '접촉에 쉽게 밀리거나 낙하지점을 자주 잘못 잡는다.',
+              '자리를 잡으면 버티지만 이동 경합과 공중볼 대응이 불안하다.',
+              '몸으로 자리를 지키고 보통의 공중볼에서 첫 경합을 수행한다.',
+              '위치·타이밍을 앞서 잡아 경합 후 우리 팀이 공을 잡게 한다.',
+              '강한 상대에게도 무리한 반칙 없이 지상·공중 경합과 후속 연결을 주도한다.' ] }
+          ]
+        }
+      };
+      const validScore = value => Number.isInteger(value) && value >= 1 && value <= 5;
+      function calculate(sport, scores) {
+        const skills = sports[sport].skills;
+        const completed = skills.filter(skill => validScore(scores[skill.id])).length;
+        if (completed !== skills.length) return { completed, total:null, tier:null, nearBoundary:false };
+        // Integer point units prevent float drift at exact tier boundaries.
+        const units = skills.reduce((sum,skill) => sum + scores[skill.id] * skill.weight, 0);
+        const total = units / 5;
+        const tier = tiers.find(item => total >= item.min).name;
+        const nearBoundary = tiers.slice(0,-1).some(item => Math.abs(total-item.min) <= 2);
+        return { completed,total,tier,nearBoundary };
+      }
+      function comparison(currentTier, result) {
+        if (!result.tier) return '미평가';
+        if (!currentTier) return '현재 티어 확인 필요';
+        const diff = tiers.findIndex(tier => tier.name === currentTier) - tiers.findIndex(tier => tier.name === result.tier);
+        if (!diff) return '현재 티어와 일치';
+        return `${Math.abs(diff)}단계 ${diff > 0 ? '상향' : '하향'} 검토`;
+      }
+
+      function cleanScores(sport, value, strict = true) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('저장된 점수 형식 오류');
+        const ids = new Set(sports[sport].skills.map(skill => skill.id));
+        const result = {};
+        for (const [id,score] of Object.entries(value)) {
+          if (!ids.has(id) || !validScore(score)) { if (strict) throw new Error('저장된 점수 범위 오류'); continue; }
+          result[id] = score;
+        }
+        return result;
+      }
+      function readSaved(data) {
+        if (!data || data.version !== 2 || !Array.isArray(data.entries) || data.entries.length > 2000) throw new Error('저장 형식 오류');
+        const scores = new Map();
+        for (const entry of data.entries) {
+          if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || !entry[0] || entry[0].length > 200 || scores.has(entry[0])) throw new Error('저장된 선수 ID 오류');
+          const value = entry[1];
+          if (!value || typeof value !== 'object') throw new Error('저장된 평가 오류');
+          scores.set(entry[0],{futsal:cleanScores('futsal',value.futsal),soccer:cleanScores('soccer',value.soccer)});
+        }
+        return { scores,activeId:typeof data.activeId === 'string' ? data.activeId : '',sport:Object.hasOwn(sports,data.sport) ? data.sport : 'futsal' };
+      }
+      function migrateLegacy(data, roster) {
+        const scores = new Map();
+        if (!data || data.version !== 1 || !Array.isArray(data.players)) return scores;
+        for (const player of roster) {
+          const direct = data.players.filter(old => old && old.id === player.id);
+          const named = data.players.filter(old => old && typeof old.name === 'string' && old.name.trim() === player.name.trim());
+          const matching = direct.length === 1 ? direct : roster.filter(item => item.name.trim() === player.name.trim()).length === 1 ? named : [];
+          if (matching.length !== 1) continue;
+          const old = matching[0];
+          try { scores.set(player.id,{futsal:cleanScores('futsal',old.futsal?.scores,false),soccer:cleanScores('soccer',old.soccer?.scores,false)}); } catch { /* Preserve malformed legacy data untouched. */ }
+        }
+        return scores;
+      }
+      return {tiers,sports,validScore,calculate,comparison,cleanScores,readSaved,migrateLegacy};
+    })();
+  </script>
+  <script id="assessment-app">
+    (() => {
+      'use strict';
+      const {tiers,sports,calculate,comparison,readSaved,migrateLegacy} = Assessment;
+      const byId = id => document.getElementById(id);
+      const escapeHtml = value => String(value).replace(/[&<>"']/g,char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      const STORAGE_KEY = 'jeotja-fc-skill-assessment-v2';
+      const channel = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      const expectedOrigin = location.protocol === 'file:' ? 'null' : location.origin;
+      const targetOrigin = location.protocol === 'file:' ? '*' : location.origin;
+      let authorized = false;
+      let initialized = false;
+      let storageBlocked = false;
+      let legacyPending = null;
+      let renderedSelection = '';
+      let pendingClear = null;
+      let roster = [];
+      let status = {};
+      let state = {scores:new Map(),activeId:'',sport:'futsal'};
+      const activePlayer = () => roster.find(player => player.id === state.activeId);
+      const scorecard = (id = state.activeId,sport = state.sport) => state.scores.get(id)?.[sport] || {};
+      function notice(message) { byId('storageNotice').textContent = message; byId('storageNotice').hidden = false; }
+      function initialize() {
+        if (initialized) return;
+        initialized = true;
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) state = readSaved(JSON.parse(raw));
+          else {
+            const legacy = localStorage.getItem('jeotja-fc-skill-assessment-v1');
+            if (legacy) { try { legacyPending = JSON.parse(legacy); } catch { /* Old content is never overwritten. */ } }
+          }
+        } catch {
+          storageBlocked = true;
+          notice('저장된 평가를 읽지 못했습니다. 현재 채점 내용은 이 화면에서만 유지됩니다.');
+          byId('saveState').textContent = '자동 저장 중지';
+        }
+      }
+      function persist() {
+        if (!authorized || storageBlocked) return;
+        try {
+          localStorage.setItem(STORAGE_KEY,JSON.stringify({version:2,activeId:state.activeId,sport:state.sport,entries:[...state.scores]}));
+          byId('saveState').textContent = '이 브라우저에 저장됨';
+          byId('storageNotice').hidden = true;
+        } catch {
+          byId('saveState').textContent = '저장 실패';
+          notice('브라우저 저장 공간을 사용할 수 없어 현재 채점 내용은 이 화면에서만 유지됩니다.');
+        }
+      }
+      function current(player = activePlayer(),sport = state.sport) {
+        const feed = status[sport];
+        if (!player || !['ready','cached'].includes(status.players) || !['ready','cached'].includes(feed)) return null;
+        const rating = player[sport];
+        if (sport === 'soccer' && rating?.source === 'futsal' && !['ready','cached'].includes(status.futsal)) return null;
+        return rating && tiers.some(tier => tier.name === rating.tier) ? rating : null;
+      }
+      function sourceText(player = activePlayer(),sport = state.sport) {
+        const rating = current(player,sport);
+        if (!rating) return status[sport] === 'error' || status.players === 'error' || (sport === 'soccer' && player?.soccer?.source === 'futsal' && status.futsal === 'error') ? '최신 티어를 불러오지 못했습니다' : '최신 티어를 불러오는 중';
+        const source = rating.source === 'manual' ? '관리자 지정' : rating.source === 'votes' ? `최근 투표 ${rating.votes}표 반영` : rating.source === 'futsal' ? '축구 투표 없음 · 풋살 티어 적용' : '투표 없음 · 기본 티어';
+        return (status[sport] === 'cached' || status.players === 'cached' || (sport === 'soccer' && rating.source === 'futsal' && status.futsal === 'cached') ? '저장된 데이터 · ' : '') + source;
+      }
+      function renderPlayerList() {
+        byId('playerCount').textContent = `${roster.length}명`;
+        byId('emptyState').hidden = roster.length > 0;
+        byId('emptyState').textContent = status.players === 'loading' ? '선수 목록을 불러오는 중입니다.' : status.players === 'error' ? '선수 목록을 불러오지 못했습니다. 관리자 화면의 연결 상태를 확인해주세요.' : '등록된 선수가 없습니다.';
+        byId('playerList').innerHTML = roster.map((player,index) => {
+          const result = calculate(state.sport,scorecard(player.id));
+          const rating = current(player);
+          return `<button class="player-choice" type="button" data-player-index="${index}" aria-pressed="${state.activeId === player.id}" aria-label="${escapeHtml(player.name)} 평가"><span class="name-line"><strong>${escapeHtml(player.name)}</strong><span class="tier">${rating ? rating.tier : '—'}</span></span><small>${result.tier ? `${result.total.toFixed(1)}점 · 권장 ${result.tier}` : result.completed ? `${result.completed}/10 채점` : '평가 전'}</small></button>`;
+        }).join('');
+        const feed = status[state.sport];
+        byId('syncState').textContent = status.players === 'error' || feed === 'error' ? '최신 데이터 연결 확인 필요' : status.players === 'loading' || feed === 'loading' ? '최신 데이터를 불러오는 중' : status.players === 'cached' || feed === 'cached' ? '저장된 투표 기준' : '최신 투표 반영';
+      }
+      function renderSkills() {
+        const config = sports[state.sport];
+        const scores = scorecard();
+        document.querySelectorAll('[data-sport]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.sport === state.sport)));
+        byId('skillList').innerHTML = config.skills.map((skill,index) => `<article class="skill-row" data-skill="${skill.id}"><div class="skill-top"><div><div class="skill-title"><span class="skill-number">${String(index+1).padStart(2,'0')}</span><h3>${skill.title}</h3><span class="weight">${skill.weight}%</span></div><p class="skill-description">${skill.description}</p></div><div class="rating-control"><fieldset><legend class="sr-only">${skill.title} 점수</legend><div class="rating-options">${skill.criteria.map((criterion,i) => `<label class="rating-option" title="${i+1}점 · ${criterion}"><input type="radio" name="score-${skill.id}" value="${i+1}" aria-label="${skill.title} ${i+1}점" ${scores[skill.id] === i+1 ? 'checked' : ''}><span>${i+1}</span></label>`).join('')}</div></fieldset><div class="rating-footer"><span id="contribution-${skill.id}"></span><button type="button" class="clear-rating" data-clear="${skill.id}" aria-label="${skill.title} 점수 지우기">지우기</button></div></div></div><details><summary>1~5점 채점 기준</summary><div class="anchors">${skill.criteria.map((criterion,i) => `<span class="anchor-score">${i+1}</span><span>${criterion}</span>`).join('')}</div></details></article>`).join('');
+        byId('rubricBody').innerHTML = config.skills.map(skill => `<tr data-rubric="${skill.id}"><th scope="row">${skill.title}<small>${skill.weight}% · <span class="rubric-score"></span></small></th>${skill.criteria.map((criterion,i) => `<td data-score="${i+1}">${criterion}</td>`).join('')}</tr>`).join('');
+        const polygon = radius => config.skills.map((_,index) => point(index,radius).join(',')).join(' ');
+        byId('radarGrid').innerHTML = [1,2,3,4,5].map(level => `<polygon points="${polygon(level*16)}" fill="none" stroke="#507963" stroke-width=".7"/>`).join('') + config.skills.map((skill,index) => { const [x,y] = point(index,80); const [lx,ly] = point(index,101); return `<line x1="140" y1="121" x2="${x}" y2="${y}" stroke="#507963" stroke-width=".6"/><text x="${lx}" y="${ly+3}" text-anchor="${lx < 130 ? 'end' : lx > 150 ? 'start' : 'middle'}">${skill.short}</text>`; }).join('');
+      }
+      function point(index,radius) { const angle = (index*36-90)*Math.PI/180; return [140+Math.cos(angle)*radius,121+Math.sin(angle)*radius]; }
+      function renderResult() {
+        const player = activePlayer();
+        byId('workspace').hidden = !player;
+        byId('mobileSummary').hidden = !player;
+        byId('printButton').disabled = !player;
+        byId('clearAssessment').disabled = !player || calculate(state.sport,scorecard()).completed === 0;
+        if (!player) { byId('printSummary').textContent = ''; return; }
+        const config = sports[state.sport];
+        const scores = scorecard();
+        const result = calculate(state.sport,scores);
+        const rating = current();
+        byId('selectedName').textContent = `${player.name} · ${config.label}`;
+        byId('currentTier').textContent = `현재 티어 ${rating?.tier || '—'}`;
+        byId('tierSource').textContent = sourceText();
+        byId('resultName').textContent = player.name;
+        byId('resultSport').textContent = config.english;
+        byId('totalScore').textContent = result.total === null ? '—' : result.total.toFixed(1).replace('.0','');
+        byId('tierResult').innerHTML = result.tier ? `<strong>${result.tier}</strong> 권장 티어` : '평가를 시작하세요';
+        byId('completionCount').textContent = `${result.completed} / 10`;
+        byId('completionProgress').value = result.completed;
+        byId('mobileResult').textContent = result.tier ? `${player.name} · ${result.total.toFixed(1)}점 · ${result.tier}` : `${player.name} · ${result.completed}/10 채점`;
+        byId('mobileProgress').textContent = `${config.label} · 현재 티어 ${rating?.tier || '—'}${byId('storageNotice').hidden ? '' : ' · 자동 저장 확인 필요'}`;
+        byId('tierGrid').innerHTML = tiers.map((tier,index) => `<div class="tier-item ${result.tier === tier.name ? 'active' : ''}"><strong>${tier.name}</strong><span>${tier.min}${index ? '–<'+tiers[index-1].min : '–100'}</span></div>`).join('');
+        for (const skill of config.skills) {
+          const score = scores[skill.id];
+          byId('contribution-'+skill.id).textContent = score ? `${score}점 · 환산 ${(score*skill.weight/5).toFixed(1)} / ${skill.weight}` : '미평가';
+          document.querySelector(`[data-clear="${skill.id}"]`).hidden = !score;
+          const row = document.querySelector(`[data-rubric="${skill.id}"]`);
+          row.querySelector('.rubric-score').textContent = score ? `${score}점` : '미평가';
+          row.querySelectorAll('[data-score]').forEach(cell => cell.classList.toggle('chosen',Number(cell.dataset.score) === score));
+        }
+        const valid = config.skills.map((skill,index) => ({skill,index,score:scores[skill.id]})).filter(item => Assessment.validScore(item.score));
+        let plot = result.tier ? `<polygon points="${valid.map(item => point(item.index,item.score*16).join(',')).join(' ')}" fill="#b8d6a833" stroke="#d4e9b7" stroke-width="1.8"/>` : '';
+        plot += valid.map(item => { const [x,y] = point(item.index,item.score*16); return `<circle cx="${x}" cy="${y}" r="3" fill="#e0efc6"/>`; }).join('');
+        byId('radarValues').innerHTML = plot;
+        byId('radarDesc').textContent = valid.length ? valid.map(item => `${item.skill.title} ${item.score}점`).join(', ') : '미평가 상태입니다.';
+        byId('insight').hidden = !result.tier;
+        if (result.tier) {
+          byId('comparisonTitle').textContent = comparison(rating?.tier || '',result);
+          byId('comparisonDetail').textContent = (rating ? `현재 ${rating.tier} → 권장 ${result.tier}.` : sourceText()+'.') + (result.nearBoundary ? ' 티어 경계에서 2점 이내입니다.' : '');
+          const sorted = [...valid].sort((a,b) => b.score-a.score);
+          const high = sorted[0].score; const low = sorted[sorted.length-1].score;
+          byId('insight').textContent = high === low ? `모든 항목 ${high}점` : `강점: ${sorted.filter(item => item.score === high).slice(0,2).map(item => item.skill.short).join('·')} (${high}점) / 보완: ${sorted.filter(item => item.score === low).slice(0,2).map(item => item.skill.short).join('·')} (${low}점)`;
+        } else {
+          byId('comparisonTitle').textContent = result.completed ? `${10-result.completed}개 항목이 남았습니다` : '10개 항목을 채점해주세요';
+          byId('comparisonDetail').textContent = '모든 항목을 채점하면 현재 티어와 비교합니다.';
+        }
+        byId('printSummary').textContent = `${player.name} · ${config.label} 실력 평가표\n현재 티어: ${rating?.tier || '확인 중'} (${sourceText()}) | 점수: ${result.total === null ? '미완료' : result.total.toFixed(1)+'/100'} | 권장 티어: ${result.tier || '판정 보류'} | ${result.tier ? comparison(rating?.tier || '',result) : `${result.completed}/10 채점`}\n계산: Σ(항목 점수 ÷ 5 × 비중) · 필드 플레이어 대상 동호회용 제안 기준\n티어 구간: ${tiers.map((tier,index) => `${tier.name} ${tier.min}${index ? '–<'+tiers[index-1].min : '–100'}`).join(' / ')} (<는 미만)`;
+      }
+      function render(full = false) {
+        renderPlayerList();
+        const key = activePlayer() ? `${state.activeId}:${state.sport}` : '';
+        if (key && (full || key !== renderedSelection)) renderSkills();
+        renderedSelection = key;
+        renderResult();
+      }
+      function lock() { authorized = false; closeClearDialog(); byId('assessmentApp').hidden = true; byId('accessGate').hidden = false; }
+      window.addEventListener('message',event => {
+        if (window.parent === window || event.source !== window.parent || event.origin !== expectedOrigin) return;
+        const data = event.data;
+        if (!data || data.channel !== channel) return;
+        if (data.type === 'skill-assessment:revoked') { lock(); return; }
+        if (data.type !== 'skill-assessment:snapshot' || data.authorized !== true || !Array.isArray(data.players)) return;
+        authorized = true;
+        initialize();
+        const previous = state.activeId;
+        const first = byId('assessmentApp').hidden;
+        roster = data.players.filter(player => player && typeof player.id === 'string' && typeof player.name === 'string');
+        status = data.status || {};
+        if (legacyPending && roster.length) {
+          const migrated = migrateLegacy(legacyPending,roster);
+          for (const [id,card] of migrated) if (!state.scores.has(id)) state.scores.set(id,card);
+          legacyPending = null;
+          if (migrated.size) persist();
+        }
+        if (!activePlayer() && ['ready','cached'].includes(status.players)) state.activeId = roster[0]?.id || '';
+        byId('accessGate').hidden = true;
+        byId('assessmentApp').hidden = false;
+        render(first || previous !== state.activeId);
+      });
+      byId('playerList').addEventListener('click',event => {
+        const button = event.target.closest('[data-player-index]'); if (!authorized || !button) return;
+        const player = roster[Number(button.dataset.playerIndex)]; if (!player) return;
+        state.activeId = player.id; persist(); render(true);
+        if (matchMedia('(max-width:740px)').matches) byId('workspace').scrollIntoView({block:'start'});
+      });
+      document.querySelectorAll('[data-sport]').forEach(button => button.addEventListener('click',() => { if (!authorized) return; state.sport = button.dataset.sport; persist(); render(true); }));
+      document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click',() => {
+        if (!authorized) return;
+        const rubric = button.dataset.view === 'rubric';
+        document.querySelectorAll('[data-view]').forEach(item => item.setAttribute('aria-pressed',String(item === button)));
+        byId('skillList').hidden = rubric; byId('rubricView').hidden = !rubric;
+      }));
+      byId('skillList').addEventListener('change',event => {
+        const input = event.target.closest('input[type="radio"]'); if (!authorized || !activePlayer() || !input) return;
+        if (!state.scores.has(state.activeId)) state.scores.set(state.activeId,{futsal:{},soccer:{}});
+        state.scores.get(state.activeId)[state.sport][input.name.slice(6)] = Number(input.value);
+        persist(); render();
+      });
+      byId('skillList').addEventListener('click',event => {
+        const button = event.target.closest('[data-clear]'); if (!authorized || !activePlayer() || !button) return;
+        const skill = button.dataset.clear;
+        delete scorecard()[skill];
+        document.querySelectorAll(`input[name="score-${skill}"]`).forEach(input => { input.checked = false; });
+        persist(); render(); document.querySelector(`input[name="score-${skill}"]`).focus();
+      });
+      function closeClearDialog() {
+        pendingClear = null;
+        if (byId('clearAssessmentDialog').open) byId('clearAssessmentDialog').close();
+      }
+      byId('clearAssessment').addEventListener('click',() => {
+        const player = activePlayer();
+        if (!authorized || !player) return;
+        const completed = calculate(state.sport,scorecard()).completed;
+        if (!completed) return;
+        pendingClear = {id:player.id,sport:state.sport};
+        byId('clearAssessmentMessage').textContent = `${player.name} 선수의 ${sports[state.sport].label} 평가 점수 ${completed}개를 모두 지웁니다.`;
+        byId('clearAssessmentDialog').showModal();
+        byId('cancelClearAssessment').focus();
+      });
+      byId('cancelClearAssessment').addEventListener('click',closeClearDialog);
+      byId('clearAssessmentDialog').addEventListener('cancel',event => { event.preventDefault(); closeClearDialog(); });
+      byId('confirmClearAssessment').addEventListener('click',() => {
+        const target = pendingClear;
+        closeClearDialog();
+        if (!authorized || !target || !roster.some(player => player.id === target.id)) return;
+        const card = state.scores.get(target.id);
+        if (!card) return;
+        card[target.sport] = {};
+        persist(); render(true);
+        document.querySelector('[data-view][aria-pressed="true"]').focus({preventScroll:true});
+      });
+      byId('backButton').addEventListener('click',() => { if (authorized) window.parent.postMessage({type:'skill-assessment:close',channel},targetOrigin); });
+      byId('printButton').addEventListener('click',() => { if (authorized && activePlayer()) { renderResult(); window.print(); } });
+      document.addEventListener('keydown',event => { if (event.key === 'Escape' && authorized && !byId('clearAssessmentDialog').open) byId('backButton').click(); });
+      window.addEventListener('storage',event => {
+        if (!authorized || (event.key !== STORAGE_KEY && event.key !== null)) return;
+        storageBlocked = true;
+        byId('saveState').textContent = '다른 창에서 변경됨';
+        notice('다른 창에서 평가가 변경되어 자동 저장을 멈췄습니다. 평가표를 닫고 다시 열면 최신 내용을 불러옵니다.');
+        renderResult();
+      });
+      if (window.parent !== window) window.parent.postMessage({type:'skill-assessment:ready',channel},targetOrigin);
+    })();
+  </script>
+</body>
+</html>
