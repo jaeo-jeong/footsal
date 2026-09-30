@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#174e40">
-  <title>선수 실력 평가표 · 젓자FC</title>
+  <title>티어 평가표 · 젓자FC</title>
   <style>
     :root { color-scheme:light; --ink:#24352b; --muted:#69766b; --green:#174e40; --pale:#edf4ed; --line:#dde5dc; --paper:#f5f6f2; }
     * { box-sizing:border-box; }
@@ -80,7 +80,8 @@
     .rating-footer { display:flex; align-items:center; justify-content:space-between; min-height:25px; font-size:10px; color:var(--muted); }
     .clear-rating { min-height:25px; border:0; background:none; font-size:10px; color:var(--muted); text-decoration:underline; text-underline-offset:2px; padding:0 2px; }
     .skill-row details { margin-left:22px; margin-top:2px; }
-    summary { font-size:11px; color:var(--muted); cursor:pointer; width:fit-content; }
+    summary { font-size:11px; font-weight:650; color:#c62828; cursor:pointer; width:fit-content; }
+    summary:hover { text-decoration:underline; text-underline-offset:2px; }
     .anchors { display:grid; grid-template-columns:22px 1fr; gap:6px 8px; margin-top:11px; padding:12px; background:#f6f8f3; border-radius:7px; font-size:12px; color:#58665b; }
     .anchor-score { display:grid; place-items:center; height:22px; border:1px solid var(--line); background:white; border-radius:4px; font-size:10px; }
     .aside { position:sticky; top:18px; display:grid; gap:15px; }
@@ -164,9 +165,9 @@
   </style>
 </head>
 <body>
-  <section id="accessGate" class="access-gate panel"><h2>관리자 전용 평가표</h2><p>젓자FC 관리자 화면에서 ‘선수 실력 평가표’를 열어주세요.</p><a class="button" href="index.html" target="_top">젓자FC로 이동</a></section>
+  <section id="accessGate" class="access-gate panel"><h2>젓자FC에서 여는 평가표</h2><p>젓자FC에 관리자 또는 일반 사용자로 입장한 뒤 ‘티어 평가표’를 열어주세요.</p><a class="button" href="index.html" target="_top">젓자FC로 이동</a></section>
   <div id="assessmentApp" hidden>
-    <header class="topbar"><div class="shell topbar-inner"><h1><span>젓자FC</span>선수 실력 평가표</h1><div class="top-actions"><span id="saveState" class="save-state" role="status">이 브라우저에 자동 저장</span><button id="printButton" class="button" type="button">인쇄 / PDF</button><button id="backButton" class="button" type="button">닫기</button></div></div></header>
+    <header class="topbar"><div class="shell topbar-inner"><h1><span>젓자FC</span>티어 평가표</h1><div class="top-actions"><span id="saveState" class="save-state" role="status">이 브라우저에 자동 저장</span><button id="printButton" class="button" type="button">인쇄 / PDF</button><button id="backButton" class="button" type="button">닫기</button></div></div></header>
     <main class="shell">
       <div id="storageNotice" class="notice" role="status" hidden></div>
       <nav class="mode-bar" aria-label="평가 종목"><div class="sports"><button class="sport-tab" type="button" data-sport="futsal" aria-pressed="true">풋살<span>FUTSAL</span></button><button class="sport-tab" type="button" data-sport="soccer" aria-pressed="false">축구<span>FOOTBALL</span></button></div><p id="syncState" class="sync-state" role="status">선수 목록을 불러오는 중</p></nav>
@@ -452,7 +453,7 @@
       function renderPlayerList() {
         byId('playerCount').textContent = `${roster.length}명`;
         byId('emptyState').hidden = roster.length > 0;
-        byId('emptyState').textContent = status.players === 'loading' ? '선수 목록을 불러오는 중입니다.' : status.players === 'error' ? '선수 목록을 불러오지 못했습니다. 관리자 화면의 연결 상태를 확인해주세요.' : '등록된 선수가 없습니다.';
+        byId('emptyState').textContent = status.players === 'loading' ? '선수 목록을 불러오는 중입니다.' : status.players === 'error' ? '선수 목록을 불러오지 못했습니다. 젓자FC 화면의 연결 상태를 확인해주세요.' : '등록된 선수가 없습니다.';
         byId('playerList').innerHTML = roster.map((player,index) => {
           const result = calculate(state.sport,scorecard(player.id));
           const rating = current(player);
@@ -518,7 +519,7 @@
           byId('comparisonTitle').textContent = result.completed ? `${10-result.completed}개 항목이 남았습니다` : '10개 항목을 채점해주세요';
           byId('comparisonDetail').textContent = '모든 항목을 채점하면 현재 티어와 비교합니다.';
         }
-        byId('printSummary').textContent = `${player.name} · ${config.label} 실력 평가표\n현재 티어: ${rating?.tier || '확인 중'} (${sourceText()}) | 점수: ${result.total === null ? '미완료' : result.total.toFixed(1)+'/100'} | 권장 티어: ${result.tier || '판정 보류'} | ${result.tier ? comparison(rating?.tier || '',result) : `${result.completed}/10 채점`}\n계산: Σ(항목 점수 ÷ 5 × 비중) · 필드 플레이어 대상 동호회용 제안 기준\n티어 구간: ${tiers.map((tier,index) => `${tier.name} ${tier.min}${index ? '–<'+tiers[index-1].min : '–100'}`).join(' / ')} (<는 미만)`;
+        byId('printSummary').textContent = `${player.name} · ${config.label} 티어 평가표\n현재 티어: ${rating?.tier || '확인 중'} (${sourceText()}) | 점수: ${result.total === null ? '미완료' : result.total.toFixed(1)+'/100'} | 권장 티어: ${result.tier || '판정 보류'} | ${result.tier ? comparison(rating?.tier || '',result) : `${result.completed}/10 채점`}\n계산: Σ(항목 점수 ÷ 5 × 비중) · 필드 플레이어 대상 동호회용 제안 기준\n티어 구간: ${tiers.map((tier,index) => `${tier.name} ${tier.min}${index ? '–<'+tiers[index-1].min : '–100'}`).join(' / ')} (<는 미만)`;
       }
       function render(full = false) {
         renderPlayerList();

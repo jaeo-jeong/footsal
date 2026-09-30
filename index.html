@@ -3532,7 +3532,7 @@
                 축구 투표 이력 보기
             </button>
             <button id="skillAssessmentBtn" class="btn btn-info" onclick="SkillAssessmentHost.open()" style="background: #174e40; color: white; display: none;" disabled>
-                선수 실력 평가표
+                티어 평가표
             </button>
             <button id="gameCenterBtn" type="button" class="fa-entry" onclick="FootballGameCenter.open()" style="display: none;" disabled>🎮 게임 센터</button>
             <button id="resetMiniGameBtn" class="btn btn-secondary" onclick="resetMiniGameScores()" style="background: #e67e22; color: white; display: none;">
@@ -4220,6 +4220,7 @@
         // 권한 관리
         let isAdmin = false;
         let adminCode = '';
+        let hasEntered = false; // 관리자 또는 일반 사용자로 입장했는지
 
         // 티어 가중치 (높을수록 강함, 비선형 간격)
         const tierWeights = TeamBuilder.TIER_WEIGHTS;
@@ -4550,6 +4551,7 @@
 
             if (await verifyAdminCode(code)) {
                 isAdmin = true;
+                hasEntered = true;
                 adminCode = code;
                 localStorage.setItem(ADMIN_CODE_KEY, await hashCode(code));
                 localStorage.setItem('jeotjaFcAdminCodeRaw', code);
@@ -4564,6 +4566,7 @@
         // 일반 사용자로 입장
         async function enterAsGuest() {
             isAdmin = false;
+            hasEntered = true;
             adminCode = '';
             document.getElementById('adminModal').classList.remove('active');
             updateUIForPermission();
@@ -15566,16 +15569,16 @@
             closeMiniGame: () => FootballMiniGames.close(false)
         });
 
-        // The assessment shares this page's current administrator session and live roster.
+        // The assessment is open to both admin and guest entries and shares this page's live roster.
         // No password or role flag is placed in the assessment URL or local storage.
         window.SkillAssessmentHost = (() => {
             const dialog = document.createElement('dialog');
             dialog.id = 'skillAssessmentDialog';
-            dialog.setAttribute('aria-label', '선수 실력 평가표');
+            dialog.setAttribute('aria-label', '티어 평가표');
             dialog.style.cssText = 'padding:0;border:0;margin:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;background:#f5f6f2;';
             const frame = document.createElement('iframe');
             frame.id = 'skillAssessmentFrame';
-            frame.title = '관리자 선수 실력 평가표';
+            frame.title = '티어 평가표';
             frame.style.cssText = 'display:block;width:100%;height:100%;border:0;';
             dialog.append(frame);
             document.body.append(dialog);
@@ -15593,7 +15596,7 @@
                 lastSnapshot = '';
                 frame.removeAttribute('src');
                 document.body.style.overflow = previousOverflow;
-                if (isAdmin) document.getElementById('skillAssessmentBtn').focus();
+                if (hasEntered) document.getElementById('skillAssessmentBtn').focus();
             }
             function close() {
                 if (dialog.open) dialog.close();
@@ -15612,7 +15615,7 @@
             }
             function refresh(force = false) {
                 if (!dialog.open || !channel) return;
-                if (!isAdmin) { close(); return; }
+                if (!hasEntered) { close(); return; }
                 const data = snapshot();
                 const serialized = JSON.stringify(data);
                 if (!force && serialized === lastSnapshot) return;
@@ -15621,13 +15624,13 @@
             }
             function syncPermission() {
                 const button = document.getElementById('skillAssessmentBtn');
-                button.style.display = isAdmin ? 'inline-block' : 'none';
-                button.disabled = !isAdmin;
-                if (!isAdmin) close();
+                button.style.display = hasEntered ? 'inline-block' : 'none';
+                button.disabled = !hasEntered;
+                if (!hasEntered) close();
             }
             window.addEventListener('message', event => {
                 if (event.source !== frame.contentWindow || (location.protocol !== 'file:' && event.origin !== location.origin)) return;
-                if (!dialog.open || !isAdmin) return;
+                if (!dialog.open || !hasEntered) return;
                 const message = event.data;
                 if (!message || typeof message !== 'object') return;
                 if (message.type === 'skill-assessment:ready' && typeof message.channel === 'string' && message.channel.length <= 100) {
@@ -15639,14 +15642,14 @@
             dialog.addEventListener('close', () => { if (!dialog.open) cleanup(); });
             return {
                 open() {
-                    if (!isAdmin || dialog.open) return;
+                    if (!hasEntered || dialog.open) return;
                     channel = null;
                     lastSnapshot = '';
                     previousOverflow = document.body.style.overflow;
                     sessionOpen = true;
                     document.body.style.overflow = 'hidden';
                     dialog.showModal();
-                    frame.src = 'skill-assessment.html?v=20260930-2';
+                    frame.src = 'skill-assessment.html?v=20260930-5';
                 },
                 close, refresh, syncPermission,
                 setStatus(key,value) { if (Object.hasOwn(status,key)) status[key] = value; }
